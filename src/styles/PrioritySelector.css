@@ -1,0 +1,41 @@
+.priority-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.priority-btn {
+  padding: 6px 14px;
+  border: 2px solid var(--border);
+  border-radius: 999px;
+  background: var(--card-bg);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: all var(--transition);
+}
+
+.priority-btn:hover {
+  border-color: var(--primary-light);
+  color: var(--primary);
+}
+
+.priority-btn.active {
+  border-color: var(--primary);
+  background: var(--active-bg);
+  color: var(--primary);
+}
+
+.priority-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.priority-btn[data-priority="high"].active {
+  border-color: var(--danger);
+  background: #FEF2F2;
+  color: var(--danger);
+}

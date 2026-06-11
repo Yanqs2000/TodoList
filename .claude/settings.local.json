@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/yanqs/.agents/skills/ui-ux-pro-max/scripts/**)",
+      "Bash(python3 /Users/yanqs/.claude/skills/ui-ux-pro-max/scripts/search.py \"task management to-do list productivity clean minimal\" --design-system -p \"Todo List\")",
+      "Bash(open *)"
+    ]
+  }
+}

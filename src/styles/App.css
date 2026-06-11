@@ -1,0 +1,68 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --primary: #0D9488;
+  --primary-light: #14B8A6;
+  --cta: #F97316;
+  --bg: #F0FDFA;
+  --card-bg: #ffffff;
+  --text: #134E4A;
+  --text-muted: #475569;
+  --text-light: #94A3B8;
+  --border: #E2E8F0;
+  --danger: #EF4444;
+  --danger-hover: #DC2626;
+  --active-bg: #CCFBF1;
+  --completed-opacity: 0.5;
+  --radius: 12px;
+  --transition: 200ms ease;
+}
+
+[data-theme="dark"] {
+  --primary: #14B8A6;
+  --primary-light: #2DD4BF;
+  --cta: #FB923C;
+  --bg: #0F172A;
+  --card-bg: #1E293B;
+  --text: #E2E8F0;
+  --text-muted: #94A3B8;
+  --text-light: #64748B;
+  --border: #334155;
+  --danger: #F87171;
+  --danger-hover: #EF4444;
+  --active-bg: #134E4A;
+  --completed-opacity: 0.4;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+  }
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.6;
+}
+
+.container {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 48px 20px 32px;
+}
+
+@media (max-width: 480px) {
+  .container {
+    padding: 32px 16px 24px;
+  }
+}

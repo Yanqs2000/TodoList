@@ -1,0 +1,154 @@
+.task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideOut {
+  to {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+}
+
+.task-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: all var(--transition);
+  animation: slideIn 250ms ease-out;
+}
+
+.task-item:hover {
+  border-color: var(--primary-light);
+  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.08);
+}
+
+.task-item.completed .task-text {
+  text-decoration: line-through;
+  color: var(--text-light);
+  opacity: var(--completed-opacity);
+}
+
+.task-item.removing {
+  animation: slideOut 200ms ease-in forwards;
+}
+
+.checkbox {
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--border);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all var(--transition);
+}
+
+.checkbox:hover {
+  border-color: var(--primary);
+}
+
+.checkbox:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.task-item.completed .checkbox {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.checkbox svg {
+  width: 14px;
+  height: 14px;
+  stroke: #fff;
+  stroke-width: 3;
+  fill: none;
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+
+.task-item.completed .checkbox svg {
+  opacity: 1;
+}
+
+.task-text {
+  flex: 1;
+  font-size: 0.9375rem;
+  color: var(--text);
+  word-break: break-word;
+  transition: all var(--transition);
+}
+
+.priority-tag {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.priority-tag.low {
+  background: #F0FDF4;
+  color: #16A34A;
+}
+
+.priority-tag.medium {
+  background: #FFF7ED;
+  color: #EA580C;
+}
+
+.priority-tag.high {
+  background: #FEF2F2;
+  color: var(--danger);
+}
+
+.btn-delete {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-light);
+  flex-shrink: 0;
+  transition: all var(--transition);
+}
+
+.btn-delete:hover {
+  background: #FEF2F2;
+  color: var(--danger);
+}
+
+.btn-delete:focus-visible {
+  outline: 2px solid var(--danger);
+  outline-offset: 2px;
+}
+
+.btn-delete svg {
+  width: 18px;
+  height: 18px;
+}

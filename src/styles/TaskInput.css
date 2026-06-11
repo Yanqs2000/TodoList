@@ -1,0 +1,63 @@
+.input-area {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.input-area input {
+  flex: 1;
+  padding: 12px 16px;
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.9375rem;
+  font-family: inherit;
+  background: var(--card-bg);
+  color: var(--text);
+  outline: none;
+  transition: border-color var(--transition);
+}
+
+.input-area input:focus {
+  border-color: var(--primary);
+}
+
+.input-area input::placeholder {
+  color: var(--text-light);
+}
+
+.btn-add {
+  padding: 12px 20px;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background var(--transition), opacity var(--transition);
+  white-space: nowrap;
+}
+
+.btn-add:hover {
+  background: var(--primary-light);
+}
+
+.btn-add:active {
+  opacity: 0.85;
+}
+
+.btn-add:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+@media (max-width: 480px) {
+  .input-area {
+    flex-direction: column;
+  }
+
+  .btn-add {
+    padding: 12px;
+  }
+}
