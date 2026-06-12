@@ -1,8 +1,16 @@
 import { useState, useCallback, useRef } from 'react';
 import type { Todo, Priority } from '../types';
 import { escapeHtml } from '../utils/escapeHtml';
+import type { TimeField } from '../types';
 import '../styles/TaskItem.css';
 import '../styles/DragDrop.css';
+
+const formatTimeTag = (time: TimeField): string => {
+  if (time.end) {
+    return `${time.start}-${time.end}`;
+  }
+  return time.start;
+};
 
 interface TaskItemProps {
   task: Todo;
@@ -91,6 +99,11 @@ function TaskItem({
       <span className={`priority-tag ${task.priority}`}>
         {priorityLabels[task.priority]}
       </span>
+      {task.time && (
+        <span className="time-tag">
+          {formatTimeTag(task.time)}
+        </span>
+      )}
       <button
         className="btn-delete"
         aria-label="删除任务"
