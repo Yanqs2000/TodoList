@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import '../styles/TaskInput.css';
 
 interface TaskInputProps {
@@ -8,23 +8,32 @@ interface TaskInputProps {
 function TaskInput({ addTask }: TaskInputProps) {
   const [value, setValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const isComposingRef = useRef(false);
 
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
 
-  const handleSubmit = () => {
+  const handleSubmit = useCallback(() => {
     if (value.trim()) {
       addTask(value);
       setValue('');
       inputRef.current?.focus();
     }
-  };
+  }, [value, addTask]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && !isComposingRef.current) {
       handleSubmit();
     }
+  };
+
+  const handleCompositionStart = () => {
+    isComposingRef.current = true;
+  };
+
+  const handleCompositionEnd = () => {
+    isComposingRef.current = false;
   };
 
   return (
@@ -35,6 +44,8 @@ function TaskInput({ addTask }: TaskInputProps) {
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={handleKeyDown}
+        onCompositionStart={handleCompositionStart}
+        onCompositionEnd={handleCompositionEnd}
         placeholder="添加新任务..."
         autoComplete="off"
       />
