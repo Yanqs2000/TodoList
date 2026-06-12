@@ -1,0 +1,127 @@
+.time-picker {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  min-width: 240px;
+  animation: fadeIn 150ms ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.time-picker-header {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+}
+
+.time-mode-btn {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  background: transparent;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  font-family: inherit;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.time-mode-btn:hover {
+  color: var(--text);
+  background: var(--active-bg);
+}
+
+.time-mode-btn.active {
+  color: var(--primary);
+  background: var(--active-bg);
+}
+
+.time-picker-body {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.time-input-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.time-input-group label {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  min-width: 32px;
+}
+
+.time-input-group input[type="time"] {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-family: inherit;
+  background: var(--bg);
+  color: var(--text);
+  outline: none;
+  transition: border-color var(--transition);
+}
+
+.time-input-group input[type="time"]:focus {
+  border-color: var(--primary);
+}
+
+.time-picker-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.time-btn-clear,
+.time-btn-confirm {
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.time-btn-clear {
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text-muted);
+}
+
+.time-btn-clear:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.time-btn-confirm {
+  border: none;
+  background: var(--primary);
+  color: #fff;
+}
+
+.time-btn-confirm:hover {
+  background: var(--primary-light);
+}
+
+.time-btn-confirm:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
