@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Todo, Priority, FilterType } from '../types';
+import { Todo, TimeField, Priority, FilterType } from '../types';
 
 const STORAGE_KEY = 'todo-tasks';
 
@@ -20,7 +20,7 @@ export function useTodos() {
   const [filter, setFilter] = useState<FilterType>('all');
   const [priority, setPriority] = useState<Priority>('low');
 
-  const addTask = useCallback((text: string) => {
+  const addTask = useCallback((text: string, time?: TimeField) => {
     const trimmed = text.trim();
     if (!trimmed) return;
 
@@ -30,6 +30,7 @@ export function useTodos() {
       completed: false,
       priority,
       createdAt: Date.now(),
+      time,
     };
 
     setTasks(prev => {
@@ -88,6 +89,11 @@ export function useTodos() {
     if (filter === 'active') return !t.completed;
     if (filter === 'completed') return t.completed;
     return true;
+  }).sort((a, b) => {
+    if (a.time && b.time) return a.time.start.localeCompare(b.time.start);
+    if (a.time && !b.time) return -1;
+    if (!a.time && b.time) return 1;
+    return 0;
   });
 
   return {
