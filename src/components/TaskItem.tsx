@@ -1,7 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
-import type { Todo, Priority } from '../types';
+import type { Todo, Priority, TimeField } from '../types';
 import { escapeHtml } from '../utils/escapeHtml';
-import type { TimeField } from '../types';
 import '../styles/TaskItem.css';
 import '../styles/DragDrop.css';
 
