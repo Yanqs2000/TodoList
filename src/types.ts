@@ -1,6 +1,6 @@
 export type Priority = 'low' | 'medium' | 'high';
 export type FilterType = 'all' | 'active' | 'completed';
-export type Category = 'work' | 'study' | 'life' | 'other' | string;
+export type Category = 'work' | 'study' | 'life' | 'other';
 
 export interface TimeField {
   start: string;  // ISO datetime: "2026-06-15T14:30"
