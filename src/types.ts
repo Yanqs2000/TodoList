@@ -2,8 +2,8 @@ export type Priority = 'low' | 'medium' | 'high';
 export type FilterType = 'all' | 'active' | 'completed';
 
 export interface TimeField {
-  start: string;  // "14:30"
-  end?: string;   // "15:30" (optional, for time range)
+  start: string;  // ISO datetime: "2026-06-15T14:30"
+  end?: string;   // ISO datetime for range end: "2026-06-15T15:30"
 }
 
 export interface Todo {
