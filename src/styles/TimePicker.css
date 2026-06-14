@@ -71,6 +71,8 @@
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 8px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .calendar-header {
@@ -131,7 +133,6 @@
 .calendar-days {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  grid-template-rows: repeat(6, 1fr);
   gap: 2px;
 }
 
@@ -148,6 +149,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  box-sizing: border-box;
 }
 
 .calendar-day:hover:not(.empty):not(.selected) {
@@ -155,7 +157,7 @@
 }
 
 .calendar-day.empty {
-  cursor: default;
+  visibility: hidden;
 }
 
 .calendar-day.today {
