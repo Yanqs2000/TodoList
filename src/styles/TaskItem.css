@@ -100,27 +100,31 @@
 
 .priority-tag {
   font-size: 0.6875rem;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  padding: 2px 8px;
+  padding: 3px 10px;
   border-radius: 999px;
   flex-shrink: 0;
+  border: 1px solid transparent;
 }
 
 .priority-tag.low {
-  background: #F0FDF4;
-  color: #16A34A;
+  background: #DCFCE7;
+  color: #15803D;
+  border-color: #86EFAC;
 }
 
 .priority-tag.medium {
-  background: #FFF7ED;
-  color: #EA580C;
+  background: #FEF3C7;
+  color: #D97706;
+  border-color: #FCD34D;
 }
 
 .priority-tag.high {
-  background: #FEF2F2;
-  color: var(--danger);
+  background: #FEE2E2;
+  color: #DC2626;
+  border-color: #FCA5A5;
 }
 
 .btn-delete {
