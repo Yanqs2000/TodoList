@@ -18,6 +18,13 @@ function Footer({ stats, onClearCompleted, achievements }: FooterProps) {
   const todayCompleted = achievements?.todayCompleted ?? 0;
   const streakDays = achievements?.streakDays ?? 0;
 
+  const handleClearCompleted = () => {
+    if (stats.completed === 0) return;
+    if (window.confirm(`确定要清除 ${stats.completed} 个已完成的任务吗？`)) {
+      onClearCompleted();
+    }
+  };
+
   return (
     <div className="footer">
       <div className="footer-stats">
@@ -41,7 +48,7 @@ function Footer({ stats, onClearCompleted, achievements }: FooterProps) {
         <button
           className="btn-clear"
           disabled={stats.completed === 0}
-          onClick={onClearCompleted}
+          onClick={handleClearCompleted}
         >
           清除已完成
         </button>
