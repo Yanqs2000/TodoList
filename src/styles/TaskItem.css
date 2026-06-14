@@ -30,13 +30,15 @@
   background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 4px 12px rgba(0, 0, 0, 0.04);
   transition: all var(--transition);
   animation: slideIn 250ms ease-out;
 }
 
 .task-item:hover {
   border-color: var(--primary-light);
-  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.08);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08), 0 8px 24px rgba(13, 148, 136, 0.12);
+  transform: translateY(-1px);
 }
 
 .task-item.completed .task-text {
