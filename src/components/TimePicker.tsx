@@ -93,10 +93,6 @@ function TimePicker({ time, onTimeChange, onClose }: TimePickerProps) {
     const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
     const monthNames = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
 
-    const days: (number | null)[] = [];
-    for (let i = 0; i < firstDay; i++) days.push(null);
-    for (let i = 1; i <= daysInMonth; i++) days.push(i);
-
     return (
       <div className="calendar">
         <div className="calendar-header">
@@ -116,12 +112,12 @@ function TimePicker({ time, onTimeChange, onClose }: TimePickerProps) {
           {weekDays.map(d => <span key={d}>{d}</span>)}
         </div>
         <div className="calendar-days">
-          {days.map((day, i) => (
+          {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => (
             <button
-              key={i}
-              className={`calendar-day${day === null ? ' empty' : ''}${isToday(day!) ? ' today' : ''}${isSelected(day!) ? ' selected' : ''}`}
-              onClick={() => day && onDayClick(day)}
-              disabled={day === null}
+              key={day}
+              className={`calendar-day${isToday(day) ? ' today' : ''}${isSelected(day) ? ' selected' : ''}`}
+              style={{ gridColumn: (firstDay + day - 1) % 7 + 1 }}
+              onClick={() => onDayClick(day)}
             >
               {day}
             </button>

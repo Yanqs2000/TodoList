@@ -152,12 +152,8 @@
   box-sizing: border-box;
 }
 
-.calendar-day:hover:not(.empty):not(.selected) {
+.calendar-day:hover:not(.selected) {
   background: var(--active-bg);
-}
-
-.calendar-day.empty {
-  visibility: hidden;
 }
 
 .calendar-day.today {
