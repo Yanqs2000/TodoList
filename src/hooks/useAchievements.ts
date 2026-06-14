@@ -30,7 +30,6 @@ export function useAchievements(onUnlockSound?: () => void) {
     const checks: { id: string; condition: boolean }[] = [
       { id: 'first-task', condition: completedCount >= 1 },
       { id: 'speed-demon', condition: completedCount >= 10 },
-      { id: 'streak-7', condition: false },
     ];
 
     for (const check of checks) {
