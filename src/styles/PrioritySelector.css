@@ -11,7 +11,7 @@
   border-radius: 999px;
   background: var(--card-bg);
   font-size: 0.8125rem;
-  font-weight: 500;
+  font-weight: 600;
   font-family: inherit;
   cursor: pointer;
   color: var(--text-muted);
@@ -34,8 +34,20 @@
   outline-offset: 2px;
 }
 
+.priority-btn[data-priority="low"].active {
+  border-color: #15803D;
+  background: #DCFCE7;
+  color: #15803D;
+}
+
+.priority-btn[data-priority="medium"].active {
+  border-color: #D97706;
+  background: #FEF3C7;
+  color: #D97706;
+}
+
 .priority-btn[data-priority="high"].active {
-  border-color: var(--danger);
-  background: #FEF2F2;
-  color: var(--danger);
+  border-color: #DC2626;
+  background: #FEE2E2;
+  color: #DC2626;
 }
