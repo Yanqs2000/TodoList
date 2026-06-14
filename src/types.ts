@@ -1,5 +1,6 @@
 export type Priority = 'low' | 'medium' | 'high';
 export type FilterType = 'all' | 'active' | 'completed';
+export type Category = 'work' | 'study' | 'life' | 'other' | string;
 
 export interface TimeField {
   start: string;  // ISO datetime: "2026-06-15T14:30"
@@ -13,6 +14,8 @@ export interface Todo {
   priority: Priority;
   createdAt: number;
   time?: TimeField;
+  category?: Category;
+  notes?: string;
 }
 
 export interface AchievementDef {
