@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useTodos } from './hooks/useTodos';
 import { useTheme } from './hooks/useTheme';
 import { useSound } from './hooks/useSound';
 import { useAchievements } from './hooks/useAchievements';
 import ConfettiCanvas, { useConfetti } from './components/ConfettiCanvas';
-import Header from './components/Header';
+import Header, { SearchBox } from './components/Header';
 import TaskInput from './components/TaskInput';
 import PrioritySelector from './components/PrioritySelector';
 import FilterTabs from './components/FilterTabs';
@@ -20,9 +20,34 @@ function App() {
   const achievements = useAchievements(sound.playAchievement);
   const confetti = useConfetti();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImport = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      try {
+        await todoState.importTasks(file);
+        alert('导入成功！');
+      } catch {
+        alert('导入失败：文件格式错误');
+      }
+    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
   return (
     <div className="container">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json"
+        style={{ display: 'none' }}
+        onChange={handleFileChange}
+      />
       <AchievementDrawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
@@ -44,7 +69,10 @@ function App() {
         onOpenAchievements={() => setDrawerOpen(true)}
         muted={sound.muted}
         onToggleMuted={sound.toggleMuted}
+        onExport={todoState.exportTasks}
+        onImport={handleImport}
       />
+      <SearchBox value={todoState.searchQuery} onChange={todoState.setSearchQuery} />
       <TaskInput addTask={todoState.addTask} />
       <PrioritySelector
         priority={todoState.priority}
@@ -74,6 +102,7 @@ function App() {
           sound.playDelete();
           todoState.removeTask(id);
         }}
+        onEdit={todoState.editTask}
         onReorder={todoState.reorderTasks}
       />
       <Footer

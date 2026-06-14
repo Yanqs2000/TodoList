@@ -1,6 +1,7 @@
 import type { Theme } from '../hooks/useTheme';
 import '../styles/Header.css';
 import '../styles/ThemeToggle.css';
+import '../styles/Search.css';
 
 interface HeaderProps {
   theme: Theme;
@@ -8,9 +9,39 @@ interface HeaderProps {
   onOpenAchievements: () => void;
   muted: boolean;
   onToggleMuted: () => void;
+  onExport: () => void;
+  onImport: () => void;
 }
 
-function Header({ theme, onToggleTheme, onOpenAchievements, muted, onToggleMuted }: HeaderProps) {
+interface SearchBoxProps {
+  value: string;
+  onChange: (value: string) => void;
+}
+
+export function SearchBox({ value, onChange }: SearchBoxProps) {
+  return (
+    <div className="search-box">
+      <svg className="search-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+      </svg>
+      <input
+        type="text"
+        placeholder="搜索任务..."
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      {value && (
+        <button className="search-clear" onClick={() => onChange('')} aria-label="清除搜索">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      )}
+    </div>
+  );
+}
+
+function Header({ theme, onToggleTheme, onOpenAchievements, muted, onToggleMuted, onExport, onImport }: HeaderProps) {
   return (
     <div className="header">
       <div className="header-actions">
@@ -38,6 +69,16 @@ function Header({ theme, onToggleTheme, onOpenAchievements, muted, onToggleMuted
         >
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 18.75h-9m9 0a3 3 0 0 1 3 3h-15a3 3 0 0 1 3-3m9 0v-4.5A3.375 3.375 0 0 0 19.875 10.875 3.375 3.375 0 0 0 16.5 7.5h0a3.375 3.375 0 0 0-3.375 3.375v0A3.375 3.375 0 0 1 9.75 7.5h0a3.375 3.375 0 0 0-3.375 3.375 3.375 3.375 0 0 0-3.375 3.375V18.75m9 0h-9" />
+          </svg>
+        </button>
+        <button className="icon-btn" onClick={onExport} aria-label="导出" title="导出任务">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+          </svg>
+        </button>
+        <button className="icon-btn" onClick={onImport} aria-label="导入" title="导入任务">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 7.5m0 0L7.5 12m4.5-4.5V21" />
           </svg>
         </button>
         <button
