@@ -1,15 +1,23 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import type { TimeField } from '../types';
+import type { TimeField, Category } from '../types';
 import TimePicker from './TimePicker';
 import '../styles/TaskInput.css';
 
+const CATEGORY_LABELS: Record<Category, string> = {
+  work: '工作',
+  study: '学习',
+  life: '生活',
+  other: '其他',
+};
+
 interface TaskInputProps {
-  addTask: (text: string, time?: TimeField) => void;
+  addTask: (text: string, time?: TimeField, category?: Category) => void;
 }
 
 function TaskInput({ addTask }: TaskInputProps) {
   const [value, setValue] = useState('');
   const [time, setTime] = useState<TimeField | undefined>();
+  const [category, setCategory] = useState<Category>('other');
   const [showTimePicker, setShowTimePicker] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const isComposingRef = useRef(false);
@@ -20,12 +28,12 @@ function TaskInput({ addTask }: TaskInputProps) {
 
   const handleSubmit = useCallback(() => {
     if (value.trim()) {
-      addTask(value, time);
+      addTask(value, time, category);
       setValue('');
       setTime(undefined);
       inputRef.current?.focus();
     }
-  }, [value, time, addTask]);
+  }, [value, time, category, addTask]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !isComposingRef.current) {
@@ -97,6 +105,17 @@ function TaskInput({ addTask }: TaskInputProps) {
         <button className="btn-add" onClick={handleSubmit}>
           添加
         </button>
+      </div>
+      <div className="category-row">
+        {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
+          <button
+            key={key}
+            className={`category-btn${category === key ? ' active' : ''}`}
+            onClick={() => setCategory(key as Category)}
+          >
+            {label}
+          </button>
+        ))}
       </div>
     </div>
   );

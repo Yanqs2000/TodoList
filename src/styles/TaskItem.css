@@ -25,6 +25,7 @@
 .task-item {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
   padding: 14px 16px;
   background: var(--card-bg);
@@ -129,6 +130,72 @@
   border-color: #FCA5A5;
 }
 
+.category-tag {
+  font-size: 0.625rem;
+  font-weight: 500;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--border);
+  color: var(--text-muted);
+}
+
+.category-work {
+  background: #DBEAFE;
+  color: #2563EB;
+}
+
+.category-study {
+  background: #FEF3C7;
+  color: #D97706;
+}
+
+.category-life {
+  background: #D1FAE5;
+  color: #059669;
+}
+
+.category-other {
+  background: #E2E8F0;
+  color: #64748B;
+}
+
+.edit-input {
+  flex: 1;
+  padding: 4px 8px;
+  border: 2px solid var(--primary);
+  border-radius: 6px;
+  font-size: 0.9375rem;
+  font-family: inherit;
+  background: var(--card-bg);
+  color: var(--text);
+  outline: none;
+}
+
+.btn-edit {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-light);
+  flex-shrink: 0;
+  transition: all var(--transition);
+}
+
+.btn-edit:hover {
+  background: var(--active-bg);
+  color: var(--primary);
+}
+
+.btn-edit svg {
+  width: 16px;
+  height: 16px;
+}
+
 .btn-delete {
   width: 32px;
   height: 32px;
@@ -167,4 +234,55 @@
   background: var(--active-bg);
   color: var(--primary);
   white-space: nowrap;
+}
+
+.task-notes {
+  width: 100%;
+  padding: 8px 12px;
+  margin-top: 8px;
+  background: var(--bg);
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.btn-expand {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-light);
+  transition: all var(--transition);
+}
+
+.btn-expand:hover {
+  background: var(--active-bg);
+  color: var(--primary);
+}
+
+.btn-expand.expanded {
+  transform: rotate(180deg);
+}
+
+.btn-expand svg {
+  width: 14px;
+  height: 14px;
+}
+
+.notes-indicator {
+  display: flex;
+  align-items: center;
+  color: var(--text-light);
+}
+
+.notes-indicator svg {
+  width: 14px;
+  height: 14px;
 }

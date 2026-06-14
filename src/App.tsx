@@ -81,6 +81,10 @@ function App() {
       <FilterTabs
         filter={todoState.filter}
         setFilter={todoState.setFilter}
+        categoryFilter={todoState.categoryFilter}
+        setCategoryFilter={todoState.setCategoryFilter}
+        categories={todoState.categories}
+        categoryLabels={todoState.categoryLabels}
       />
       <TaskList
         tasks={todoState.tasks}
