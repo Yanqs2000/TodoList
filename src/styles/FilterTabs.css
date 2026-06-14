@@ -1,11 +1,11 @@
 .filter-area {
-  margin-bottom: 20px;
+  margin-bottom: 12px;
 }
 
 .filters {
   display: flex;
   gap: 4px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   background: var(--card-bg);
   border-radius: var(--radius);
   padding: 4px;
