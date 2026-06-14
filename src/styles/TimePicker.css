@@ -113,7 +113,8 @@
 .calendar-weekdays {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  margin-bottom: 4px;
+  gap: 2px;
+  margin-bottom: 2px;
 }
 
 .calendar-weekdays span {
@@ -121,7 +122,10 @@
   font-size: 0.6875rem;
   font-weight: 500;
   color: var(--text-light);
-  padding: 4px 0;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .calendar-days {
