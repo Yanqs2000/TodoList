@@ -18,14 +18,17 @@ export function useSound() {
   const [muted, setMutedState] = useState(getInitialMuted);
   const ctxRef = useRef<AudioContext | null>(null);
 
-  const getCtx = useCallback(() => {
+  const getCtx = useCallback(async () => {
     if (!ctxRef.current) ctxRef.current = createAudioContext();
+    if (ctxRef.current?.state === 'suspended') {
+      await ctxRef.current.resume();
+    }
     return ctxRef.current;
   }, []);
 
-  const playTone = useCallback((frequency: number, duration: number, type: OscillatorType = 'sine', volume = 0.15) => {
+  const playTone = useCallback(async (frequency: number, duration: number, type: OscillatorType = 'sine', volume = 0.15) => {
     if (muted) return;
-    const ctx = getCtx();
+    const ctx = await getCtx();
     if (!ctx) return;
 
     const osc = ctx.createOscillator();
