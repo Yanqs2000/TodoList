@@ -46,10 +46,16 @@ function TaskInput({ addTask }: TaskInputProps) {
   };
 
   const formatTimeDisplay = (t: TimeField): string => {
+    const formatSingle = (iso: string): string => {
+      if (!iso) return '';
+      const [datePart, timePart] = iso.split('T');
+      const [, month, day] = datePart.split('-');
+      return `${month}/${day} ${timePart}`;
+    };
     if (t.end) {
-      return `${t.start}-${t.end}`;
+      return `${formatSingle(t.start)} - ${formatSingle(t.end)}`;
     }
-    return t.start;
+    return formatSingle(t.start);
   };
 
   return (

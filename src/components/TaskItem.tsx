@@ -5,10 +5,16 @@ import '../styles/TaskItem.css';
 import '../styles/DragDrop.css';
 
 const formatTimeTag = (time: TimeField): string => {
+  const formatSingle = (iso: string): string => {
+    if (!iso) return '';
+    const [datePart, timePart] = iso.split('T');
+    const [, month, day] = datePart.split('-');
+    return `${month}/${day} ${timePart}`;
+  };
   if (time.end) {
-    return `${time.start}-${time.end}`;
+    return `${formatSingle(time.start)} - ${formatSingle(time.end)}`;
   }
-  return time.start;
+  return formatSingle(time.start);
 };
 
 interface TaskItemProps {
