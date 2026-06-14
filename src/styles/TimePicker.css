@@ -184,6 +184,69 @@
   border-color: var(--primary);
 }
 
+.time-scrollers {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  justify-content: center;
+}
+
+.time-scroller {
+  width: 60px;
+  height: 100px;
+  overflow-y: auto;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  scroll-behavior: smooth;
+}
+
+.time-scroller::-webkit-scrollbar {
+  width: 4px;
+}
+
+.time-scroller::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 2px;
+}
+
+.time-scroller::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.time-scroller-item {
+  width: 100%;
+  height: 32px;
+  border: none;
+  background: transparent;
+  font-size: 0.875rem;
+  font-family: inherit;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.time-scroller-item:hover {
+  background: var(--active-bg);
+  color: var(--primary);
+}
+
+.time-scroller-item.selected {
+  background: var(--primary);
+  color: #fff;
+  font-weight: 600;
+}
+
+.time-separator {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
 .time-picker-footer {
   display: flex;
   justify-content: flex-end;

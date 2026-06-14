@@ -29,6 +29,35 @@ function parseDateTime(iso: string): { year: number; month: number; day: number;
   return { year, month: month - 1, day, time: timePart || '09:00' };
 }
 
+const hours = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
+const minutes = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
+
+function TimeScroller({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: string[] }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const itemHeight = 32;
+
+  useEffect(() => {
+    if (ref.current) {
+      const idx = options.indexOf(value);
+      ref.current.scrollTop = idx * itemHeight;
+    }
+  }, [value, options, itemHeight]);
+
+  return (
+    <div className="time-scroller" ref={ref}>
+      {options.map(opt => (
+        <button
+          key={opt}
+          className={`time-scroller-item${opt === value ? ' selected' : ''}`}
+          onClick={() => onChange(opt)}
+        >
+          {opt}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function TimePicker({ time, onTimeChange, onClose }: TimePickerProps) {
   const [mode, setMode] = useState<'point' | 'range'>(time?.end ? 'range' : 'point');
   const startParsed = parseDateTime(time?.start || '');
@@ -36,8 +65,10 @@ function TimePicker({ time, onTimeChange, onClose }: TimePickerProps) {
 
   const [startDate, setStartDate] = useState(startParsed);
   const [endDate, setEndDate] = useState(endParsed);
-  const [startTime, setStartTime] = useState(startParsed.time);
-  const [endTime, setEndTime] = useState(endParsed.time);
+  const [startHour, setStartHour] = useState(startParsed.time.split(':')[0] || '09');
+  const [startMinute, setStartMinute] = useState(startParsed.time.split(':')[1] || '00');
+  const [endHour, setEndHour] = useState(endParsed.time.split(':')[0] || '18');
+  const [endMinute, setEndMinute] = useState(endParsed.time.split(':')[1] || '00');
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -69,6 +100,8 @@ function TimePicker({ time, onTimeChange, onClose }: TimePickerProps) {
   };
 
   const handleConfirm = () => {
+    const startTime = `${startHour}:${startMinute}`;
+    const endTime = `${endHour}:${endMinute}`;
     const start = formatDate(startDate.year, startDate.month, startDate.day, startTime);
     const end = mode === 'range'
       ? formatDate(endDate.year, endDate.month, endDate.day, endTime)
@@ -127,6 +160,14 @@ function TimePicker({ time, onTimeChange, onClose }: TimePickerProps) {
     );
   };
 
+  const renderTimeScroller = (hour: string, minute: string, setHour: (h: string) => void, setMinute: (m: string) => void) => (
+    <div className="time-scrollers">
+      <TimeScroller value={hour} onChange={setHour} options={hours} />
+      <span className="time-separator">:</span>
+      <TimeScroller value={minute} onChange={setMinute} options={minutes} />
+    </div>
+  );
+
   return (
     <div className="time-picker" ref={ref}>
       <div className="time-picker-header">
@@ -148,24 +189,14 @@ function TimePicker({ time, onTimeChange, onClose }: TimePickerProps) {
         <div className="time-section">
           <label className="time-section-label">开始时间</label>
           {renderCalendar(startDate, (day) => handleDateSelect(day, false), (delta) => handleMonthChange(delta, false))}
-          <input
-            type="time"
-            className="time-input"
-            value={startTime}
-            onChange={(e) => setStartTime(e.target.value)}
-          />
+          {renderTimeScroller(startHour, startMinute, setStartHour, setStartMinute)}
         </div>
 
         {mode === 'range' && (
           <div className="time-section">
             <label className="time-section-label">结束时间</label>
             {renderCalendar(endDate, (day) => handleDateSelect(day, true), (delta) => handleMonthChange(delta, true))}
-            <input
-              type="time"
-              className="time-input"
-              value={endTime}
-              onChange={(e) => setEndTime(e.target.value)}
-            />
+            {renderTimeScroller(endHour, endMinute, setEndHour, setEndMinute)}
           </div>
         )}
       </div>
