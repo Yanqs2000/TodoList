@@ -127,11 +127,12 @@
 .calendar-days {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
+  grid-template-rows: repeat(6, 1fr);
   gap: 2px;
 }
 
 .calendar-day {
-  aspect-ratio: 1;
+  height: 32px;
   border: none;
   border-radius: 6px;
   background: transparent;
