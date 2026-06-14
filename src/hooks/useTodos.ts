@@ -1,15 +1,8 @@
 import { useState, useCallback } from 'react';
 import { Todo, TimeField, Priority, FilterType, Category } from '../types';
+import { CATEGORIES, CATEGORY_LABELS } from '../constants';
 
 const STORAGE_KEY = 'todo-tasks';
-
-const CATEGORIES: Category[] = ['work', 'study', 'life', 'other'];
-const CATEGORY_LABELS: Record<Category, string> = {
-  work: '工作',
-  study: '学习',
-  life: '生活',
-  other: '其他',
-};
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);

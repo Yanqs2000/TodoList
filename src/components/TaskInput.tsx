@@ -1,14 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { TimeField, Category } from '../types';
+import { CATEGORY_LABELS } from '../constants';
 import TimePicker from './TimePicker';
 import '../styles/TaskInput.css';
-
-const CATEGORY_LABELS: Record<Category, string> = {
-  work: '工作',
-  study: '学习',
-  life: '生活',
-  other: '其他',
-};
 
 interface TaskInputProps {
   addTask: (text: string, time?: TimeField, category?: Category) => void;

@@ -1,15 +1,8 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import type { Todo, Priority, TimeField, Category } from '../types';
-import { escapeHtml } from '../utils/escapeHtml';
+import type { Todo, Priority, TimeField } from '../types';
+import { CATEGORY_LABELS } from '../constants';
 import '../styles/TaskItem.css';
 import '../styles/DragDrop.css';
-
-const CATEGORY_LABELS: Record<Category, string> = {
-  work: '工作',
-  study: '学习',
-  life: '生活',
-  other: '其他',
-};
 
 const formatTimeTag = (time: TimeField): string => {
   const formatSingle = (iso: string): string => {
@@ -142,7 +135,7 @@ function TaskItem({
         />
       ) : (
         <span className="task-text" onClick={() => setIsEditing(true)}>
-          {escapeHtml(task.text)}
+          {task.text}
         </span>
       )}
       <span className={`priority-tag ${task.priority}`}>
