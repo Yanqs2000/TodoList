@@ -4,6 +4,14 @@ import { CATEGORIES, CATEGORY_LABELS } from '../constants';
 
 const STORAGE_KEY = 'todo-tasks';
 
+function safeSetItem(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch (e) {
+    console.warn('Failed to save to localStorage:', e);
+  }
+}
+
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 }
@@ -39,7 +47,7 @@ export function useTodos() {
 
     setTasks(prev => {
       const updated = [newTask, ...prev];
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      safeSetItem(STORAGE_KEY, JSON.stringify(updated));
       return updated;
     });
   }, [priority]);
@@ -49,7 +57,7 @@ export function useTodos() {
       const updated = prev.map(t =>
         t.id === id ? { ...t, completed: !t.completed } : t
       );
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      safeSetItem(STORAGE_KEY, JSON.stringify(updated));
       return updated;
     });
   }, []);
@@ -57,7 +65,7 @@ export function useTodos() {
   const removeTask = useCallback((id: string) => {
     setTasks(prev => {
       const updated = prev.filter(t => t.id !== id);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      safeSetItem(STORAGE_KEY, JSON.stringify(updated));
       return updated;
     });
   }, []);
@@ -67,7 +75,7 @@ export function useTodos() {
       const updated = prev.map(t =>
         t.id === id ? { ...t, ...updates } : t
       );
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      safeSetItem(STORAGE_KEY, JSON.stringify(updated));
       return updated;
     });
   }, []);
@@ -80,7 +88,7 @@ export function useTodos() {
       const updated = [...prev];
       const [moved] = updated.splice(fromIdx, 1);
       updated.splice(toIdx, 0, moved);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      safeSetItem(STORAGE_KEY, JSON.stringify(updated));
       return updated;
     });
   }, []);
@@ -88,7 +96,7 @@ export function useTodos() {
   const clearCompleted = useCallback(() => {
     setTasks(prev => {
       const updated = prev.filter(t => !t.completed);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      safeSetItem(STORAGE_KEY, JSON.stringify(updated));
       return updated;
     });
   }, []);
@@ -119,7 +127,7 @@ export function useTodos() {
               const existingIds = new Set(prev.map(t => t.id));
               const newTasks = data.tasks.filter((t: Todo) => !existingIds.has(t.id));
               const updated = [...prev, ...newTasks];
-              localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+              safeSetItem(STORAGE_KEY, JSON.stringify(updated));
               return updated;
             });
             resolve();
