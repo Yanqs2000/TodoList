@@ -9,48 +9,84 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Styling**: Plain CSS with custom properties (CSS variables) for theming
 - **State**: React hooks with localStorage persistence
 - **Desktop**: Tauri 2 (Rust-based, wraps web app as native Mac .app)
-- **Zero dependencies** beyond React — Canvas API for particles, Web Audio API for sound
+- **Testing**: Vitest 4 + @testing-library/react
+- **Zero runtime deps** beyond React — Canvas API for particles, Web Audio API for sound
 
 ## Commands
 
 - `npm run dev` - Start dev server (Vite)
 - `npm run build` - Type-check with `tsc -b` then build with Vite
 - `npm run preview` - Preview production build
+- `npm test` - Run Vitest test suite
+- `npm run test:watch` - Watch mode
+- `npm run test:coverage` - Coverage report
 - `npm run tauri dev` - Run as desktop app in development mode
 - `npm run tauri build` - Build standalone Mac .app and .dmg
+
+## Project Structure (feature-based)
+
+```
+src/
+├── app/                          # App entry
+│   ├── App.tsx                   # Root component, orchestrates hooks
+│   ├── main.tsx                  # ReactDOM render
+│   └── styles/App.css            # Global styles + theme variables
+├── features/                     # Business features
+│   ├── tasks/                    # Task management
+│   │   ├── components/           # TaskInput, TaskList, TaskItem, FilterTabs,
+│   │   │                         # PrioritySelector, TimePicker, EmptyState
+│   │   ├── hooks/                # useTodos, useDragDrop
+│   │   ├── lib/                  # validateTodo, id
+│   │   └── styles/
+│   ├── achievements/             # AchievementDrawer, Toast, useAchievements
+│   ├── theme/                    # useTheme
+│   ├── sound/                    # useSound
+│   ├── confetti/                 # ConfettiCanvas + useConfetti
+│   ├── feedback/                 # InfoToast
+│   ├── header/                   # Header + SearchBox
+│   └── stats/                    # Footer + ProgressRing
+├── shared/                       # Cross-feature shared code
+│   ├── lib/storage.ts            # safeSetItem / safeGetItem
+│   ├── constants.ts              # CATEGORIES, CATEGORY_LABELS
+│   └── types.ts                  # Todo, Priority, FilterType, etc.
+├── test/setup.ts
+└── vite-env.d.ts
+```
+
+**Path alias**: `@/*` → `src/*`. Use absolute imports for cross-feature references:
+
+```typescript
+import { useTodos } from '@/features/tasks/hooks/useTodos';
+import { safeSetItem } from '@/shared/lib/storage';
+import type { Todo } from '@/shared/types';
+```
+
+Relative imports (`./`, `../`) are fine for intra-feature references (e.g. `./TaskItem` within `features/tasks/components/`).
 
 ## Architecture
 
 Single-page todo list app with Chinese UI, gamification, and visual effects. Components use function declarations with default exports.
 
-**Data flow**: `App.tsx` orchestrates multiple hooks → passes state/handlers down as props
+**Data flow**: `app/App.tsx` orchestrates hooks → passes state/handlers down as props → components trigger hook methods → state updates persist to localStorage.
 
 **Hooks**:
-- `useTodos` — task CRUD, filtering, reorder, localStorage sync
-- `useTheme` — dark/light mode, `data-theme` attribute on `<html>`, localStorage persistence
-- `useSound` — Web Audio API oscillator synthesis (complete/delete/achievement sounds), mute toggle
-- `useAchievements` — achievement unlock tracking, streak calculation, toast notifications
-- `useDragDrop` — HTML5 drag & drop state management
-- `useConfetti` (in ConfettiCanvas.tsx) — Canvas particle burst system
+- `useTodos` (`features/tasks/hooks/`) — task CRUD, filtering, sortMode (manual/time), reorder, search, import/export, localStorage sync
+- `useTheme` (`features/theme/hooks/`) — dark/light mode, `data-theme` attribute on `<html>`, localStorage persistence
+- `useSound` (`features/sound/hooks/`) — Web Audio API oscillator synthesis (complete/delete/achievement sounds), mute toggle
+- `useAchievements` (`features/achievements/hooks/`) — achievement unlock tracking, streak calculation, toast notifications
+- `useDragDrop` (`features/tasks/hooks/`) — HTML5 drag & drop state, dragover throttled via ref
+- `useConfetti` (in `features/confetti/components/ConfettiCanvas.tsx`) — Canvas particle burst system
 
-**Types** (`src/types.ts`): `Todo`, `Priority`, `FilterType`, `AchievementDef`, `AchievementState`
+**Types** (`src/shared/types.ts`): `Todo`, `Priority`, `FilterType`, `Category`, `TimeField`, `AchievementDef`, `AchievementState`
 
-**Component structure**:
-- `Header` — title + action buttons (mute, achievements, theme toggle)
-- `TaskInput` — text input with Enter-to-submit
-- `PrioritySelector` — low/medium/high priority picker
-- `FilterTabs` — all/active/completed filter
-- `TaskList` → `TaskItem` — task items with toggle/delete, drag-drop reordering
-- `EmptyState` — shown when no tasks match filter
-- `Footer` — progress ring, streak counter, total stats, clear-completed
-- `ConfettiCanvas` — fixed fullscreen canvas overlay for particle effects
-- `AchievementDrawer` — slide-in panel showing achievements and stats
-- `Toast` — achievement unlock notification
-- `ProgressRing` — SVG circular progress indicator
-
-**CSS theming**: `:root` defines light theme variables, `[data-theme="dark"]` overrides them. All components use `var(--*)` references.
+**CSS theming**: `:root` defines light theme variables, `[data-theme="dark"]` overrides them. All components use `var(--*)` references. CSS files live alongside their feature in `features/<name>/styles/`.
 
 **localStorage keys**: `todo-tasks`, `todo-theme`, `todo-muted`, `todo-achievements`
+
+## Documentation
+
+- `README.md` — project intro (latest version), mirrored in `docs/project-overview.md`
+- `docs/development-logs/` — per-version development logs (`v0.1.0-*.md` through `v0.1.5-*.md`)
 
 ## Tauri Desktop Build
 
@@ -60,8 +96,8 @@ Output:
 - `.app`: `src-tauri/target/release/bundle/macos/Todo List.app`
 - `.dmg`: `src-tauri/target/release/bundle/dmg/Todo List_0.1.0_aarch64.dmg`
 
-Requires Rust toolchain (`rustup`). In China, configure crates.io mirror in `~/.cargo/config.toml`.
+Requires Rust toolchain (`rustup`). In China, configure crates.io mirror in `~/.cargo/config.toml` (USTC mirror works).
 
 ## TypeScript Config
 
-Strict mode enabled. `noUnusedLocals` and `noUnusedParameters` are enforced - remove any unused imports/variables.
+Strict mode enabled. `noUnusedLocals` and `noUnusedParameters` are enforced - remove any unused imports/variables. `@/*` path alias configured in `tsconfig.json`.
