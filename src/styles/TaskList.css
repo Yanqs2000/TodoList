@@ -3,3 +3,31 @@
   flex-direction: column;
   gap: 8px;
 }
+
+.sort-bar {
+  display: flex;
+  gap: 6px;
+  padding: 4px 0 8px;
+}
+
+.sort-btn {
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.sort-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.sort-btn.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}

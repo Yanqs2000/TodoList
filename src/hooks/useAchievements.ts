@@ -1,5 +1,6 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import type { AchievementDef, AchievementState } from '../types';
+import { safeSetItem, safeGetItem } from '../utils/storage';
 
 const STORAGE_KEY = 'todo-achievements';
 
@@ -14,17 +15,42 @@ function getToday(): string {
 }
 
 function getInitialState(): AchievementState {
+  const fallback: AchievementState = {
+    unlocked: [],
+    streakDays: 0,
+    lastActiveDate: '',
+    todayCompleted: 0,
+    todayDate: getToday(),
+  };
+  const raw = safeGetItem(STORAGE_KEY);
+  if (!raw) return fallback;
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) return JSON.parse(stored);
-  } catch {}
-  return { unlocked: [], streakDays: 0, lastActiveDate: '', todayCompleted: 0, todayDate: getToday() };
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return fallback;
+    return {
+      unlocked: Array.isArray(parsed.unlocked) ? parsed.unlocked.filter((x: unknown): x is string => typeof x === 'string') : [],
+      streakDays: typeof parsed.streakDays === 'number' ? parsed.streakDays : 0,
+      lastActiveDate: typeof parsed.lastActiveDate === 'string' ? parsed.lastActiveDate : '',
+      todayCompleted: typeof parsed.todayCompleted === 'number' ? parsed.todayCompleted : 0,
+      todayDate: typeof parsed.todayDate === 'string' ? parsed.todayDate : getToday(),
+    };
+  } catch {
+    return fallback;
+  }
 }
 
 export function useAchievements(onUnlockSound?: () => void) {
   const [state, setState] = useState(getInitialState);
   const [toast, setToast] = useState<AchievementDef | null>(null);
-  const toastTimerRef = useRef<number>(0);
+  const toastTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current !== null) {
+        clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
 
   const checkAchievements = useCallback((completedCount: number, newUnlocked: string[]) => {
     const checks: { id: string; condition: boolean }[] = [
@@ -43,10 +69,16 @@ export function useAchievements(onUnlockSound?: () => void) {
   const recordCompletion = useCallback(() => {
     setState(prev => {
       const today = getToday();
-      let todayCompleted = prev.todayDate === today ? prev.todayCompleted + 1 : 1;
+      const sameDay = prev.todayDate === today;
+      const todayCompleted = sameDay ? prev.todayCompleted + 1 : 1;
       let streakDays = prev.streakDays;
 
-      if (prev.lastActiveDate !== today) {
+      if (!sameDay) {
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = yesterday.toISOString().slice(0, 10);
+        streakDays = prev.lastActiveDate === yesterdayStr ? streakDays + 1 : 1;
+      } else if (prev.lastActiveDate !== today) {
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
         const yesterdayStr = yesterday.toISOString().slice(0, 10);
@@ -66,7 +98,7 @@ export function useAchievements(onUnlockSound?: () => void) {
         if (achievement) {
           setToast(achievement);
           onUnlockSound?.();
-          clearTimeout(toastTimerRef.current);
+          if (toastTimerRef.current !== null) clearTimeout(toastTimerRef.current);
           toastTimerRef.current = window.setTimeout(() => setToast(null), 3000);
         }
       }
@@ -78,13 +110,17 @@ export function useAchievements(onUnlockSound?: () => void) {
         todayCompleted,
         todayDate: today,
       };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
+      safeSetItem(STORAGE_KEY, JSON.stringify(newState));
       return newState;
     });
   }, [checkAchievements, onUnlockSound]);
 
   const dismissToast = useCallback(() => {
     setToast(null);
+    if (toastTimerRef.current !== null) {
+      clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = null;
+    }
   }, []);
 
   return {

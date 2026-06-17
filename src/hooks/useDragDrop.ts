@@ -1,8 +1,9 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 
 export function useDragDrop(onReorder: (fromId: string, toId: string) => void) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
+  const lastOverIdRef = useRef<string | null>(null);
 
   const handleDragStart = useCallback((e: React.DragEvent, id: string) => {
     setDraggingId(id);
@@ -13,11 +14,18 @@ export function useDragDrop(onReorder: (fromId: string, toId: string) => void) {
   const handleDragOver = useCallback((e: React.DragEvent, id: string) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    setOverId(id);
+    if (lastOverIdRef.current !== id) {
+      lastOverIdRef.current = id;
+      setOverId(id);
+    }
   }, []);
 
-  const handleDragLeave = useCallback(() => {
-    setOverId(null);
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    if (lastOverIdRef.current !== null) {
+      lastOverIdRef.current = null;
+      setOverId(null);
+    }
   }, []);
 
   const handleDrop = useCallback((e: React.DragEvent, toId: string) => {
@@ -28,11 +36,13 @@ export function useDragDrop(onReorder: (fromId: string, toId: string) => void) {
     }
     setDraggingId(null);
     setOverId(null);
+    lastOverIdRef.current = null;
   }, [onReorder]);
 
   const handleDragEnd = useCallback(() => {
     setDraggingId(null);
     setOverId(null);
+    lastOverIdRef.current = null;
   }, []);
 
   return {

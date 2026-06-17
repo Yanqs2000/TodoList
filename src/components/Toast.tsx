@@ -9,8 +9,8 @@ interface ToastProps {
 
 function Toast({ icon, title, description, onDismiss }: ToastProps) {
   return (
-    <div className="toast" onClick={onDismiss}>
-      <span className="toast-icon">{icon}</span>
+    <div className="toast" onClick={onDismiss} role="alert" aria-live="assertive">
+      <span className="toast-icon" aria-hidden="true">{icon}</span>
       <div className="toast-content">
         <strong>{title}</strong>
         <span>{description}</span>

@@ -26,7 +26,7 @@ interface TaskItemProps {
   overId?: string | null;
   onDragStart?: (e: React.DragEvent, id: string) => void;
   onDragOver?: (e: React.DragEvent, id: string) => void;
-  onDragLeave?: () => void;
+  onDragLeave?: (e: React.DragEvent) => void;
   onDrop?: (e: React.DragEvent, id: string) => void;
   onDragEnd?: () => void;
 }
@@ -47,6 +47,8 @@ function TaskItem({
   const [isExpanded, setIsExpanded] = useState(false);
   const [editText, setEditText] = useState(task.text);
   const editInputRef = useRef<HTMLInputElement>(null);
+  const removeTimerRef = useRef<number | null>(null);
+  const removeDoneRef = useRef(false);
   const removeRef = useRef(onDelete);
   removeRef.current = onDelete;
 
@@ -56,6 +58,14 @@ function TaskItem({
       editInputRef.current.select();
     }
   }, [isEditing]);
+
+  useEffect(() => {
+    return () => {
+      if (removeTimerRef.current !== null) {
+        clearTimeout(removeTimerRef.current);
+      }
+    };
+  }, []);
 
   const handleEditSubmit = () => {
     if (editText.trim() && editText !== task.text) {
@@ -73,26 +83,25 @@ function TaskItem({
     onToggle(task.id);
   }, [onToggle, task.id]);
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      onToggle(task.id);
-    }
-  };
-
   const handleDelete = useCallback(() => {
+    if (!window.confirm(`确定要删除任务「${task.text}」吗？`)) return;
+    removeDoneRef.current = false;
     setRemoving(true);
     const onEnd = () => {
+      if (removeDoneRef.current) return;
+      removeDoneRef.current = true;
+      if (removeTimerRef.current !== null) {
+        clearTimeout(removeTimerRef.current);
+        removeTimerRef.current = null;
+      }
       removeRef.current(task.id);
     };
+    removeTimerRef.current = window.setTimeout(onEnd, 220);
     const el = document.querySelector(`[data-task-id="${task.id}"]`);
     if (el) {
       el.addEventListener('animationend', onEnd, { once: true });
-      setTimeout(onEnd, 200);
-    } else {
-      removeRef.current(task.id);
     }
-  }, [task.id]);
+  }, [task.id, task.text]);
 
   const isDragging = draggingId === task.id;
   const isOver = overId === task.id && draggingId !== task.id;
@@ -108,22 +117,20 @@ function TaskItem({
       onDrop={onDrop ? (e) => onDrop(e, task.id) : undefined}
       onDragEnd={onDragEnd}
     >
-      <div
+      <input
+        type="checkbox"
         className="checkbox"
-        role="checkbox"
-        aria-checked={task.completed}
-        tabIndex={0}
-        onClick={handleToggle}
-        onKeyDown={handleKeyDown}
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-          <path
-            d="M5 13l4 4L19 7"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </div>
+        checked={task.completed}
+        onChange={handleToggle}
+        aria-label={task.completed ? '标记为未完成' : '标记为已完成'}
+      />
+      <svg className="checkbox-mark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true">
+        <path
+          d="M5 13l4 4L19 7"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
       {isEditing ? (
         <input
           ref={editInputRef}

@@ -12,6 +12,13 @@ import TaskList from './components/TaskList';
 import Footer from './components/Footer';
 import AchievementDrawer from './components/AchievementDrawer';
 import Toast from './components/Toast';
+import InfoToast from './components/InfoToast';
+import '../src/styles/App.css';
+
+interface InfoToastState {
+  message: string;
+  tone: 'success' | 'error';
+}
 
 function App() {
   const todoState = useTodos();
@@ -20,7 +27,15 @@ function App() {
   const achievements = useAchievements(sound.playAchievement);
   const confetti = useConfetti();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [infoToast, setInfoToast] = useState<InfoToastState | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const infoTimerRef = useRef<number | null>(null);
+
+  const showInfo = (message: string, tone: 'success' | 'error') => {
+    setInfoToast({ message, tone });
+    if (infoTimerRef.current !== null) clearTimeout(infoTimerRef.current);
+    infoTimerRef.current = window.setTimeout(() => setInfoToast(null), 2500);
+  };
 
   const handleImport = () => {
     fileInputRef.current?.click();
@@ -30,10 +45,15 @@ function App() {
     const file = e.target.files?.[0];
     if (file) {
       try {
-        await todoState.importTasks(file);
-        alert('导入成功！');
+        const result = await todoState.importTasks(file);
+        if (result.added === 0) {
+          showInfo('没有可导入的任务（已存在或格式无效）', 'error');
+        } else {
+          const extra = result.skipped > 0 ? `，跳过 ${result.skipped} 个无效项` : '';
+          showInfo(`已导入 ${result.added} 个任务${extra}`, 'success');
+        }
       } catch {
-        alert('导入失败：文件格式错误');
+        showInfo('导入失败：文件格式错误', 'error');
       }
     }
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -54,12 +74,23 @@ function App() {
         achievements={achievements.achievements}
         allAchievements={achievements.allAchievements}
       />
+      <div className="sr-only" role="status" aria-live="polite">
+        {achievements.toast ? `成就解锁：${achievements.toast.name} — ${achievements.toast.description}` : ''}
+        {infoToast ? infoToast.message : ''}
+      </div>
       {achievements.toast && (
         <Toast
           icon={achievements.toast.icon}
           title={achievements.toast.name}
           description={achievements.toast.description}
           onDismiss={achievements.dismissToast}
+        />
+      )}
+      {infoToast && (
+        <InfoToast
+          message={infoToast.message}
+          tone={infoToast.tone}
+          onDismiss={() => setInfoToast(null)}
         />
       )}
       <ConfettiCanvas canvasRef={confetti.canvasRef} />
@@ -89,6 +120,8 @@ function App() {
       <TaskList
         tasks={todoState.tasks}
         filter={todoState.filter}
+        sortMode={todoState.sortMode}
+        onToggleSortMode={todoState.setSortMode}
         onToggle={(id) => {
           const task = todoState.allTasks.find(t => t.id === id);
           todoState.toggleTask(id);

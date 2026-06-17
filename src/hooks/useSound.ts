@@ -1,9 +1,10 @@
 import { useState, useCallback, useRef } from 'react';
+import { safeSetItem, safeGetItem } from '../utils/storage';
 
 const STORAGE_KEY = 'todo-muted';
 
 function getInitialMuted(): boolean {
-  return localStorage.getItem(STORAGE_KEY) === 'true';
+  return safeGetItem(STORAGE_KEY) === 'true';
 }
 
 function createAudioContext(): AudioContext | null {
@@ -63,7 +64,7 @@ export function useSound() {
   const toggleMuted = useCallback(() => {
     setMutedState(prev => {
       const next = !prev;
-      localStorage.setItem(STORAGE_KEY, String(next));
+      safeSetItem(STORAGE_KEY, String(next));
       return next;
     });
   }, []);

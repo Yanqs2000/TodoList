@@ -53,13 +53,15 @@
 }
 
 .checkbox {
+  position: relative;
+  appearance: none;
+  -webkit-appearance: none;
   width: 22px;
   height: 22px;
+  margin: 0;
   border: 2px solid var(--border);
   border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  background: transparent;
   cursor: pointer;
   flex-shrink: 0;
   transition: all var(--transition);
@@ -74,22 +76,26 @@
   outline-offset: 2px;
 }
 
-.task-item.completed .checkbox {
+.checkbox:checked {
   background: var(--primary);
   border-color: var(--primary);
 }
 
-.checkbox svg {
+.checkbox-mark {
+  position: absolute;
   width: 14px;
   height: 14px;
+  margin-left: -18px;
+  margin-top: 4px;
   stroke: #fff;
   stroke-width: 3;
   fill: none;
   opacity: 0;
+  pointer-events: none;
   transition: opacity var(--transition);
 }
 
-.task-item.completed .checkbox svg {
+.task-item.completed .checkbox-mark {
   opacity: 1;
 }
 
