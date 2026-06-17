@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Todo List",
-  "version": "0.1.3",
+  "version": "0.1.5",
   "identifier": "com.todo-app.desktop",
   "build": {
     "frontendDist": "../dist",
@@ -33,6 +33,11 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "macOS": {
+      "signingIdentity": "-",
+      "minimumSystemVersion": "11.0",
+      "entitlements": null
+    },
     "android": {
       "debugApplicationIdSuffix": ".debug"
     }

@@ -111,7 +111,9 @@ src/
 | `npm run test:watch` | 监听模式 |
 | `npm run test:coverage` | 生成覆盖率报告 |
 | `npm run tauri dev` | 桌面应用开发模式 |
-| `npm run tauri build` | 构建 Mac .app 和 .dmg |
+| `npm run tauri build` | 构建 Mac .app 和 .dmg（不签名） |
+| `npm run tauri:build` | 构建 + 自动 ad-hoc 签名 .app 和 .dmg |
+| `npm run sign:macos` | 对已构建产物做 ad-hoc 签名 |
 
 ## 桌面端构建
 
@@ -119,9 +121,17 @@ src/
 
 产物：
 - `src-tauri/target/release/bundle/macos/Todo List.app`
-- `src-tauri/target/release/bundle/dmg/Todo List_0.1.0_aarch64.dmg`
+- `src-tauri/target/release/bundle/dmg/Todo List_0.1.5_aarch64.dmg`
 
 需要 Rust 工具链（rustup）。国内需配置 crates.io 镜像（见 `~/.cargo/config.toml`）。
+
+### 代码签名
+
+本应用使用 ad-hoc 签名（无需 Apple Developer 账号）。`npm run tauri:build` 会自动调用 `scripts/sign-macos-bundle.sh` 对 `.app` 做深度签名 + hardened runtime，对 `.dmg` 做外层签名。
+
+**用户首次打开需绕过 Gatekeeper**（右键打开或 `xattr -dr` 命令），详见 [installation-guide.md](./docs/installation-guide.md)。
+
+> 当前仅构建 Apple Silicon（arm64）架构。Intel Mac 暂不支持。
 
 ## 测试
 
