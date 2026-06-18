@@ -47,24 +47,24 @@
   --transition: 200ms ease;
 }
 
-/* ---- 浅色：编辑器（冷白，VSCode 风） ---- */
-[data-theme="editor-light"] {
+/* ---- 浅色：薄荷（浅绿底，清新自然） ---- */
+[data-theme="mint-light"] {
   --primary: #0D9488;
   --primary-light: #14B8A6;
   --primary-soft: #CCFBF1;
   --cta: #F97316;
-  --bg: #FFFFFF;
-  --bg-elevated: #F8FAFC;
+  --bg: #F0FDFA;
+  --bg-elevated: #E6FBF5;
   --card-bg: #FFFFFF;
-  --card-bg-hover: #F8FAFC;
-  --text: #0F172A;
+  --card-bg-hover: #F7FFFD;
+  --text: #134E4A;
   --text-muted: #475569;
   --text-light: #94A3B8;
-  --border: #E2E8F0;
-  --border-strong: #CBD5E1;
+  --border: #CCFBF1;
+  --border-strong: #99F6E4;
   --danger: #DC2626;
   --danger-hover: #B91C1C;
-  --active-bg: #F0FDFA;
+  --active-bg: #CCFBF1;
   --priority-high: #DC2626;
   --priority-medium: #D97706;
   --priority-low: #059669;
@@ -73,9 +73,9 @@
   --category-life: #059669;
   --category-other: #64748B;
   --completed-opacity: 0.5;
-  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
-  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.06);
-  --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.10);
+  --shadow-sm: 0 1px 2px rgba(13, 148, 136, 0.04);
+  --shadow-md: 0 4px 12px rgba(13, 148, 136, 0.08);
+  --shadow-lg: 0 12px 32px rgba(13, 148, 136, 0.12);
   --radius: 12px;
   --radius-sm: 8px;
   --radius-lg: 16px;
@@ -152,21 +152,21 @@
   --transition: 200ms ease;
 }
 
-/* ---- 深色：编辑器 ---- */
-[data-theme="editor-dark"] {
+/* ---- 深色：薄荷 ---- */
+[data-theme="mint-dark"] {
   --primary: #2DD4BF;
   --primary-light: #5EEAD4;
   --primary-soft: #134E4A;
   --cta: #FB923C;
-  --bg: #0E0E10;
-  --bg-elevated: #141414;
-  --card-bg: #161616;
-  --card-bg-hover: #1C1C1C;
-  --text: #E5E5E5;
-  --text-muted: #A3A3A3;
-  --text-light: #737373;
-  --border: #262626;
-  --border-strong: #404040;
+  --bg: #0A1F1C;
+  --bg-elevated: #0F2A26;
+  --card-bg: #13302C;
+  --card-bg-hover: #173B36;
+  --text: #E0F2EF;
+  --text-muted: #94B8B2;
+  --text-light: #6B8581;
+  --border: #1E4540;
+  --border-strong: #2C5A53;
   --danger: #F87171;
   --danger-hover: #FCA5A5;
   --active-bg: #134E4A;
@@ -176,7 +176,7 @@
   --category-work: #60A5FA;
   --category-study: #FBBF24;
   --category-life: #4ADE80;
-  --category-other: #A1A1AA;
+  --category-other: #94B8B2;
   --completed-opacity: 0.4;
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);

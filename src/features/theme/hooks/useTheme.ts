@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { safeSetItem, safeGetItem } from '@/shared/lib/storage';
 
-export type ThemeStyle = 'workspace' | 'editor' | 'paper';
+export type ThemeStyle = 'workspace' | 'mint' | 'paper';
 export type ThemeMode = 'light' | 'dark';
 export type ThemeId = `${ThemeStyle}-${ThemeMode}`;
 
@@ -9,10 +9,10 @@ const STORAGE_KEY = 'todo-theme';
 
 export const THEME_IDS: ThemeId[] = [
   'workspace-light',
-  'editor-light',
+  'mint-light',
   'paper-light',
   'workspace-dark',
-  'editor-dark',
+  'mint-dark',
   'paper-dark',
 ];
 
@@ -30,11 +30,11 @@ export const THEMES: Record<ThemeId, ThemeMeta> = {
     description: '暖白底，适合日常办公',
     swatch: { bg: '#FAFAF7', card: '#FFFFFF', accent: '#0D9488' },
   },
-  'editor-light': {
-    id: 'editor-light',
-    name: '编辑器 · 浅',
-    description: '冷白底，VSCode 风格',
-    swatch: { bg: '#FFFFFF', card: '#FFFFFF', accent: '#0D9488' },
+  'mint-light': {
+    id: 'mint-light',
+    name: '薄荷 · 浅',
+    description: '浅绿底，清新自然',
+    swatch: { bg: '#F0FDFA', card: '#FFFFFF', accent: '#0D9488' },
   },
   'paper-light': {
     id: 'paper-light',
@@ -48,11 +48,11 @@ export const THEMES: Record<ThemeId, ThemeMeta> = {
     description: '深色，适合夜间办公',
     swatch: { bg: '#0E0E10', card: '#18181B', accent: '#2DD4BF' },
   },
-  'editor-dark': {
-    id: 'editor-dark',
-    name: '编辑器 · 深',
-    description: '深色，VSCode 风格',
-    swatch: { bg: '#0E0E10', card: '#161616', accent: '#2DD4BF' },
+  'mint-dark': {
+    id: 'mint-dark',
+    name: '薄荷 · 深',
+    description: '深绿底，护眼舒适',
+    swatch: { bg: '#0A1F1C', card: '#13302C', accent: '#2DD4BF' },
   },
   'paper-dark': {
     id: 'paper-dark',
@@ -69,6 +69,8 @@ function isValidThemeId(value: string | null): value is ThemeId {
 function migrateLegacy(value: string | null): ThemeId | null {
   if (value === 'light') return 'workspace-light';
   if (value === 'dark') return 'workspace-dark';
+  if (value === 'editor-light') return 'mint-light';
+  if (value === 'editor-dark') return 'mint-dark';
   return null;
 }
 

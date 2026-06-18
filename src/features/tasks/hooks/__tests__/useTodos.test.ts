@@ -48,7 +48,7 @@ describe('useTodos', () => {
       result.current.toggleTask(taskId);
     });
 
-    expect(result.current.tasks[0].completed).toBe(true);
+    expect(result.current.allTasks[0].completed).toBe(true);
   });
 
   it('should remove a task', () => {

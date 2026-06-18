@@ -21,7 +21,7 @@ function loadInitialTasks(): Todo[] {
 export function useTodos() {
   const [tasks, setTasks] = useState<Todo[]>(loadInitialTasks);
 
-  const [filter, setFilter] = useState<FilterType>('all');
+  const [filter, setFilter] = useState<FilterType>('active');
   const [priority, setPriority] = useState<Priority>('low');
   const [categoryFilter, setCategoryFilter] = useState<Category | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -83,48 +83,6 @@ export function useTodos() {
     setTasks(prev => persist(prev.filter(t => !t.completed)));
   }, []);
 
-  const exportTasks = useCallback(() => {
-    const data = {
-      version: 1,
-      exportedAt: new Date().toISOString(),
-      tasks,
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `todo-backup-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [tasks]);
-
-  const importTasks = useCallback((file: File) => {
-    return new Promise<{ added: number; skipped: number }>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const data = JSON.parse(e.target?.result as string);
-          if (!data || !Array.isArray(data.tasks)) {
-            reject(new Error('Invalid file format'));
-            return;
-          }
-          const valid = validateTodoArray(data.tasks);
-          const skipped = data.tasks.length - valid.length;
-          setTasks(prev => {
-            const existingIds = new Set(prev.map(t => t.id));
-            const newTasks = valid.filter(t => !existingIds.has(t.id));
-            return persist([...prev, ...newTasks]);
-          });
-          resolve({ added: valid.length, skipped });
-        } catch (err) {
-          reject(err);
-        }
-      };
-      reader.onerror = () => reject(new Error('Failed to read file'));
-      reader.readAsText(file);
-    });
-  }, []);
-
   const stats = {
     total: tasks.length,
     active: tasks.filter(t => !t.completed).length,
@@ -172,8 +130,6 @@ export function useTodos() {
     editTask,
     clearCompleted,
     reorderTasks,
-    exportTasks,
-    importTasks,
     setFilter,
     setPriority,
     setCategoryFilter,

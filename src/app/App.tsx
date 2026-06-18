@@ -36,7 +36,6 @@ function App() {
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [infoToast, setInfoToast] = useState<InfoToastState | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const infoTimerRef = useRef<number | null>(null);
 
   const showInfo = (message: string, tone: 'success' | 'error') => {
@@ -56,28 +55,6 @@ function App() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
-
-  const handleImport = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      try {
-        const result = await todoState.importTasks(file);
-        if (result.added === 0) {
-          showInfo('没有可导入的任务（已存在或格式无效）', 'error');
-        } else {
-          const extra = result.skipped > 0 ? `，跳过 ${result.skipped} 个无效项` : '';
-          showInfo(`已导入 ${result.added} 个任务${extra}`, 'success');
-        }
-      } catch {
-        showInfo('导入失败：文件格式错误', 'error');
-      }
-    }
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
 
   const handleToggle = useCallback((id: string) => {
     const task = todoState.allTasks.find(t => t.id === id);
@@ -108,20 +85,19 @@ function App() {
     setCreateModalOpen(false);
   }, [todoState]);
 
+  const handleClearCompleted = useCallback(() => {
+    const count = todoState.stats.completed;
+    if (count === 0) return;
+    todoState.clearCompleted();
+    showInfo(`已清除 ${count} 个已完成任务`, 'success');
+  }, [todoState]);
+
   const selectedTask = selectedTaskId
     ? todoState.allTasks.find(t => t.id === selectedTaskId) ?? null
     : null;
 
   return (
     <div className="app-shell">
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".json"
-        style={{ display: 'none' }}
-        onChange={handleFileChange}
-      />
-
       <AchievementDrawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
@@ -176,8 +152,6 @@ function App() {
           onOpenCreateModal={() => setCreateModalOpen(true)}
           muted={sound.muted}
           onToggleMuted={sound.toggleMuted}
-          onExport={todoState.exportTasks}
-          onImport={handleImport}
         />
       </div>
 
@@ -212,7 +186,7 @@ function App() {
         />
         <Footer
           stats={todoState.stats}
-          onClearCompleted={todoState.clearCompleted}
+          onClearCompleted={handleClearCompleted}
           achievements={achievements.achievements}
         />
       </main>

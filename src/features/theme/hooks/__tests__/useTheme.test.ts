@@ -24,9 +24,9 @@ describe('useTheme', () => {
   it('should persist theme to localStorage', () => {
     const { result } = renderHook(() => useTheme());
     act(() => {
-      result.current.setTheme('editor-light');
+      result.current.setTheme('mint-light');
     });
-    expect(localStorage.getItem('todo-theme')).toBe('editor-light');
+    expect(localStorage.getItem('todo-theme')).toBe('mint-light');
   });
 
   it('should set data-theme attribute', () => {
@@ -38,9 +38,9 @@ describe('useTheme', () => {
   });
 
   it('should load saved theme from localStorage', () => {
-    localStorage.setItem('todo-theme', 'editor-dark');
+    localStorage.setItem('todo-theme', 'mint-dark');
     const { result } = renderHook(() => useTheme());
-    expect(result.current.theme).toBe('editor-dark');
+    expect(result.current.theme).toBe('mint-dark');
   });
 
   it('should migrate legacy "light" value to workspace-light', () => {
