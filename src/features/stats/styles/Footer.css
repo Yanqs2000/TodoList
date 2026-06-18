@@ -1,46 +1,83 @@
 .footer {
-  margin-top: 20px;
-  padding: 16px 0;
+  margin-top: 24px;
+  padding: 20px 0 12px;
+  border-top: 1px solid var(--border);
 }
 
-.footer-stats {
+.footer-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.footer-card {
   display: flex;
-  justify-content: center;
-  gap: 32px;
-  margin-bottom: 16px;
-  padding: 16px;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
   background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  transition: border-color var(--transition), box-shadow var(--transition);
 }
 
-.footer-stat {
+.footer-card:hover {
+  border-color: var(--border-strong);
+}
+
+.footer-card__big {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  width: 56px;
+  flex-shrink: 0;
+  justify-content: center;
+}
+
+.footer-card__value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.02em;
+  line-height: 1;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+.footer-card__unit {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.footer-card__meta {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 6px;
+  gap: 2px;
+  min-width: 0;
 }
 
-.footer-stat-value {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--primary);
-}
-
-.footer-stat-label {
-  font-size: 0.6875rem;
+.footer-card__label {
+  font-size: 0.75rem;
+  font-weight: 600;
   color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.footer-card__sub {
+  font-size: 0.6875rem;
+  color: var(--text-light);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .footer-actions {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
-}
-
-.footer-summary {
-  font-size: 0.8125rem;
-  color: var(--text-light);
 }
 
 .btn-clear {
@@ -56,7 +93,7 @@
   transition: all var(--transition);
 }
 
-.btn-clear:hover {
+.btn-clear:hover:not(:disabled) {
   border-color: var(--danger);
   color: var(--danger);
 }
@@ -69,4 +106,10 @@
 .btn-clear:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+@media (max-width: 720px) {
+  .footer-grid {
+    grid-template-columns: 1fr;
+  }
 }

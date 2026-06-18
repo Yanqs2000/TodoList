@@ -32,7 +32,7 @@ export function useTodos() {
     return next;
   };
 
-  const addTask = useCallback((text: string, time?: TimeField, category?: Category) => {
+  const addTask = useCallback((text: string, time?: TimeField, category?: Category, notes?: string, priorityOverride?: Priority) => {
     const trimmed = text.trim();
     if (!trimmed) return;
 
@@ -40,10 +40,11 @@ export function useTodos() {
       id: generateId(),
       text: trimmed,
       completed: false,
-      priority,
+      priority: priorityOverride ?? priority,
       createdAt: Date.now(),
       time,
       category,
+      notes: notes?.trim() || undefined,
     };
 
     setTasks(prev => persist([newTask, ...prev]));

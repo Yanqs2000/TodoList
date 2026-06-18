@@ -6,38 +6,220 @@
   padding: 0;
 }
 
-:root {
+/* ============================================================
+   6 套主题 tokens (3 风格 × 2 明暗)
+   主色 teal: 浅色 #0D9488 / 深色 #2DD4BF
+   深色统一 bg #0E0E10
+   ============================================================ */
+
+/* ---- 浅色：工作台（暖白，默认） ---- */
+[data-theme="workspace-light"] {
   --primary: #0D9488;
   --primary-light: #14B8A6;
+  --primary-soft: #CCFBF1;
   --cta: #F97316;
-  --bg: #F0FDFA;
-  --card-bg: #ffffff;
-  --text: #134E4A;
-  --text-muted: #475569;
-  --text-light: #94A3B8;
-  --border: #E2E8F0;
-  --danger: #EF4444;
-  --danger-hover: #DC2626;
-  --active-bg: #CCFBF1;
+  --bg: #FAFAF7;
+  --bg-elevated: #F4F4F0;
+  --card-bg: #FFFFFF;
+  --card-bg-hover: #F9FAFB;
+  --text: #1F2937;
+  --text-muted: #4B5563;
+  --text-light: #9CA3AF;
+  --border: #E5E7EB;
+  --border-strong: #D1D5DB;
+  --danger: #DC2626;
+  --danger-hover: #B91C1C;
+  --active-bg: #F0FDFA;
+  --priority-high: #DC2626;
+  --priority-medium: #D97706;
+  --priority-low: #059669;
+  --category-work: #2563EB;
+  --category-study: #D97706;
+  --category-life: #059669;
+  --category-other: #64748B;
   --completed-opacity: 0.5;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.10);
   --radius: 12px;
+  --radius-sm: 8px;
+  --radius-lg: 16px;
   --transition: 200ms ease;
 }
 
-[data-theme="dark"] {
-  --primary: #14B8A6;
-  --primary-light: #2DD4BF;
+/* ---- 浅色：编辑器（冷白，VSCode 风） ---- */
+[data-theme="editor-light"] {
+  --primary: #0D9488;
+  --primary-light: #14B8A6;
+  --primary-soft: #CCFBF1;
+  --cta: #F97316;
+  --bg: #FFFFFF;
+  --bg-elevated: #F8FAFC;
+  --card-bg: #FFFFFF;
+  --card-bg-hover: #F8FAFC;
+  --text: #0F172A;
+  --text-muted: #475569;
+  --text-light: #94A3B8;
+  --border: #E2E8F0;
+  --border-strong: #CBD5E1;
+  --danger: #DC2626;
+  --danger-hover: #B91C1C;
+  --active-bg: #F0FDFA;
+  --priority-high: #DC2626;
+  --priority-medium: #D97706;
+  --priority-low: #059669;
+  --category-work: #2563EB;
+  --category-study: #D97706;
+  --category-life: #059669;
+  --category-other: #64748B;
+  --completed-opacity: 0.5;
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.06);
+  --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.10);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-lg: 16px;
+  --transition: 200ms ease;
+}
+
+/* ---- 浅色：纸笺（米色，Notion/Bear 风） ---- */
+[data-theme="paper-light"] {
+  --primary: #0D9488;
+  --primary-light: #14B8A6;
+  --primary-soft: #D6F5EF;
+  --cta: #C2410C;
+  --bg: #F7F6F3;
+  --bg-elevated: #F0EEE8;
+  --card-bg: #FFFDF8;
+  --card-bg-hover: #FBF8F1;
+  --text: #3F3B36;
+  --text-muted: #6B6358;
+  --text-light: #A39B8E;
+  --border: #E8E2D6;
+  --border-strong: #D4CDBD;
+  --danger: #B91C1C;
+  --danger-hover: #991B1B;
+  --active-bg: #EDE9DF;
+  --priority-high: #B91C1C;
+  --priority-medium: #B45309;
+  --priority-low: #047857;
+  --category-work: #2563EB;
+  --category-study: #B45309;
+  --category-life: #047857;
+  --category-other: #6B6358;
+  --completed-opacity: 0.5;
+  --shadow-sm: 0 1px 2px rgba(63, 59, 54, 0.04);
+  --shadow-md: 0 4px 12px rgba(63, 59, 54, 0.06);
+  --shadow-lg: 0 12px 32px rgba(63, 59, 54, 0.10);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-lg: 16px;
+  --transition: 200ms ease;
+}
+
+/* ---- 深色：工作台 ---- */
+[data-theme="workspace-dark"] {
+  --primary: #2DD4BF;
+  --primary-light: #5EEAD4;
+  --primary-soft: #134E4A;
   --cta: #FB923C;
-  --bg: #0F172A;
-  --card-bg: #1E293B;
-  --text: #E2E8F0;
-  --text-muted: #94A3B8;
-  --text-light: #64748B;
-  --border: #334155;
+  --bg: #0E0E10;
+  --bg-elevated: #161618;
+  --card-bg: #18181B;
+  --card-bg-hover: #1F1F23;
+  --text: #E4E4E7;
+  --text-muted: #A1A1AA;
+  --text-light: #71717A;
+  --border: #27272A;
+  --border-strong: #3F3F46;
   --danger: #F87171;
-  --danger-hover: #EF4444;
+  --danger-hover: #FCA5A5;
   --active-bg: #134E4A;
+  --priority-high: #F87171;
+  --priority-medium: #FBBF24;
+  --priority-low: #4ADE80;
+  --category-work: #60A5FA;
+  --category-study: #FBBF24;
+  --category-life: #4ADE80;
+  --category-other: #A1A1AA;
   --completed-opacity: 0.4;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-lg: 16px;
+  --transition: 200ms ease;
+}
+
+/* ---- 深色：编辑器 ---- */
+[data-theme="editor-dark"] {
+  --primary: #2DD4BF;
+  --primary-light: #5EEAD4;
+  --primary-soft: #134E4A;
+  --cta: #FB923C;
+  --bg: #0E0E10;
+  --bg-elevated: #141414;
+  --card-bg: #161616;
+  --card-bg-hover: #1C1C1C;
+  --text: #E5E5E5;
+  --text-muted: #A3A3A3;
+  --text-light: #737373;
+  --border: #262626;
+  --border-strong: #404040;
+  --danger: #F87171;
+  --danger-hover: #FCA5A5;
+  --active-bg: #134E4A;
+  --priority-high: #F87171;
+  --priority-medium: #FBBF24;
+  --priority-low: #4ADE80;
+  --category-work: #60A5FA;
+  --category-study: #FBBF24;
+  --category-life: #4ADE80;
+  --category-other: #A1A1AA;
+  --completed-opacity: 0.4;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-lg: 16px;
+  --transition: 200ms ease;
+}
+
+/* ---- 深色：纸笺 ---- */
+[data-theme="paper-dark"] {
+  --primary: #2DD4BF;
+  --primary-light: #5EEAD4;
+  --primary-soft: #134E4A;
+  --cta: #FB923C;
+  --bg: #0E0E10;
+  --bg-elevated: #15130F;
+  --card-bg: #1A1814;
+  --card-bg-hover: #211E18;
+  --text: #E8E2D6;
+  --text-muted: #B3AB99;
+  --text-light: #807968;
+  --border: #2D2922;
+  --border-strong: #443E33;
+  --danger: #F87171;
+  --danger-hover: #FCA5A5;
+  --active-bg: #1F2A26;
+  --priority-high: #F87171;
+  --priority-medium: #FBBF24;
+  --priority-low: #4ADE80;
+  --category-work: #60A5FA;
+  --category-study: #FBBF24;
+  --category-life: #4ADE80;
+  --category-other: #A1A1AA;
+  --completed-opacity: 0.4;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-lg: 16px;
+  --transition: 200ms ease;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -48,21 +230,93 @@
 }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
   line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-.container {
-  max-width: 640px;
-  margin: 0 auto;
-  padding: 24px 20px 24px;
+#root {
+  min-height: 100vh;
 }
 
-@media (max-width: 480px) {
-  .container {
-    padding: 16px 16px 16px;
+/* ============================================================
+   三栏布局 Shell
+   ============================================================ */
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr) 320px;
+  grid-template-rows: 56px minmax(0, 1fr);
+  grid-template-areas:
+    "header header header"
+    "sidebar list detail";
+  height: 100vh;
+  overflow: hidden;
+}
+
+.app-shell__header {
+  grid-area: header;
+}
+
+.app-shell__sidebar {
+  grid-area: sidebar;
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  background: var(--bg-elevated);
+}
+
+.app-shell__list {
+  grid-area: list;
+  overflow-y: auto;
+  padding: 20px 24px 32px;
+}
+
+.app-shell__detail {
+  grid-area: detail;
+  border-left: 1px solid var(--border);
+  overflow-y: auto;
+  background: var(--bg-elevated);
+}
+
+@media (max-width: 1024px) {
+  .app-shell {
+    grid-template-columns: 200px minmax(0, 1fr);
+    grid-template-areas:
+      "header header"
+      "sidebar list";
   }
+  .app-shell__detail {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .app-shell {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "header"
+      "list";
+  }
+  .app-shell__sidebar {
+    display: none;
+  }
+  .app-shell__list {
+    padding: 16px;
+  }
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }

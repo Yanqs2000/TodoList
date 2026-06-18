@@ -1,4 +1,5 @@
 import type { AchievementState } from '@/shared/types';
+import { DAILY_GOAL } from '@/shared/constants';
 import ProgressRing from './ProgressRing';
 import '../styles/Footer.css';
 
@@ -12,7 +13,7 @@ interface FooterProps {
   achievements?: AchievementState;
 }
 
-const DAILY_GOAL = 10;
+
 
 function Footer({ stats, onClearCompleted, achievements }: FooterProps) {
   const todayCompleted = achievements?.todayCompleted ?? 0;
@@ -27,25 +28,40 @@ function Footer({ stats, onClearCompleted, achievements }: FooterProps) {
 
   return (
     <div className="footer">
-      <div className="footer-stats">
-        <div className="footer-stat">
-          <ProgressRing current={todayCompleted} goal={DAILY_GOAL} />
-          <span className="footer-stat-label">今日目标</span>
+      <div className="footer-grid">
+        <div className="footer-card">
+          <ProgressRing current={todayCompleted} goal={DAILY_GOAL} size={56} strokeWidth={5} />
+          <div className="footer-card__meta">
+            <span className="footer-card__label">今日目标</span>
+            <span className="footer-card__sub">{todayCompleted} / {DAILY_GOAL}</span>
+          </div>
         </div>
-        <div className="footer-stat">
-          <span className="footer-stat-value">{streakDays}</span>
-          <span className="footer-stat-label">连续天数</span>
+
+        <div className="footer-card">
+          <div className="footer-card__big">
+            <span className="footer-card__value">{streakDays}</span>
+            <span className="footer-card__unit">天</span>
+          </div>
+          <div className="footer-card__meta">
+            <span className="footer-card__label">连续打卡</span>
+            <span className="footer-card__sub">不间断</span>
+          </div>
         </div>
-        <div className="footer-stat">
-          <span className="footer-stat-value">{stats.completed}</span>
-          <span className="footer-stat-label">总完成</span>
+
+        <div className="footer-card">
+          <div className="footer-card__big">
+            <span className="footer-card__value">{stats.completed}</span>
+          </div>
+          <div className="footer-card__meta">
+            <span className="footer-card__label">总完成</span>
+            <span className="footer-card__sub">共 {stats.total} 项 · 进行中 {stats.active}</span>
+          </div>
         </div>
       </div>
+
       <div className="footer-actions">
-        <span className="footer-summary">
-          共 {stats.total} 项 · 未完成 {stats.active}
-        </span>
         <button
+          type="button"
           className="btn-clear"
           disabled={stats.completed === 0}
           onClick={handleClearCompleted}

@@ -1,6 +1,6 @@
 # TodoList — 项目介绍
 
-> 当前版本：**v0.1.5**（2026-06-17）  
+> 当前版本：**v0.2.0**（2026-06-17）  
 > 仓库：https://github.com/Yanqs2000/TodoList
 
 一个具有游戏化体验的待办事项应用，支持中文界面。采用纯前端技术栈，零第三方依赖，使用 Canvas API 实现粒子效果，Web Audio API 实现音效合成。
@@ -17,8 +17,8 @@
 
 ## 功能特性
 
-### 🌙 深色模式
-右上角太阳/月亮图标切换，CSS 变量驱动全局配色，偏好持久化到 localStorage。
+### 🌙 6 主题系统
+3 种风格 × 2 种明暗 = 6 套主题（工作台/编辑器/纸笺 × 浅/深）。右上角主题按钮打开 popover，色块预览即时切换，CSS 变量驱动，偏好持久化到 localStorage。
 
 ### 🎉 撒花粒子系统
 完成任务时从 checkbox 位置爆发彩色粒子，纯 Canvas 实现，带重力和旋转效果。
@@ -117,11 +117,11 @@ src/
 
 ## 桌面端构建
 
-配置文件：`src-tauri/tauri.conf.json`，窗口 640×800，可调整大小。
+配置文件：`src-tauri/tauri.conf.json`，窗口默认 1080×720（最小 720×560），可调整大小。
 
 产物：
 - `src-tauri/target/release/bundle/macos/Todo List.app`
-- `src-tauri/target/release/bundle/dmg/Todo List_0.1.5_aarch64.dmg`
+- `src-tauri/target/release/bundle/dmg/Todo List_0.2.0_aarch64.dmg`
 
 需要 Rust 工具链（rustup）。国内需配置 crates.io 镜像（见 `~/.cargo/config.toml`）。
 
@@ -129,17 +129,17 @@ src/
 
 本应用使用 ad-hoc 签名（无需 Apple Developer 账号）。`npm run tauri:build` 会自动调用 `scripts/sign-macos-bundle.sh` 对 `.app` 做深度签名 + hardened runtime，对 `.dmg` 做外层签名。
 
-**用户首次打开需绕过 Gatekeeper**（右键打开或 `xattr -dr` 命令），详见 [installation-guide.md](./docs/installation-guide.md)。
+**用户首次打开需绕过 Gatekeeper**（右键打开或 `xattr -dr` 命令），详见 [installation-guide.md](./installation-guide.md)。
 
 > 当前仅构建 Apple Silicon（arm64）架构。Intel Mac 暂不支持。
 
 ## 测试
 
-48 个单元测试，覆盖 hooks、组件、工具函数。详见 [development-logs/v0.1.3-testing-guide.md](./development-logs/v0.1.3-testing-guide.md)。
+52 个单元测试，覆盖 hooks、组件、工具函数。详见 [development-logs/v0.1.3-testing-guide.md](./development-logs/v0.1.3-testing-guide.md)。
 
 ```
 Test Files  8 passed (8)
-     Tests  48 passed (48)
+     Tests  52 passed (52)
 ```
 
 ## 版本历史
@@ -152,6 +152,8 @@ Test Files  8 passed (8)
 | [v0.1.3](./development-logs/v0.1.3-categories.md) | 2026-06-14 | 任务分类、备注、搜索、导入导出 |
 | [v0.1.4](./development-logs/v0.1.4-code-review-bugfix.md) | 2026-06-17 | 系统性代码审查与 13 项 bug 修复 |
 | [v0.1.5](./development-logs/v0.1.5-restructure.md) | 2026-06-17 | feature-based 项目结构重组 + 文档统一 |
+| [v0.1.6](./development-logs/v0.1.6-macos-signing.md) | 2026-06-17 | macOS DMG 签名修复（ad-hoc + hardened runtime） |
+| [v0.2.0](./development-logs/v0.2.0-redesign.md) | 2026-06-17 | 三栏布局重构 + 6 主题系统 + 创建任务模态 |
 
 ## 后续规划
 

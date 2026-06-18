@@ -1,31 +1,98 @@
-.header {
-  text-align: center;
-  margin-bottom: 20px;
-  position: relative;
-}
-
-.header h1 {
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--text);
-  margin-bottom: 4px;
-}
-
-.header p {
-  font-size: 0.875rem;
-  color: var(--text-muted);
-}
-
-.header-actions {
+.app-header {
   display: flex;
-  gap: 8px;
-  position: absolute;
-  top: 0;
-  right: 0;
+  align-items: center;
+  gap: 16px;
+  height: 100%;
+  padding: 0 20px;
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--border);
 }
 
-@media (max-width: 480px) {
-  .header h1 {
-    font-size: 1.5rem;
+.app-header__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.app-header__logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--primary);
+  color: #fff;
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.app-header__title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.app-header__new-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card-bg);
+  color: var(--text);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all var(--transition);
+  flex-shrink: 0;
+}
+
+.app-header__new-btn:hover {
+  border-color: var(--primary);
+  background: var(--active-bg);
+  color: var(--primary);
+}
+
+.app-header__new-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.app-header__kbd {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  margin-left: 4px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text-light);
+  font-size: 0.6875rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.app-header__actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+@media (max-width: 720px) {
+  .app-header {
+    padding: 0 12px;
+    gap: 8px;
+  }
+  .app-header__title,
+  .app-header__kbd {
+    display: none;
+  }
+  .app-header__new-btn span:not(.app-header__kbd) {
+    display: none;
   }
 }

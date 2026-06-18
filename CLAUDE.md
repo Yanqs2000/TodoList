@@ -33,22 +33,22 @@ src/
 │   └── styles/App.css            # Global styles + theme variables
 ├── features/                     # Business features
 │   ├── tasks/                    # Task management
-│   │   ├── components/           # TaskInput, TaskList, TaskItem, FilterTabs,
-│   │   │                         # PrioritySelector, TimePicker, EmptyState
+│   │   ├── components/           # TaskList, TaskItem, Sidebar, DetailPanel,
+│   │   │                         # CreateTaskModal, TimePicker, EmptyState
 │   │   ├── hooks/                # useTodos, useDragDrop
-│   │   ├── lib/                  # validateTodo, id
+│   │   ├── lib/                  # validateTodo, id, formatTime
 │   │   └── styles/
 │   ├── achievements/             # AchievementDrawer, Toast, useAchievements
-│   ├── theme/                    # useTheme
+│   ├── theme/                    # useTheme, ThemeSwitcher (6 themes: 3 styles × 2 modes)
 │   ├── sound/                    # useSound
 │   ├── confetti/                 # ConfettiCanvas + useConfetti
 │   ├── feedback/                 # InfoToast
-│   ├── header/                   # Header + SearchBox
+│   ├── header/                   # Header
 │   └── stats/                    # Footer + ProgressRing
 ├── shared/                       # Cross-feature shared code
 │   ├── lib/storage.ts            # safeSetItem / safeGetItem
-│   ├── constants.ts              # CATEGORIES, CATEGORY_LABELS
-│   └── types.ts                  # Todo, Priority, FilterType, etc.
+│   ├── constants.ts              # CATEGORIES, CATEGORY_LABELS, PRIORITY_LABELS, DAILY_GOAL
+│   └── types.ts                  # Todo, Priority, FilterType, Category, TimeField, etc.
 ├── test/setup.ts
 └── vite-env.d.ts
 ```
@@ -71,7 +71,7 @@ Single-page todo list app with Chinese UI, gamification, and visual effects. Com
 
 **Hooks**:
 - `useTodos` (`features/tasks/hooks/`) — task CRUD, filtering, sortMode (manual/time), reorder, search, import/export, localStorage sync
-- `useTheme` (`features/theme/hooks/`) — dark/light mode, `data-theme` attribute on `<html>`, localStorage persistence
+- `useTheme` (`features/theme/hooks/`) — 6 themes (workspace/editor/paper × light/dark), `data-theme` attribute on `<html>`, localStorage persistence with legacy migration
 - `useSound` (`features/sound/hooks/`) — Web Audio API oscillator synthesis (complete/delete/achievement sounds), mute toggle
 - `useAchievements` (`features/achievements/hooks/`) — achievement unlock tracking, streak calculation, toast notifications
 - `useDragDrop` (`features/tasks/hooks/`) — HTML5 drag & drop state, dragover throttled via ref
@@ -79,22 +79,24 @@ Single-page todo list app with Chinese UI, gamification, and visual effects. Com
 
 **Types** (`src/shared/types.ts`): `Todo`, `Priority`, `FilterType`, `Category`, `TimeField`, `AchievementDef`, `AchievementState`
 
-**CSS theming**: `:root` defines light theme variables, `[data-theme="dark"]` overrides them. All components use `var(--*)` references. CSS files live alongside their feature in `features/<name>/styles/`.
+**CSS theming**: `[data-theme="<id>"]` defines 24 CSS variables per theme (6 themes: workspace/editor/paper × light/dark). All components use `var(--*)` references including `--category-*` and `--priority-*`. New components use BEM class naming. CSS files live alongside their feature in `features/<name>/styles/`.
+
+**Layout**: CSS Grid three-column shell (Sidebar 240px + List + Detail 320px), responsive breakpoints at 1024px and 720px. Task items use dual-row design (main row + sub row for tags).
 
 **localStorage keys**: `todo-tasks`, `todo-theme`, `todo-muted`, `todo-achievements`
 
 ## Documentation
 
 - `README.md` — project intro (latest version), mirrored in `docs/project-overview.md`
-- `docs/development-logs/` — per-version development logs (`v0.1.0-*.md` through `v0.1.5-*.md`)
+- `docs/development-logs/` — per-version development logs (`v0.1.0-*.md` through `v0.2.0-redesign.md`)
 
 ## Tauri Desktop Build
 
-Config: `src-tauri/tauri.conf.json`. Window: 640×800, resizable. Identifier: `com.todo-app.desktop`.
+Config: `src-tauri/tauri.conf.json`. Window: 1080×720 (min 720×560), resizable. Identifier: `com.todo-app.desktop`.
 
 Output:
 - `.app`: `src-tauri/target/release/bundle/macos/Todo List.app`
-- `.dmg`: `src-tauri/target/release/bundle/dmg/Todo List_0.1.0_aarch64.dmg`
+- `.dmg`: `src-tauri/target/release/bundle/dmg/Todo List_0.2.0_aarch64.dmg`
 
 Requires Rust toolchain (`rustup`). In China, configure crates.io mirror in `~/.cargo/config.toml` (USTC mirror works).
 

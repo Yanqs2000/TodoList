@@ -1,27 +1,19 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import type { Todo, Priority, TimeField } from '@/shared/types';
-import { CATEGORY_LABELS } from '@/shared/constants';
+import type { Todo } from '@/shared/types';
+import { CATEGORY_LABELS, PRIORITY_LABELS } from '@/shared/constants';
+import { formatTimeField } from '../lib/formatTime';
 import '../styles/TaskItem.css';
 import '../styles/DragDrop.css';
 
-const formatTimeTag = (time: TimeField): string => {
-  const formatSingle = (iso: string): string => {
-    if (!iso) return '';
-    const [datePart, timePart] = iso.split('T');
-    const [, month, day] = datePart.split('-');
-    return `${month}/${day} ${timePart}`;
-  };
-  if (time.end) {
-    return `${formatSingle(time.start)} - ${formatSingle(time.end)}`;
-  }
-  return formatSingle(time.start);
-};
+const formatTimeTag = formatTimeField;
 
 interface TaskItemProps {
   task: Todo;
+  selected?: boolean;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
   onEdit?: (id: string, updates: Partial<Pick<Todo, 'text' | 'priority' | 'time' | 'category' | 'notes'>>) => void;
+  onSelect?: (id: string | null) => void;
   draggingId?: string | null;
   overId?: string | null;
   onDragStart?: (e: React.DragEvent, id: string) => void;
@@ -31,20 +23,25 @@ interface TaskItemProps {
   onDragEnd?: () => void;
 }
 
-const priorityLabels: Record<Priority, string> = {
-  low: '低',
-  medium: '中',
-  high: '高',
-};
+const priorityLabels = PRIORITY_LABELS;
 
 function TaskItem({
-  task, onToggle, onDelete, onEdit,
-  draggingId, overId,
-  onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd,
+  task,
+  selected = false,
+  onToggle,
+  onDelete,
+  onEdit,
+  onSelect,
+  draggingId,
+  overId,
+  onDragStart,
+  onDragOver,
+  onDragLeave,
+  onDrop,
+  onDragEnd,
 }: TaskItemProps) {
   const [removing, setRemoving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
   const [editText, setEditText] = useState(task.text);
   const editInputRef = useRef<HTMLInputElement>(null);
   const removeTimerRef = useRef<number | null>(null);
@@ -79,11 +76,39 @@ function TaskItem({
     if (e.key === 'Escape') { setEditText(task.text); setIsEditing(false); }
   };
 
-  const handleToggle = useCallback(() => {
+  const handleToggle = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
     onToggle(task.id);
   }, [onToggle, task.id]);
 
-  const handleDelete = useCallback(() => {
+  const handleSelect = useCallback(() => {
+    if (isEditing) return;
+    onSelect?.(selected ? null : task.id);
+  }, [isEditing, onSelect, selected, task.id]);
+
+  const handleCardKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if (!isEditing && onSelect) {
+        onSelect(selected ? null : task.id);
+      }
+    }
+  }, [isEditing, onSelect, selected, task.id]);
+
+  const handleTextClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onSelect) {
+      onSelect(task.id);
+    }
+  }, [onSelect, task.id]);
+
+  const handleEditButtonClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsEditing(true);
+  }, []);
+
+  const handleDelete = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
     if (!window.confirm(`确定要删除任务「${task.text}」吗？`)) return;
     removeDoneRef.current = false;
     setRemoving(true);
@@ -106,101 +131,114 @@ function TaskItem({
   const isDragging = draggingId === task.id;
   const isOver = overId === task.id && draggingId !== task.id;
 
+  const hasSubRow = !!(task.category || task.notes || task.priority);
+
   return (
     <div
-      className={`task-item${task.completed ? ' completed' : ''}${removing ? ' removing' : ''}${isDragging ? ' dragging' : ''}${isOver ? ' drag-over' : ''}`}
+      className={`task-item${task.completed ? ' completed' : ''}${removing ? ' removing' : ''}${isDragging ? ' dragging' : ''}${isOver ? ' drag-over' : ''}${selected ? ' selected' : ''}`}
       data-task-id={task.id}
+      data-priority={task.priority}
       draggable={!!onDragStart}
+      onClick={onSelect ? handleSelect : undefined}
+      onKeyDown={onSelect ? handleCardKeyDown : undefined}
       onDragStart={onDragStart ? (e) => onDragStart(e, task.id) : undefined}
       onDragOver={onDragOver ? (e) => onDragOver(e, task.id) : undefined}
       onDragLeave={onDragLeave}
       onDrop={onDrop ? (e) => onDrop(e, task.id) : undefined}
       onDragEnd={onDragEnd}
+      tabIndex={onSelect ? 0 : undefined}
+      role={onSelect ? 'option' : undefined}
+      aria-selected={onSelect ? selected : undefined}
     >
-      <input
-        type="checkbox"
-        className="checkbox"
-        checked={task.completed}
-        onChange={handleToggle}
-        aria-label={task.completed ? '标记为未完成' : '标记为已完成'}
-      />
-      <svg className="checkbox-mark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true">
-        <path
-          d="M5 13l4 4L19 7"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-      {isEditing ? (
-        <input
-          ref={editInputRef}
-          className="edit-input"
-          value={editText}
-          onChange={(e) => setEditText(e.target.value)}
-          onBlur={handleEditSubmit}
-          onKeyDown={handleEditKeyDown}
-        />
-      ) : (
-        <span className="task-text" onClick={() => setIsEditing(true)}>
-          {task.text}
-        </span>
-      )}
-      <span className={`priority-tag ${task.priority}`}>
-        {priorityLabels[task.priority]}
-      </span>
-      {task.category && (
-        <span className={`category-tag category-${task.category}`}>
-          {CATEGORY_LABELS[task.category] || task.category}
-        </span>
-      )}
-      {task.time && (
-        <span className="time-tag">
-          {formatTimeTag(task.time)}
-        </span>
-      )}
-      <button
-        className="btn-edit"
-        aria-label="编辑任务"
-        onClick={() => setIsEditing(true)}
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z" />
-        </svg>
-      </button>
-      {task.notes && !isExpanded && (
-        <span className="notes-indicator" title="有备注">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
-          </svg>
-        </span>
-      )}
-      {task.notes && (
+      <div className="task-item__main">
         <button
-          className={`btn-expand${isExpanded ? ' expanded' : ''}`}
-          onClick={() => setIsExpanded(!isExpanded)}
-          aria-label={isExpanded ? '收起备注' : '展开备注'}
+          type="button"
+          className="checkbox-wrap"
+          onClick={handleToggle}
+          aria-label={task.completed ? '标记为未完成' : '标记为已完成'}
+          aria-pressed={task.completed}
+        >
+          <span className={`checkbox${task.completed ? ' checked' : ''}`}>
+            <svg className="checkbox-mark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M5 13l4 4L19 7"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </span>
+        </button>
+
+        {isEditing ? (
+          <input
+            ref={editInputRef}
+            className="edit-input"
+            value={editText}
+            onChange={(e) => setEditText(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            onBlur={handleEditSubmit}
+            onKeyDown={handleEditKeyDown}
+          />
+        ) : (
+          <span className="task-text" onClick={handleTextClick}>
+            {task.text}
+          </span>
+        )}
+
+        {task.time && (
+          <span className="time-tag" title={formatTimeTag(task.time)}>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+            </svg>
+            <span>{formatTimeTag(task.time)}</span>
+          </span>
+        )}
+
+        <button
+          type="button"
+          className="btn-edit"
+          aria-label="编辑任务"
+          onClick={handleEditButtonClick}
         >
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z" />
           </svg>
         </button>
-      )}
-      <button
-        className="btn-delete"
-        aria-label="删除任务"
-        onClick={handleDelete}
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M6 18L18 6M6 6l12 12"
-          />
-        </svg>
-      </button>
-      {task.notes && isExpanded && (
-        <div className="task-notes">
-          <p>{task.notes}</p>
+
+        <button
+          type="button"
+          className="btn-delete"
+          aria-label="删除任务"
+          onClick={handleDelete}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M6 18L18 6M6 6l12 12"
+            />
+          </svg>
+        </button>
+      </div>
+
+      {hasSubRow && (
+        <div className="task-item__sub">
+          <span className={`priority-tag priority-${task.priority}`}>
+            {priorityLabels[task.priority]}
+          </span>
+          {task.category && (
+            <span className={`category-tag category-${task.category}`}>
+              {CATEGORY_LABELS[task.category] || task.category}
+            </span>
+          )}
+          {task.notes && (
+            <span className="notes-indicator" title={task.notes}>
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+              </svg>
+              <span className="notes-indicator-text">{task.notes}</span>
+            </span>
+          )}
         </div>
       )}
     </div>

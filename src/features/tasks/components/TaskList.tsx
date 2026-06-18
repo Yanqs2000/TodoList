@@ -13,9 +13,11 @@ interface TaskListProps {
   onDelete: (id: string) => void;
   onEdit?: (id: string, updates: Partial<Pick<Todo, 'text' | 'priority' | 'time' | 'category' | 'notes'>>) => void;
   onReorder: (fromId: string, toId: string) => void;
+  selectedTaskId?: string | null;
+  onSelectTask?: (id: string | null) => void;
 }
 
-function TaskList({ tasks, filter, sortMode, onToggleSortMode, onToggle, onDelete, onEdit, onReorder }: TaskListProps) {
+function TaskList({ tasks, filter, sortMode, onToggleSortMode, onToggle, onDelete, onEdit, onReorder, selectedTaskId, onSelectTask }: TaskListProps) {
   const drag = useDragDrop(onReorder);
 
   if (tasks.length === 0) {
@@ -44,9 +46,11 @@ function TaskList({ tasks, filter, sortMode, onToggleSortMode, onToggle, onDelet
         <TaskItem
           key={task.id}
           task={task}
+          selected={selectedTaskId === task.id}
           onToggle={onToggle}
           onDelete={onDelete}
           onEdit={onEdit}
+          onSelect={onSelectTask}
           draggingId={drag.draggingId}
           overId={drag.overId}
           onDragStart={drag.handleDragStart}

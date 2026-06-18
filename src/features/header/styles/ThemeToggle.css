@@ -27,11 +27,3 @@
   width: 20px;
   height: 20px;
 }
-
-.header-actions {
-  display: flex;
-  gap: 8px;
-  position: absolute;
-  top: 0;
-  right: 0;
-}
