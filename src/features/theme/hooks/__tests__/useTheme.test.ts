@@ -54,4 +54,16 @@ describe('useTheme', () => {
     const { result } = renderHook(() => useTheme());
     expect(result.current.theme).toBe('workspace-dark');
   });
+
+  it('should migrate legacy "editor-light" value to mint-light (v0.2.0 → v0.2.1)', () => {
+    localStorage.setItem('todo-theme', 'editor-light');
+    const { result } = renderHook(() => useTheme());
+    expect(result.current.theme).toBe('mint-light');
+  });
+
+  it('should migrate legacy "editor-dark" value to mint-dark (v0.2.0 → v0.2.1)', () => {
+    localStorage.setItem('todo-theme', 'editor-dark');
+    const { result } = renderHook(() => useTheme());
+    expect(result.current.theme).toBe('mint-dark');
+  });
 });

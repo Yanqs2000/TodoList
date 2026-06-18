@@ -79,9 +79,11 @@ export function useTodos() {
     setSortMode('manual');
   }, []);
 
-  const clearCompleted = useCallback(() => {
+  const clearCompleted = useCallback((): number => {
+    const cleared = tasks.filter(t => t.completed).length;
     setTasks(prev => persist(prev.filter(t => !t.completed)));
-  }, []);
+    return cleared;
+  }, [tasks]);
 
   const stats = {
     total: tasks.length,

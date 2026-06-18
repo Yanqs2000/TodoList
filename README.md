@@ -1,6 +1,6 @@
 # TodoList — 项目介绍
 
-> 当前版本：**v0.2.0**（2026-06-17）  
+> 当前版本：**v0.2.1**（2026-06-18）  
 > 仓库：https://github.com/Yanqs2000/TodoList
 
 一个具有游戏化体验的待办事项应用，支持中文界面。采用纯前端技术栈，零第三方依赖，使用 Canvas API 实现粒子效果，Web Audio API 实现音效合成。
@@ -18,7 +18,7 @@
 ## 功能特性
 
 ### 🌙 6 主题系统
-3 种风格 × 2 种明暗 = 6 套主题（工作台/编辑器/纸笺 × 浅/深）。右上角主题按钮打开 popover，色块预览即时切换，CSS 变量驱动，偏好持久化到 localStorage。
+3 种风格 × 2 种明暗 = 6 套主题（工作台/薄荷/纸笺 × 浅/深）。右上角主题按钮打开 popover，色块预览即时切换，CSS 变量驱动，偏好持久化到 localStorage，含 legacy 值自动迁移。
 
 ### 🎉 撒花粒子系统
 完成任务时从 checkbox 位置爆发彩色粒子，纯 Canvas 实现，带重力和旋转效果。
@@ -49,9 +49,6 @@ HTML5 Drag & Drop API 实现任务重排，拖拽时有视觉反馈，排序结�
 ### 🔍 搜索
 按文本、分类、备注全文搜索。
 
-### 📦 导入 / 导出
-JSON 格式备份与恢复，导入时按字段 schema 校验，跳过无效项。
-
 ## 架构
 
 ### 数据流
@@ -66,22 +63,21 @@ src/
 │   └── styles/App.css
 ├── features/                     # 按业务功能划分
 │   ├── tasks/                    # 任务管理
-│   │   ├── components/           # TaskInput, TaskList, TaskItem,
-│   │   │                         # FilterTabs, PrioritySelector,
-│   │   │                         # TimePicker, EmptyState
+│   │   ├── components/           # TaskList, TaskItem, Sidebar, DetailPanel,
+│   │   │                         # CreateTaskModal, TimePicker, EmptyState
 │   │   ├── hooks/                # useTodos, useDragDrop
-│   │   ├── lib/                  # validateTodo, id
+│   │   ├── lib/                  # validateTodo, id, formatTime
 │   │   └── styles/
 │   ├── achievements/             # AchievementDrawer, Toast, useAchievements
-│   ├── theme/                    # useTheme
+│   ├── theme/                    # useTheme, ThemeSwitcher (6 主题)
 │   ├── sound/                    # useSound
 │   ├── confetti/                 # ConfettiCanvas
 │   ├── feedback/                 # InfoToast
-│   ├── header/                   # Header, SearchBox
+│   ├── header/                   # Header
 │   └── stats/                    # Footer, ProgressRing
 ├── shared/                       # 跨功能共享
 │   ├── lib/storage.ts            # safeSetItem / safeGetItem
-│   ├── constants.ts
+│   ├── constants.ts              # CATEGORIES, PRIORITY_LABELS, DAILY_GOAL
 │   └── types.ts
 ├── test/setup.ts
 └── vite-env.d.ts
@@ -93,8 +89,8 @@ src/
 ### Hooks 职责
 | Hook | 位置 | 职责 |
 |------|------|------|
-| `useTodos` | `features/tasks/hooks/` | 任务 CRUD、过滤、排序、搜索、导入导出、localStorage 同步 |
-| `useTheme` | `features/theme/hooks/` | 深色/浅色模式切换 |
+| `useTodos` | `features/tasks/hooks/` | 任务 CRUD、过滤、排序、搜索、localStorage 同步 |
+| `useTheme` | `features/theme/hooks/` | 6 主题切换 + legacy 值自动迁移 |
 | `useSound` | `features/sound/hooks/` | Web Audio 音效合成与静音控制 |
 | `useAchievements` | `features/achievements/hooks/` | 成就解锁追踪、连续天数计算 |
 | `useDragDrop` | `features/tasks/hooks/` | 拖拽状态管理（含 dragover 节流） |
@@ -121,7 +117,7 @@ src/
 
 产物：
 - `src-tauri/target/release/bundle/macos/Todo List.app`
-- `src-tauri/target/release/bundle/dmg/Todo List_0.2.0_aarch64.dmg`
+- `src-tauri/target/release/bundle/dmg/Todo List_0.2.1_aarch64.dmg`
 
 需要 Rust 工具链（rustup）。国内需配置 crates.io 镜像（见 `~/.cargo/config.toml`）。
 
@@ -154,6 +150,7 @@ Test Files  8 passed (8)
 | [v0.1.5](./docs/development-logs/v0.1.5-restructure.md) | 2026-06-17 | feature-based 项目结构重组 + 文档统一 |
 | [v0.1.6](./docs/development-logs/v0.1.6-macos-signing.md) | 2026-06-17 | macOS DMG 签名修复（ad-hoc + hardened runtime） |
 | [v0.2.0](./docs/development-logs/v0.2.0-redesign.md) | 2026-06-17 | 三栏布局重构 + 6 主题系统 + 创建任务模态 |
+| [v0.2.1](./docs/development-logs/v0.2.1-feedback-tweaks.md) | 2026-06-18 | 用户反馈调整：mint 主题 + 默认进行中 + 移除导入导出 |
 
 ## 后续规划
 

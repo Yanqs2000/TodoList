@@ -3,18 +3,28 @@ import { render, screen } from '@testing-library/react';
 import EmptyState from '../EmptyState';
 
 describe('EmptyState', () => {
-  it('should show message for all filter', () => {
-    render(<EmptyState filter="all" />);
+  it('should show "no tasks yet" when there are no tasks at all (default)', () => {
+    render(<EmptyState filter="active" />);
     expect(screen.getByText('还没有任务，添加一个吧')).toBeInTheDocument();
   });
 
-  it('should show message for active filter', () => {
-    render(<EmptyState filter="active" />);
+  it('should show "all done" only when there are tasks but active filter is empty', () => {
+    render(<EmptyState filter="active" hasAnyTasks={true} />);
     expect(screen.getByText('所有任务都完成了！')).toBeInTheDocument();
   });
 
-  it('should show message for completed filter', () => {
-    render(<EmptyState filter="completed" />);
+  it('should show "no completed" when filter=completed and tasks exist', () => {
+    render(<EmptyState filter="completed" hasAnyTasks={true} />);
     expect(screen.getByText('还没有已完成的任务')).toBeInTheDocument();
+  });
+
+  it('should show "no matching" when filter=all but list is empty (search/category)', () => {
+    render(<EmptyState filter="all" hasAnyTasks={true} />);
+    expect(screen.getByText('没有匹配的任务')).toBeInTheDocument();
+  });
+
+  it('should show "no tasks yet" regardless of filter when hasAnyTasks is false', () => {
+    render(<EmptyState filter="completed" hasAnyTasks={false} />);
+    expect(screen.getByText('还没有任务，添加一个吧')).toBeInTheDocument();
   });
 });

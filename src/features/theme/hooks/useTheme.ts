@@ -90,13 +90,26 @@ function getInitialTheme(): ThemeId {
 export function useTheme() {
   const [theme, setThemeState] = useState<ThemeId>(getInitialTheme);
 
+  // Sync data-theme attribute on every theme change. We do NOT persist here:
+  // persistence is reserved for explicit user actions in setTheme below, so
+  // a `prefers-color-scheme` probe on first launch does not get baked into
+  // localStorage (which would break system-theme follow-along).
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
-    safeSetItem(STORAGE_KEY, theme);
   }, [theme]);
+
+  // One-time migration: if storage holds a legacy value, normalize it on mount.
+  useEffect(() => {
+    const stored = safeGetItem(STORAGE_KEY);
+    if (stored !== null && !isValidThemeId(stored) && migrateLegacy(stored)) {
+      safeSetItem(STORAGE_KEY, theme);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const setTheme = useCallback((id: ThemeId) => {
     setThemeState(id);
+    safeSetItem(STORAGE_KEY, id);
   }, []);
 
   return { theme, setTheme };

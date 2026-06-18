@@ -7,6 +7,7 @@ import EmptyState from './EmptyState';
 interface TaskListProps {
   tasks: Todo[];
   filter: FilterType;
+  hasAnyTasks: boolean;
   sortMode: 'manual' | 'time';
   onToggleSortMode: (mode: 'manual' | 'time') => void;
   onToggle: (id: string) => void;
@@ -17,11 +18,11 @@ interface TaskListProps {
   onSelectTask?: (id: string | null) => void;
 }
 
-function TaskList({ tasks, filter, sortMode, onToggleSortMode, onToggle, onDelete, onEdit, onReorder, selectedTaskId, onSelectTask }: TaskListProps) {
+function TaskList({ tasks, filter, hasAnyTasks, sortMode, onToggleSortMode, onToggle, onDelete, onEdit, onReorder, selectedTaskId, onSelectTask }: TaskListProps) {
   const drag = useDragDrop(onReorder);
 
   if (tasks.length === 0) {
-    return <EmptyState filter={filter} />;
+    return <EmptyState filter={filter} hasAnyTasks={hasAnyTasks} />;
   }
 
   return (

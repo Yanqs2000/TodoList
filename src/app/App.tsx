@@ -23,8 +23,6 @@ interface InfoToastState {
   tone: 'success' | 'error';
 }
 
-
-
 function App() {
   const todoState = useTodos();
   const { theme, setTheme } = useTheme();
@@ -54,6 +52,10 @@ function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  useEffect(() => () => {
+    if (infoTimerRef.current !== null) clearTimeout(infoTimerRef.current);
   }, []);
 
   const handleToggle = useCallback((id: string) => {
@@ -86,10 +88,8 @@ function App() {
   }, [todoState]);
 
   const handleClearCompleted = useCallback(() => {
-    const count = todoState.stats.completed;
-    if (count === 0) return;
-    todoState.clearCompleted();
-    showInfo(`已清除 ${count} 个已完成任务`, 'success');
+    const cleared = todoState.clearCompleted();
+    if (cleared > 0) showInfo(`已清除 ${cleared} 个已完成任务`, 'success');
   }, [todoState]);
 
   const selectedTask = selectedTaskId
@@ -175,6 +175,7 @@ function App() {
         <TaskList
           tasks={todoState.tasks}
           filter={todoState.filter}
+          hasAnyTasks={todoState.allTasks.length > 0}
           sortMode={todoState.sortMode}
           onToggleSortMode={todoState.setSortMode}
           onToggle={handleToggle}

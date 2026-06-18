@@ -13,8 +13,6 @@ interface FooterProps {
   achievements?: AchievementState;
 }
 
-
-
 function Footer({ stats, onClearCompleted, achievements }: FooterProps) {
   const todayCompleted = achievements?.todayCompleted ?? 0;
   const streakDays = achievements?.streakDays ?? 0;

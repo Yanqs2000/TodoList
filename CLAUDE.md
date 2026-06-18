@@ -71,7 +71,7 @@ Single-page todo list app with Chinese UI, gamification, and visual effects. Com
 
 **Hooks**:
 - `useTodos` (`features/tasks/hooks/`) — task CRUD, filtering, sortMode (manual/time), reorder, search, import/export, localStorage sync
-- `useTheme` (`features/theme/hooks/`) — 6 themes (workspace/editor/paper × light/dark), `data-theme` attribute on `<html>`, localStorage persistence with legacy migration
+- `useTheme` (`features/theme/hooks/`) — 6 themes (workspace/mint/paper × light/dark), `data-theme` attribute on `<html>`, localStorage persistence with legacy migration
 - `useSound` (`features/sound/hooks/`) — Web Audio API oscillator synthesis (complete/delete/achievement sounds), mute toggle
 - `useAchievements` (`features/achievements/hooks/`) — achievement unlock tracking, streak calculation, toast notifications
 - `useDragDrop` (`features/tasks/hooks/`) — HTML5 drag & drop state, dragover throttled via ref
@@ -79,7 +79,7 @@ Single-page todo list app with Chinese UI, gamification, and visual effects. Com
 
 **Types** (`src/shared/types.ts`): `Todo`, `Priority`, `FilterType`, `Category`, `TimeField`, `AchievementDef`, `AchievementState`
 
-**CSS theming**: `[data-theme="<id>"]` defines 24 CSS variables per theme (6 themes: workspace/editor/paper × light/dark). All components use `var(--*)` references including `--category-*` and `--priority-*`. New components use BEM class naming. CSS files live alongside their feature in `features/<name>/styles/`.
+**CSS theming**: 3-layer cascade — `:root` (universal tokens), `[data-theme$="-light/-dark"]` (mode-shared tokens), `[data-theme="<id>"]` (theme-specific overrides). 6 themes: workspace/mint/paper × light/dark. All components use `var(--*)` references including `--category-*` and `--priority-*`. New components use BEM class naming. CSS files live alongside their feature in `features/<name>/styles/`.
 
 **Layout**: CSS Grid three-column shell (Sidebar 240px + List + Detail 320px), responsive breakpoints at 1024px and 720px. Task items use dual-row design (main row + sub row for tags).
 
