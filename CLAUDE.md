@@ -42,6 +42,7 @@ src/
 │   ├── theme/                    # useTheme, ThemeSwitcher (6 themes: 3 styles × 2 modes)
 │   ├── sound/                    # useSound (complete/delete/achievement/reminder tones)
 │   ├── reminders/                # useReminders (time-based reminders + Notification)
+│   ├── desktop/                  # useDesktop, SettingsModal (Tauri tray/shortcut/autostart bridge)
 │   ├── confetti/                 # ConfettiCanvas + useConfetti
 │   ├── feedback/                 # InfoToast
 │   ├── header/                   # Header
@@ -75,6 +76,7 @@ Single-page todo list app with Chinese UI, gamification, and visual effects. Com
 - `useTheme` (`features/theme/hooks/`) — 6 themes (workspace/mint/paper × light/dark), `data-theme` attribute on `<html>`, localStorage persistence with legacy migration
 - `useSound` (`features/sound/hooks/`) — Web Audio API oscillator synthesis (complete/delete/achievement/reminder sounds), mute toggle
 - `useReminders` (`features/reminders/hooks/`) — watches tasks with `time.start`, fires reminder when due (~30s tick), de-dupes via localStorage `todo-reminded`
+- `useDesktop` (`features/desktop/hooks/`) — Tauri bridge: listens for `open-create-modal` event, manages global shortcut + autostart preferences. Detects Tauri via `__TAURI_INTERNALS__`; no-op on web.
 - `useAchievements` (`features/achievements/hooks/`) — achievement unlock tracking, streak calculation, toast notifications
 - `useDragDrop` (`features/tasks/hooks/`) — HTML5 drag & drop state, dragover throttled via ref
 - `useConfetti` (in `features/confetti/components/ConfettiCanvas.tsx`) — Canvas particle burst system
@@ -85,7 +87,7 @@ Single-page todo list app with Chinese UI, gamification, and visual effects. Com
 
 **Layout**: CSS Grid three-column shell (Sidebar 240px + List + Detail 320px), responsive breakpoints at 1024px and 720px. Task items use dual-row design (main row + sub row for tags).
 
-**localStorage keys**: `todo-tasks`, `todo-theme`, `todo-muted`, `todo-achievements`, `todo-reminded`
+**localStorage keys**: `todo-tasks`, `todo-theme`, `todo-muted`, `todo-achievements`, `todo-reminded`, `todo-shortcut`
 
 ## Documentation
 
@@ -98,7 +100,9 @@ Config: `src-tauri/tauri.conf.json`. Window: 1080×720 (min 720×560), resizable
 
 Output:
 - `.app`: `src-tauri/target/release/bundle/macos/Todo List.app`
-- `.dmg`: `src-tauri/target/release/bundle/dmg/Todo List_0.3.1_aarch64.dmg`
+- `.dmg`: `src-tauri/target/release/bundle/dmg/Todo List_0.4.0_aarch64.dmg`
+
+Tauri plugins enabled: `tauri-plugin-log`, `tauri-plugin-notification`, `tauri-plugin-autostart`, `tauri-plugin-global-shortcut`. Tray + close-to-tray + global shortcut handling lives in `src-tauri/src/lib.rs`.
 
 Requires Rust toolchain (`rustup`). In China, configure crates.io mirror in `~/.cargo/config.toml` (USTC mirror works).
 

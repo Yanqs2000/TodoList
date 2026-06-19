@@ -17,6 +17,8 @@ import DetailPanel from '@/features/tasks/components/DetailPanel';
 import ThemeSwitcher from '@/features/theme/components/ThemeSwitcher';
 import CreateTaskModal from '@/features/tasks/components/CreateTaskModal';
 import { useReminders, type ReminderEvent } from '@/features/reminders/hooks/useReminders';
+import { useDesktop } from '@/features/desktop/hooks/useDesktop';
+import SettingsModal from '@/features/desktop/components/SettingsModal';
 import './styles/App.css';
 
 interface InfoToastState {
@@ -33,6 +35,7 @@ function App() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [themeSwitcherOpen, setThemeSwitcherOpen] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [infoToast, setInfoToast] = useState<InfoToastState | null>(null);
   const infoTimerRef = useRef<number | null>(null);
@@ -83,6 +86,8 @@ function App() {
   }, [sound]);
 
   useReminders(todoState.allTasks, handleReminder);
+
+  const desktop = useDesktop(useCallback(() => setCreateModalOpen(true), []));
 
   const handleToggle = useCallback((id: string) => {
     const task = todoState.allTasks.find(t => t.id === id);
@@ -148,6 +153,16 @@ function App() {
         defaultPriority={todoState.priority}
       />
 
+      <SettingsModal
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        isDesktop={desktop.isDesktop}
+        shortcut={desktop.shortcut}
+        onSetShortcut={desktop.setShortcut}
+        autostartEnabled={desktop.autostartEnabled}
+        onToggleAutostart={desktop.toggleAutostart}
+      />
+
       <div className="sr-only" role="status" aria-live="polite">
         {achievements.toast ? `成就解锁：${achievements.toast.name} — ${achievements.toast.description}` : ''}
         {infoToast ? infoToast.message : ''}
@@ -176,6 +191,7 @@ function App() {
           onOpenThemeSwitcher={() => setThemeSwitcherOpen(true)}
           onOpenAchievements={() => setDrawerOpen(true)}
           onOpenCreateModal={() => setCreateModalOpen(true)}
+          onOpenSettings={() => setSettingsOpen(true)}
           muted={sound.muted}
           onToggleMuted={sound.toggleMuted}
         />
