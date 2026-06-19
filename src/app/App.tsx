@@ -16,6 +16,7 @@ import Sidebar from '@/features/tasks/components/Sidebar';
 import DetailPanel from '@/features/tasks/components/DetailPanel';
 import ThemeSwitcher from '@/features/theme/components/ThemeSwitcher';
 import CreateTaskModal from '@/features/tasks/components/CreateTaskModal';
+import { useReminders, type ReminderEvent } from '@/features/reminders/hooks/useReminders';
 import './styles/App.css';
 
 interface InfoToastState {
@@ -57,6 +58,31 @@ function App() {
   useEffect(() => () => {
     if (infoTimerRef.current !== null) clearTimeout(infoTimerRef.current);
   }, []);
+
+  // Request notification permission once on first task with a time set.
+  useEffect(() => {
+    if (typeof Notification === 'undefined') return;
+    if (Notification.permission !== 'default') return;
+    if (!todoState.allTasks.some(t => t.time?.start && !t.completed)) return;
+    Notification.requestPermission().catch(() => {});
+  }, [todoState.allTasks]);
+
+  const handleReminder = useCallback((event: ReminderEvent) => {
+    sound.playReminder();
+    showInfo(`⏰ 任务到时间了：${event.text}`, 'success');
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      try {
+        new Notification('Todo List 提醒', {
+          body: event.text,
+          tag: `todo-reminder-${event.taskId}`,
+        });
+      } catch {
+        // ignore notification failures (some browsers reject from non-secure contexts)
+      }
+    }
+  }, [sound]);
+
+  useReminders(todoState.allTasks, handleReminder);
 
   const handleToggle = useCallback((id: string) => {
     const task = todoState.allTasks.find(t => t.id === id);

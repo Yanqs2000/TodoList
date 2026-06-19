@@ -1,6 +1,6 @@
 # TodoList — 项目介绍
 
-> 当前版本：**v0.2.1**（2026-06-18）  
+> 当前版本：**v0.3.0**（2026-06-18）  
 > 仓库：https://github.com/Yanqs2000/TodoList
 
 一个具有游戏化体验的待办事项应用，支持中文界面。采用纯前端技术栈，零第三方依赖，使用 Canvas API 实现粒子效果，Web Audio API 实现音效合成。
@@ -48,6 +48,9 @@ HTML5 Drag & Drop API 实现任务重排，拖拽时有视觉反馈，排序结�
 
 ### 🔍 搜索
 按文本、分类、备注全文搜索。
+
+### ⏰ 时间提醒
+为任务设置时间后，到时自动通过系统通知 + 5 秒柔和音效 + 屏内 toast 三重提醒。已提醒的任务持久化记录，重启不重复。
 
 ## 架构
 
@@ -117,7 +120,7 @@ src/
 
 产物：
 - `src-tauri/target/release/bundle/macos/Todo List.app`
-- `src-tauri/target/release/bundle/dmg/Todo List_0.2.1_aarch64.dmg`
+- `src-tauri/target/release/bundle/dmg/Todo List_0.3.0_aarch64.dmg`
 
 需要 Rust 工具链（rustup）。国内需配置 crates.io 镜像（见 `~/.cargo/config.toml`）。
 
@@ -131,11 +134,11 @@ src/
 
 ## 测试
 
-52 个单元测试，覆盖 hooks、组件、工具函数。详见 [development-logs/v0.1.3-testing-guide.md](./development-logs/v0.1.3-testing-guide.md)。
+59 个单元测试，覆盖 hooks、组件、工具函数。详见 [development-logs/v0.1.3-testing-guide.md](./development-logs/v0.1.3-testing-guide.md)。
 
 ```
-Test Files  8 passed (8)
-     Tests  52 passed (52)
+Test Files  9 passed (9)
+     Tests  59 passed (59)
 ```
 
 ## 版本历史
@@ -151,6 +154,7 @@ Test Files  8 passed (8)
 | [v0.1.6](./development-logs/v0.1.6-macos-signing.md) | 2026-06-17 | macOS DMG 签名修复（ad-hoc + hardened runtime） |
 | [v0.2.0](./development-logs/v0.2.0-redesign.md) | 2026-06-17 | 三栏布局重构 + 6 主题系统 + 创建任务模态 |
 | [v0.2.1](./development-logs/v0.2.1-feedback-tweaks.md) | 2026-06-18 | 用户反馈调整：mint 主题 + 默认进行中 + 移除导入导出 |
+| [v0.3.0](./development-logs/v0.3.0-reminders.md) | 2026-06-18 | 时间提醒功能 + mint 主题淡雅化 |
 
 ## 后续规划
 

@@ -33,8 +33,8 @@ export const THEMES: Record<ThemeId, ThemeMeta> = {
   'mint-light': {
     id: 'mint-light',
     name: '薄荷 · 浅',
-    description: '浅绿底，清新自然',
-    swatch: { bg: '#F0FDFA', card: '#FFFFFF', accent: '#0D9488' },
+    description: '淡雅薄荷，柔和清新',
+    swatch: { bg: '#F7FAF9', card: '#FFFFFF', accent: '#0D9488' },
   },
   'paper-light': {
     id: 'paper-light',
@@ -51,8 +51,8 @@ export const THEMES: Record<ThemeId, ThemeMeta> = {
   'mint-dark': {
     id: 'mint-dark',
     name: '薄荷 · 深',
-    description: '深绿底，护眼舒适',
-    swatch: { bg: '#0A1F1C', card: '#13302C', accent: '#2DD4BF' },
+    description: '中性深灰，沉稳护眼',
+    swatch: { bg: '#1A1D1C', card: '#25292B', accent: '#2DD4BF' },
   },
   'paper-dark': {
     id: 'paper-dark',

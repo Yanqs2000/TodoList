@@ -61,6 +61,15 @@ export function useSound() {
     setTimeout(() => playTone(1047, 0.2, 'sine', 0.12), 300);
   }, [playTone]);
 
+  // ~5s 柔和提醒：5 次双音钟声（C5+E5），每次 ~1s 间隔
+  const playReminder = useCallback(() => {
+    for (let i = 0; i < 5; i++) {
+      const delay = i * 1000;
+      setTimeout(() => playTone(523, 0.6, 'sine', 0.12), delay);
+      setTimeout(() => playTone(659, 0.6, 'sine', 0.10), delay + 80);
+    }
+  }, [playTone]);
+
   const toggleMuted = useCallback(() => {
     setMutedState(prev => {
       const next = !prev;
@@ -69,5 +78,5 @@ export function useSound() {
     });
   }, []);
 
-  return { muted, toggleMuted, playComplete, playDelete, playAchievement };
+  return { muted, toggleMuted, playComplete, playDelete, playAchievement, playReminder };
 }
