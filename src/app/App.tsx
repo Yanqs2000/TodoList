@@ -14,7 +14,6 @@ import Toast from '@/features/achievements/components/Toast';
 import InfoToast from '@/features/feedback/components/InfoToast';
 import Sidebar from '@/features/tasks/components/Sidebar';
 import DetailPanel from '@/features/tasks/components/DetailPanel';
-import ThemeSwitcher from '@/features/theme/components/ThemeSwitcher';
 import CreateTaskModal from '@/features/tasks/components/CreateTaskModal';
 import { useReminders, type ReminderEvent } from '@/features/reminders/hooks/useReminders';
 import { useDesktop } from '@/features/desktop/hooks/useDesktop';
@@ -33,7 +32,6 @@ function App() {
   const achievements = useAchievements(sound.playAchievement);
   const confetti = useConfetti();
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [themeSwitcherOpen, setThemeSwitcherOpen] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
@@ -136,16 +134,6 @@ function App() {
         allAchievements={achievements.allAchievements}
       />
 
-      <ThemeSwitcher
-        open={themeSwitcherOpen}
-        currentTheme={theme}
-        onClose={() => setThemeSwitcherOpen(false)}
-        onSelect={(id) => {
-          setTheme(id);
-          setThemeSwitcherOpen(false);
-        }}
-      />
-
       <CreateTaskModal
         open={createModalOpen}
         onClose={() => setCreateModalOpen(false)}
@@ -161,6 +149,8 @@ function App() {
         onSetShortcut={desktop.setShortcut}
         autostartEnabled={desktop.autostartEnabled}
         onToggleAutostart={desktop.toggleAutostart}
+        currentTheme={theme}
+        onSelectTheme={setTheme}
       />
 
       <div className="sr-only" role="status" aria-live="polite">
@@ -187,8 +177,6 @@ function App() {
 
       <div className="app-shell__header">
         <Header
-          theme={theme}
-          onOpenThemeSwitcher={() => setThemeSwitcherOpen(true)}
           onOpenAchievements={() => setDrawerOpen(true)}
           onOpenCreateModal={() => setCreateModalOpen(true)}
           onOpenSettings={() => setSettingsOpen(true)}

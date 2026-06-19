@@ -53,7 +53,12 @@ fn set_global_shortcut(app: AppHandle, shortcut: String) -> Result<(), String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-  let default_shortcut: Shortcut = Shortcut::new(Some(Modifiers::ALT), Code::Space);
+  // Default: Cmd+Option+T on macOS, Ctrl+Alt+T elsewhere. Tauri's
+  // Modifiers::SUPER maps to Cmd on macOS / Win on Windows / Super on Linux.
+  let default_shortcut: Shortcut = Shortcut::new(
+    Some(Modifiers::SUPER | Modifiers::ALT),
+    Code::KeyT,
+  );
 
   tauri::Builder::default()
     .plugin(tauri_plugin_notification::init())

@@ -39,7 +39,7 @@ src/
 │   │   ├── lib/                  # validateTodo, id, formatTime
 │   │   └── styles/
 │   ├── achievements/             # AchievementDrawer, Toast, useAchievements
-│   ├── theme/                    # useTheme, ThemeSwitcher (6 themes: 3 styles × 2 modes)
+│   ├── theme/                    # useTheme (6 themes; switcher UI lives in features/desktop/SettingsModal)
 │   ├── sound/                    # useSound (complete/delete/achievement/reminder tones)
 │   ├── reminders/                # useReminders (time-based reminders + Notification)
 │   ├── desktop/                  # useDesktop, SettingsModal (Tauri tray/shortcut/autostart bridge)
@@ -100,7 +100,7 @@ Config: `src-tauri/tauri.conf.json`. Window: 1080×720 (min 720×560), resizable
 
 Output:
 - `.app`: `src-tauri/target/release/bundle/macos/Todo List.app`
-- `.dmg`: `src-tauri/target/release/bundle/dmg/Todo List_0.4.0_aarch64.dmg`
+- `.dmg`: `src-tauri/target/release/bundle/dmg/Todo List_0.4.1_aarch64.dmg`
 
 Tauri plugins enabled: `tauri-plugin-log`, `tauri-plugin-notification`, `tauri-plugin-autostart`, `tauri-plugin-global-shortcut`. Tray + close-to-tray + global shortcut handling lives in `src-tauri/src/lib.rs`.
 

@@ -1,6 +1,6 @@
 # TodoList — 项目介绍
 
-> 当前版本：**v0.4.0**（2026-06-19）  
+> 当前版本：**v0.4.1**（2026-06-19）  
 > 仓库:https://github.com/Yanqs2000/TodoList
 
 一个具有游戏化体验的待办事项应用，支持中文界面。采用纯前端技术栈，零第三方依赖，使用 Canvas API 实现粒子效果，Web Audio API 实现音效合成。
@@ -55,8 +55,9 @@ HTML5 Drag & Drop API 实现任务重排，拖拽时有视觉反馈，排序结�
 ### 🍎 桌面原生体验（v0.4.0+）
 - 系统托盘图标，左键切换显示，右键唤出菜单
 - 关闭即隐藏到托盘，应用持续后台运行
-- 全局热键 `Alt+Space`（可在设置中改）任意应用下快速添加任务
+- 全局热键 `⌘⌥T`（macOS）/ `Ctrl+Alt+T`（其他平台），可在设置中改
 - 可选开机自启动
+- 主题切换内嵌在设置面板（v0.4.1 起）
 
 ## 架构
 
@@ -126,7 +127,7 @@ src/
 
 产物：
 - `src-tauri/target/release/bundle/macos/Todo List.app`
-- `src-tauri/target/release/bundle/dmg/Todo List_0.4.0_aarch64.dmg`
+- `src-tauri/target/release/bundle/dmg/Todo List_0.4.1_aarch64.dmg`
 
 需要 Rust 工具链（rustup）。国内需配置 crates.io 镜像（见 `~/.cargo/config.toml`）。
 
@@ -163,6 +164,7 @@ Test Files  9 passed (9)
 | [v0.3.0](./development-logs/v0.3.0-reminders.md) | 2026-06-18 | 时间提醒功能 + mint 主题淡雅化 |
 | [v0.3.1](./development-logs/v0.3.1-time-tweaks.md) | 2026-06-19 | 详情面板支持修改时间 + 默认时间为当前 |
 | [v0.4.0](./development-logs/v0.4.0-desktop-native.md) | 2026-06-19 | 桌面原生体验：托盘 + 全局热键 + 关闭隐藏 + 自启动 |
+| [v0.4.1](./development-logs/v0.4.1-shortcut-fix.md) | 2026-06-19 | 设置面板整合主题 + 热键录制修复 + 默认 ⌘⌥T |
 
 ## 后续规划
 

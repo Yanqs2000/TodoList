@@ -2,7 +2,7 @@ import { useEffect, useCallback, useState, useRef } from 'react';
 import { safeSetItem, safeGetItem } from '@/shared/lib/storage';
 
 const SHORTCUT_KEY = 'todo-shortcut';
-export const DEFAULT_SHORTCUT = 'Alt+Space';
+export const DEFAULT_SHORTCUT = 'Cmd+Alt+KeyT';
 
 /**
  * Detects whether the app is running inside Tauri. We avoid hard-importing the
