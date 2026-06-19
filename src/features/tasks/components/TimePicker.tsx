@@ -22,11 +22,23 @@ function formatDate(year: number, month: number, day: number, time: string): str
   return `${year}-${m}-${d}T${time}`;
 }
 
-function parseDateTime(iso: string): { year: number; month: number; day: number; time: string } {
-  if (!iso) return { year: new Date().getFullYear(), month: new Date().getMonth(), day: new Date().getDate(), time: '09:00' };
+function parseStart(iso: string): { year: number; month: number; day: number; time: string } {
+  if (!iso) {
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    return { year: now.getFullYear(), month: now.getMonth(), day: now.getDate(), time: `${hh}:${mm}` };
+  }
   const [datePart, timePart] = iso.split('T');
   const [year, month, day] = datePart.split('-').map(Number);
   return { year, month: month - 1, day, time: timePart || '09:00' };
+}
+
+function parseEnd(iso: string, fallbackDate: { year: number; month: number; day: number }): { year: number; month: number; day: number; time: string } {
+  if (!iso) return { ...fallbackDate, time: '18:00' };
+  const [datePart, timePart] = iso.split('T');
+  const [year, month, day] = datePart.split('-').map(Number);
+  return { year, month: month - 1, day, time: timePart || '18:00' };
 }
 
 const hours = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
@@ -60,8 +72,8 @@ function TimeScroller({ value, onChange, options }: { value: string; onChange: (
 
 function TimePicker({ time, onTimeChange, onClose }: TimePickerProps) {
   const [mode, setMode] = useState<'point' | 'range'>(time?.end ? 'range' : 'point');
-  const startParsed = parseDateTime(time?.start || '');
-  const endParsed = parseDateTime(time?.end || '');
+  const startParsed = parseStart(time?.start || '');
+  const endParsed = parseEnd(time?.end || '', startParsed);
 
   const [startDate, setStartDate] = useState(startParsed);
   const [endDate, setEndDate] = useState(endParsed);

@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import type { Todo, Category } from '@/shared/types';
+import type { Todo, Category, TimeField } from '@/shared/types';
 import { CATEGORY_LABELS, PRIORITY_LABELS, PRIORITIES } from '@/shared/constants';
 import { formatTimeField } from '../lib/formatTime';
+import TimePicker from './TimePicker';
 import '../styles/DetailPanel.css';
 
 interface DetailPanelProps {
@@ -36,6 +37,7 @@ function DetailPanel({
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editTitle, setEditTitle] = useState(selectedTask?.text ?? '');
   const [notesDraft, setNotesDraft] = useState(selectedTask?.notes ?? '');
+  const [showTimePicker, setShowTimePicker] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const notesRef = useRef<HTMLTextAreaElement>(null);
 
@@ -44,6 +46,7 @@ function DetailPanel({
     setIsEditingTitle(false);
     setEditTitle(selectedTask?.text ?? '');
     setNotesDraft(selectedTask?.notes ?? '');
+    setShowTimePicker(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTask?.id]);
 
@@ -106,6 +109,12 @@ function DetailPanel({
   const handleClearTime = () => {
     if (!selectedTask) return;
     onEdit(selectedTask.id, { time: undefined });
+    setShowTimePicker(false);
+  };
+
+  const handleTimeChange = (time: TimeField | undefined) => {
+    if (!selectedTask) return;
+    onEdit(selectedTask.id, { time });
   };
 
   const handleDelete = () => {
@@ -268,7 +277,24 @@ function DetailPanel({
             ) : (
               <span className="detail__time-empty">未设置</span>
             )}
+            <button
+              type="button"
+              className="detail__btn detail__time-edit"
+              onClick={() => setShowTimePicker((s) => !s)}
+              aria-expanded={showTimePicker}
+            >
+              {showTimePicker ? '收起' : selectedTask.time ? '修改时间' : '设置时间'}
+            </button>
           </div>
+          {showTimePicker && (
+            <div className="detail__time-picker-wrap">
+              <TimePicker
+                time={selectedTask.time}
+                onTimeChange={handleTimeChange}
+                onClose={() => setShowTimePicker(false)}
+              />
+            </div>
+          )}
         </section>
 
         <section className="detail__section">

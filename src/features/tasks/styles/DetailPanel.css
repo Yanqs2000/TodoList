@@ -330,6 +330,23 @@
   color: var(--text-light);
 }
 
+.detail__time-edit {
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+
+.detail__time-picker-wrap {
+  position: relative;
+  margin-top: 8px;
+}
+
+.detail__time-picker-wrap .time-picker {
+  position: relative;
+  top: auto;
+  right: auto;
+  width: 100%;
+}
+
 /* ---------- Notes ---------- */
 .detail__notes {
   width: 100%;

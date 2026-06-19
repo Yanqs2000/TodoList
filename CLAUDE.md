@@ -98,7 +98,7 @@ Config: `src-tauri/tauri.conf.json`. Window: 1080×720 (min 720×560), resizable
 
 Output:
 - `.app`: `src-tauri/target/release/bundle/macos/Todo List.app`
-- `.dmg`: `src-tauri/target/release/bundle/dmg/Todo List_0.3.0_aarch64.dmg`
+- `.dmg`: `src-tauri/target/release/bundle/dmg/Todo List_0.3.1_aarch64.dmg`
 
 Requires Rust toolchain (`rustup`). In China, configure crates.io mirror in `~/.cargo/config.toml` (USTC mirror works).
 

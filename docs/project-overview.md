@@ -1,7 +1,7 @@
 # TodoList — 项目介绍
 
-> 当前版本：**v0.3.0**（2026-06-18）  
-> 仓库：https://github.com/Yanqs2000/TodoList
+> 当前版本：**v0.3.1**（2026-06-19）  
+> 仓库:https://github.com/Yanqs2000/TodoList
 
 一个具有游戏化体验的待办事项应用，支持中文界面。采用纯前端技术栈，零第三方依赖，使用 Canvas API 实现粒子效果，Web Audio API 实现音效合成。
 
@@ -120,7 +120,7 @@ src/
 
 产物：
 - `src-tauri/target/release/bundle/macos/Todo List.app`
-- `src-tauri/target/release/bundle/dmg/Todo List_0.3.0_aarch64.dmg`
+- `src-tauri/target/release/bundle/dmg/Todo List_0.3.1_aarch64.dmg`
 
 需要 Rust 工具链（rustup）。国内需配置 crates.io 镜像（见 `~/.cargo/config.toml`）。
 
@@ -155,6 +155,7 @@ Test Files  9 passed (9)
 | [v0.2.0](./development-logs/v0.2.0-redesign.md) | 2026-06-17 | 三栏布局重构 + 6 主题系统 + 创建任务模态 |
 | [v0.2.1](./development-logs/v0.2.1-feedback-tweaks.md) | 2026-06-18 | 用户反馈调整：mint 主题 + 默认进行中 + 移除导入导出 |
 | [v0.3.0](./development-logs/v0.3.0-reminders.md) | 2026-06-18 | 时间提醒功能 + mint 主题淡雅化 |
+| [v0.3.1](./development-logs/v0.3.1-time-tweaks.md) | 2026-06-19 | 详情面板支持修改时间 + 默认时间为当前 |
 
 ## 后续规划
 
