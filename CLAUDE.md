@@ -100,7 +100,7 @@ Config: `src-tauri/tauri.conf.json`. Window: 1080×720 (min 720×560), resizable
 
 Output:
 - `.app`: `src-tauri/target/release/bundle/macos/Todo List.app`
-- `.dmg`: `src-tauri/target/release/bundle/dmg/Todo List_0.4.3_aarch64.dmg`
+- `.dmg`: `src-tauri/target/release/bundle/dmg/Todo List_0.5.0_aarch64.dmg`
 
 Tauri plugins enabled: `tauri-plugin-log`, `tauri-plugin-notification`, `tauri-plugin-autostart`, `tauri-plugin-global-shortcut`. Tray + close-to-tray + global shortcut handling lives in `src-tauri/src/lib.rs`.
 

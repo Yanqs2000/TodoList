@@ -31,3 +31,47 @@
   border-color: var(--primary);
   color: #fff;
 }
+
+/* ===== Today Focus groups (active + time-sorted) ===== */
+.task-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.task-group + .task-group {
+  margin-top: 8px;
+}
+
+.task-group__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 2px 2px;
+}
+
+.task-group__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.task-group__dot--overdue     { background: var(--time-overdue); }
+.task-group__dot--today       { background: var(--primary); }
+.task-group__dot--future      { background: var(--category-other); }
+.task-group__dot--unscheduled { background: var(--border-strong); }
+
+.task-group__label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+}
+
+.task-group__count {
+  font-size: 0.6875rem;
+  color: var(--text-light);
+  font-variant-numeric: tabular-nums;
+}

@@ -1,0 +1,167 @@
+.day-timeline {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  animation: dayTimelineIn 200ms ease-out;
+}
+
+@keyframes dayTimelineIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.day-timeline__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.day-timeline__title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.day-timeline__cluster {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text-light);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ----- track ----- */
+.day-timeline__track {
+  position: relative;
+  height: 40px;
+  margin-top: 14px; /* room for tick labels above */
+}
+
+/* ----- ticks ----- */
+.day-timeline__tick {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+}
+
+.day-timeline__tick-mark {
+  width: 1px;
+  height: 6px;
+  background: var(--border-strong);
+}
+
+.day-timeline__tick-label {
+  position: absolute;
+  top: -14px;
+  font-size: 0.625rem;
+  color: var(--text-light);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ----- now line ----- */
+.day-timeline__now {
+  position: absolute;
+  top: -6px;
+  bottom: -6px;
+  width: 2px;
+  transform: translateX(-1px);
+  background: var(--time-now);
+  border-radius: 1px;
+  transition: left 1s linear;
+  z-index: 2;
+}
+
+.day-timeline__now-dot {
+  position: absolute;
+  top: -3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--time-now);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--time-now) 22%, transparent);
+}
+
+/* ----- task blocks ----- */
+.day-timeline__block {
+  position: absolute;
+  top: 8px;
+  height: 24px;
+  min-width: 26px;
+  padding: 0 6px;
+  border: none;
+  border-radius: 6px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  transition: box-shadow var(--transition), transform var(--transition);
+  z-index: 1;
+}
+
+.day-timeline__block:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+  z-index: 3;
+}
+
+.day-timeline__block:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  z-index: 3;
+}
+
+.day-timeline__block--overdue { background: var(--time-overdue); }
+.day-timeline__block--soon     { background: var(--time-soon); }
+.day-timeline__block--today    { background: var(--primary); }
+.day-timeline__block--future   { background: var(--category-other); }
+
+.day-timeline__block.is-selected {
+  outline: 2px solid var(--text);
+  outline-offset: 1px;
+  z-index: 4;
+}
+
+.day-timeline__block-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+/* ----- empty ----- */
+.day-timeline__empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  color: var(--text-light);
+  pointer-events: none;
+}
+
+@media (max-width: 720px) {
+  .day-timeline {
+    display: none;
+  }
+}

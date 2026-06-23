@@ -38,7 +38,24 @@
   cursor: pointer;
   position: relative;
   outline: none;
+  overflow: hidden;
 }
+
+/* ----- Time-proximity accent bar (left edge) ----- */
+.task-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: transparent;
+  transition: background var(--transition);
+}
+
+.task-item.proximity-overdue::before { background: var(--time-overdue); }
+.task-item.proximity-soon::before    { background: var(--time-soon); }
+.task-item.proximity-today::before   { background: var(--primary); }
 
 .task-item:hover {
   background: var(--card-bg-hover);

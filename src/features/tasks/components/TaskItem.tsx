@@ -3,6 +3,7 @@ import type { Todo } from '@/shared/types';
 import { CATEGORY_LABELS, PRIORITY_LABELS } from '@/shared/constants';
 import { useConfirm } from '@/shared/components/ConfirmDialog';
 import { formatTimeField } from '../lib/formatTime';
+import type { Proximity } from '../lib/timeProximity';
 import '../styles/TaskItem.css';
 import '../styles/DragDrop.css';
 
@@ -11,6 +12,7 @@ const formatTimeTag = formatTimeField;
 interface TaskItemProps {
   task: Todo;
   selected?: boolean;
+  proximity?: Proximity;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
   onEdit?: (id: string, updates: Partial<Pick<Todo, 'text' | 'priority' | 'time' | 'category' | 'notes'>>) => void;
@@ -29,6 +31,7 @@ const priorityLabels = PRIORITY_LABELS;
 function TaskItem({
   task,
   selected = false,
+  proximity,
   onToggle,
   onDelete,
   onEdit,
@@ -141,9 +144,12 @@ function TaskItem({
 
   const hasSubRow = !!(task.category || task.notes || task.priority);
 
+  const showProximityBar = !task.completed
+    && (proximity === 'overdue' || proximity === 'soon' || proximity === 'today');
+
   return (
     <div
-      className={`task-item${task.completed ? ' completed' : ''}${removing ? ' removing' : ''}${isDragging ? ' dragging' : ''}${isOver ? ' drag-over' : ''}${selected ? ' selected' : ''}`}
+      className={`task-item${task.completed ? ' completed' : ''}${removing ? ' removing' : ''}${isDragging ? ' dragging' : ''}${isOver ? ' drag-over' : ''}${selected ? ' selected' : ''}${showProximityBar ? ` proximity-${proximity}` : ''}`}
       data-task-id={task.id}
       data-priority={task.priority}
       draggable={!!onDragStart}
