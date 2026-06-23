@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { Todo } from '@/shared/types';
 import { CATEGORY_LABELS, PRIORITY_LABELS } from '@/shared/constants';
+import { useConfirm } from '@/shared/components/ConfirmDialog';
 import { formatTimeField } from '../lib/formatTime';
 import '../styles/TaskItem.css';
 import '../styles/DragDrop.css';
@@ -43,6 +44,7 @@ function TaskItem({
   const [removing, setRemoving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(task.text);
+  const confirm = useConfirm();
   const editInputRef = useRef<HTMLInputElement>(null);
   const removeTimerRef = useRef<number | null>(null);
   const removeDoneRef = useRef(false);
@@ -107,9 +109,15 @@ function TaskItem({
     setIsEditing(true);
   }, []);
 
-  const handleDelete = useCallback((e: React.MouseEvent) => {
+  const handleDelete = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!window.confirm(`确定要删除任务「${task.text}」吗？`)) return;
+    const ok = await confirm({
+      title: '删除任务',
+      message: `确定要删除任务「${task.text}」吗？`,
+      confirmText: '删除',
+      danger: true,
+    });
+    if (!ok) return;
     removeDoneRef.current = false;
     setRemoving(true);
     const onEnd = () => {
@@ -126,7 +134,7 @@ function TaskItem({
     if (el) {
       el.addEventListener('animationend', onEnd, { once: true });
     }
-  }, [task.id, task.text]);
+  }, [task.id, task.text, confirm]);
 
   const isDragging = draggingId === task.id;
   const isOver = overId === task.id && draggingId !== task.id;

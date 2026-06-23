@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import type { Todo, Category, TimeField } from '@/shared/types';
 import { CATEGORY_LABELS, PRIORITY_LABELS, PRIORITIES } from '@/shared/constants';
+import { useConfirm } from '@/shared/components/ConfirmDialog';
 import { formatTimeField } from '../lib/formatTime';
 import TimePicker from './TimePicker';
 import '../styles/DetailPanel.css';
@@ -38,6 +39,7 @@ function DetailPanel({
   const [editTitle, setEditTitle] = useState(selectedTask?.text ?? '');
   const [notesDraft, setNotesDraft] = useState(selectedTask?.notes ?? '');
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const confirm = useConfirm();
   const titleInputRef = useRef<HTMLInputElement>(null);
   const notesRef = useRef<HTMLTextAreaElement>(null);
 
@@ -117,9 +119,15 @@ function DetailPanel({
     onEdit(selectedTask.id, { time });
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!selectedTask) return;
-    if (window.confirm(`确定要删除任务「${selectedTask.text}」吗？`)) {
+    const ok = await confirm({
+      title: '删除任务',
+      message: `确定要删除任务「${selectedTask.text}」吗？`,
+      confirmText: '删除',
+      danger: true,
+    });
+    if (ok) {
       onDelete(selectedTask.id);
     }
   };
