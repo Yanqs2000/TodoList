@@ -1,6 +1,6 @@
 # TodoList — 项目介绍
 
-> 当前版本：**v0.4.2**（2026-06-19）  
+> 当前版本：**v0.4.3**（2026-06-19）  
 > 仓库:https://github.com/Yanqs2000/TodoList
 
 一个具有游戏化体验的待办事项应用，支持中文界面。采用纯前端技术栈，零第三方依赖，使用 Canvas API 实现粒子效果，Web Audio API 实现音效合成。
@@ -127,7 +127,7 @@ src/
 
 产物：
 - `src-tauri/target/release/bundle/macos/Todo List.app`
-- `src-tauri/target/release/bundle/dmg/Todo List_0.4.2_aarch64.dmg`
+- `src-tauri/target/release/bundle/dmg/Todo List_0.4.3_aarch64.dmg`
 
 需要 Rust 工具链（rustup）。国内需配置 crates.io 镜像（见 `~/.cargo/config.toml`）。
 
@@ -141,11 +141,11 @@ src/
 
 ## 测试
 
-63 个单元测试，覆盖 hooks、组件、工具函数。详见 [development-logs/v0.1.3-testing-guide.md](./development-logs/v0.1.3-testing-guide.md)。
+65 个单元测试，覆盖 hooks、组件、工具函数。详见 [development-logs/v0.1.3-testing-guide.md](./development-logs/v0.1.3-testing-guide.md)。
 
 ```
 Test Files  10 passed (10)
-     Tests  63 passed (63)
+     Tests  65 passed (65)
 ```
 
 ## 版本历史
@@ -166,6 +166,7 @@ Test Files  10 passed (10)
 | [v0.4.0](./development-logs/v0.4.0-desktop-native.md) | 2026-06-19 | 桌面原生体验：托盘 + 全局热键 + 关闭隐藏 + 自启动 |
 | [v0.4.1](./development-logs/v0.4.1-shortcut-fix.md) | 2026-06-19 | 设置面板整合主题 + 热键录制修复 + 默认 ⌘⌥T |
 | [v0.4.2](./development-logs/v0.4.2-confirm-dialog.md) | 2026-06-19 | 修复清除已完成/删除按钮无效（window.confirm 替换为应用内对话框） |
+| [v0.4.3](./development-logs/v0.4.3-category-default.md) | 2026-06-19 | 修复无分类任务无法在分类筛选中找到（默认归「其他」） |
 
 ## 后续规划
 

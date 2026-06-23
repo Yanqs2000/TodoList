@@ -121,6 +121,37 @@ describe('useTodos', () => {
     expect(result.current.tasks[0].category).toBe('work');
   });
 
+  it('should default new tasks to 其他 category when none chosen', () => {
+    const { result } = renderHook(() => useTodos());
+
+    act(() => {
+      // addTask with no category → should land under 'other'
+      result.current.addTask('Uncategorized task');
+    });
+
+    const created = result.current.allTasks[0];
+    expect(created.category).toBe('other');
+
+    act(() => {
+      result.current.setCategoryFilter('other');
+    });
+    expect(result.current.tasks.map(t => t.text)).toContain('Uncategorized task');
+  });
+
+  it('should normalize legacy tasks without category to 其他 on load', () => {
+    localStorage.setItem('todo-tasks', JSON.stringify([
+      { id: 'legacy-1', text: 'old task', completed: false, priority: 'low', createdAt: 1 },
+    ]));
+
+    const { result } = renderHook(() => useTodos());
+    expect(result.current.allTasks[0].category).toBe('other');
+
+    act(() => {
+      result.current.setCategoryFilter('other');
+    });
+    expect(result.current.tasks).toHaveLength(1);
+  });
+
   it('should search tasks', () => {
     const { result } = renderHook(() => useTodos());
 

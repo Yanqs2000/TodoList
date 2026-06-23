@@ -12,7 +12,9 @@ function loadInitialTasks(): Todo[] {
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);
-    return validateTodoArray(parsed);
+    // Normalize legacy tasks that have no category: default to 'other' so they
+    // show up under the 其他 filter (otherwise they only appear under 全部).
+    return validateTodoArray(parsed).map(t => (t.category ? t : { ...t, category: 'other' }));
   } catch {
     return [];
   }
@@ -43,7 +45,7 @@ export function useTodos() {
       priority: priorityOverride ?? priority,
       createdAt: Date.now(),
       time,
-      category,
+      category: category ?? 'other',
       notes: notes?.trim() || undefined,
     };
 

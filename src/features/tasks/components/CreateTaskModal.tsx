@@ -22,7 +22,7 @@ function formatTimeDisplay(t: TimeField): string {
 function CreateTaskModal({ open, onClose, onAdd, defaultPriority }: CreateTaskModalProps) {
   const [text, setText] = useState('');
   const [priority, setPriority] = useState<Priority>(defaultPriority);
-  const [category, setCategory] = useState<Category | undefined>(undefined);
+  const [category, setCategory] = useState<Category>('other');
   const [time, setTime] = useState<TimeField | undefined>(undefined);
   const [notes, setNotes] = useState('');
   const [showTimePicker, setShowTimePicker] = useState(false);
@@ -56,7 +56,7 @@ function CreateTaskModal({ open, onClose, onAdd, defaultPriority }: CreateTaskMo
     onAddRef.current(trimmed, timeRef.current, categoryRef.current, priorityRef.current, notesRef.current);
     setText('');
     setPriority(defaultPriorityRef.current);
-    setCategory(undefined);
+    setCategory('other');
     setTime(undefined);
     setNotes('');
     setShowTimePicker(false);
@@ -74,7 +74,7 @@ function CreateTaskModal({ open, onClose, onAdd, defaultPriority }: CreateTaskMo
     if (!open) return;
     setText('');
     setPriority(defaultPriorityRef.current);
-    setCategory(undefined);
+    setCategory('other');
     setTime(undefined);
     setNotes('');
     setShowTimePicker(false);
