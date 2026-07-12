@@ -91,8 +91,13 @@ Single-page todo list app with Chinese UI, gamification, and visual effects. Com
 
 ## Documentation
 
-- `README.md` — project intro (latest version), mirrored in `docs/project-overview.md`
-- `docs/development-logs/` — per-version development logs (`v0.1.0-*.md` through `v0.2.0-redesign.md`)
+- `README.md` - project intro (latest version), mirrored in `docs/project-overview.md`
+- `docs/CLAUDE.md` - documentation index (navigation entry for `docs/`)
+- `docs/project-overview.md` - project overview (tech stack, features, version history table)
+- `docs/development-logs/` - per-version development logs (`v0.1.0-*.md` through `v0.5.0-today-focus.md`)
+- `docs/bug-fixes/` - standalone bug records (fixes currently logged within version dev-logs)
+- `docs/plans/` - module design specs / feature planning
+- `docs/guides/` - operation guides (`installation-guide.md`, `testing-guide.md`)
 
 ## Tauri Desktop Build
 

@@ -138,13 +138,13 @@ src/
 
 本应用使用 ad-hoc 签名（无需 Apple Developer 账号）。`npm run tauri:build` 会自动调用 `scripts/sign-macos-bundle.sh` 对 `.app` 做深度签名 + hardened runtime，对 `.dmg` 做外层签名。
 
-**用户首次打开需绕过 Gatekeeper**（右键打开或 `xattr -dr` 命令），详见 [installation-guide.md](./installation-guide.md)。
+**用户首次打开需绕过 Gatekeeper**（右键打开或 `xattr -dr` 命令），详见 [installation-guide.md](./guides/installation-guide.md)。
 
 > 当前仅构建 Apple Silicon（arm64）架构。Intel Mac 暂不支持。
 
 ## 测试
 
-65 个单元测试，覆盖 hooks、组件、工具函数。详见 [development-logs/v0.1.3-testing-guide.md](./development-logs/v0.1.3-testing-guide.md)。
+65 个单元测试，覆盖 hooks、组件、工具函数。详见 [testing-guide.md](./guides/testing-guide.md)。
 
 ```
 Test Files  10 passed (10)

@@ -53,6 +53,7 @@ HTML5 Drag & Drop API 实现任务重排，拖拽时有视觉反馈，排序结�
 为任务设置时间后，到时自动通过系统通知 + 5 秒柔和音效 + 屏内 toast 三重提醒。已提醒的任务持久化记录，重启不重复。
 
 ### 📅 聚焦时间轴 Today Focus（v0.5.0+）
+
 列表顶部横向今日时间轴：有时间的今日任务画成色块落在对应时刻，一根 now 指示线随系统时间移动，未设定时间的任务收成「待安排」簇。任务卡左缘按临近度上色（已过期红 / 1h 内琥珀 / 今天主题色）。切到「进行中」+「按时间排序」时按 已过期 / 今天 / 以后 / 待安排 分组。
 
 ### 🍎 桌面原生体验（v0.4.0+）
@@ -138,13 +139,13 @@ src/
 
 本应用使用 ad-hoc 签名（无需 Apple Developer 账号）。`npm run tauri:build` 会自动调用 `scripts/sign-macos-bundle.sh` 对 `.app` 做深度签名 + hardened runtime，对 `.dmg` 做外层签名。
 
-**用户首次打开需绕过 Gatekeeper**（右键打开或 `xattr -dr` 命令），详见 [installation-guide.md](./docs/installation-guide.md)。
+**用户首次打开需绕过 Gatekeeper**（右键打开或 `xattr -dr` 命令），详见 [installation-guide.md](./docs/guides/installation-guide.md)。
 
 > 当前仅构建 Apple Silicon（arm64）架构。Intel Mac 暂不支持。
 
 ## 测试
 
-90 个单元测试，覆盖 hooks、组件、工具函数。详见 [development-logs/v0.1.3-testing-guide.md](./docs/development-logs/v0.1.3-testing-guide.md)。
+90 个单元测试，覆盖 hooks、组件、工具函数。详见 [testing-guide.md](./docs/guides/testing-guide.md)。
 
 ```
 Test Files  13 passed (13)

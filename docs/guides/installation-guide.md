@@ -153,4 +153,4 @@ npm run tauri:build
 - Universal Binary（同时支持 arm64 + x86_64）
 - 可选的 Apple Developer ID 签名 + 公证（需用户提供证书）
 
-详见 [development-logs/v0.1.4-code-review-bugfix.md](./development-logs/v0.1.4-code-review-bugfix.md) 末尾的后续建议。
+详见 [development-logs/v0.1.4-code-review-bugfix.md](../development-logs/v0.1.4-code-review-bugfix.md) 末尾的后续建议。
