@@ -344,7 +344,7 @@ Bundle migrations in the spec. Set `bundle.externalBin` to `["binaries/todo-back
 ~~~bash
 bash desktop/scripts/build-sidecar.sh
 file desktop/src-tauri/binaries/todo-backend-aarch64-apple-darwin
-uv run --directory backend pytest backend/tests/test_packaging_smoke.py -q
+uv run --directory backend pytest tests/test_packaging_smoke.py -q
 git add backend/todo-backend.spec backend/tests/test_packaging_smoke.py desktop/scripts/build-sidecar.sh desktop/src-tauri/tauri.conf.json .gitignore
 git commit -m "build: package Python backend as Tauri sidecar"
 ~~~
@@ -383,7 +383,7 @@ cargo test --manifest-path desktop/src-tauri/Cargo.toml backend
 
 - [ ] **Step 3: Implement supervisor and dependencies**
 
-Add Tauri shell and single-instance plugins, `rand`, `reqwest` with rustls, and Tokio sync/time. Register single-instance first and focus the existing window on a second launch. Spawn `app.shell().sidecar("todo-backend")`, pass database path/port/token, poll health for ten seconds, retry port binding up to three times, store child/state in an async mutex, emit unexpected exits, and kill intentionally on application exit.
+Add Tauri shell and single-instance plugins, `rand`, `reqwest` with rustls, and Tokio sync/time. Register single-instance first and focus the existing window on a second launch. Spawn `app.shell().sidecar("todo-backend")`, pass database path/port/token through `TODO_DATABASE_PATH`, `TODO_BACKEND_PORT`, and `TODO_BACKEND_TOKEN` environment variables, poll health for ten seconds, retry port binding up to three times, store child/state in an async mutex, emit unexpected exits, and kill intentionally on application exit.
 
 Do not grant JavaScript shell spawn permission because Rust owns the child.
 
