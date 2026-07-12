@@ -4,10 +4,10 @@
   "version": "0.5.0",
   "identifier": "com.todo-app.desktop",
   "build": {
-    "frontendDist": "../dist",
+    "frontendDist": "../../frontend/dist",
     "devUrl": "http://localhost:5173",
-    "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build"
+    "beforeDevCommand": "npm --prefix ../../frontend run dev",
+    "beforeBuildCommand": "npm --prefix ../../frontend run build"
   },
   "app": {
     "windows": [

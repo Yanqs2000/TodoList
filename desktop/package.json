@@ -1,0 +1,13 @@
+{
+  "name": "todo-desktop",
+  "private": true,
+  "version": "0.5.0",
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "bash scripts/build-sidecar.sh && tauri build",
+    "sign:macos": "bash scripts/sign-macos-bundle.sh"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.2"
+  }
+}
