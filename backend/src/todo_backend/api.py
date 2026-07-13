@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, FastAPI, Request, Response, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException
+from starlette.middleware.cors import CORSMiddleware
 
 from todo_backend.auth import require_token
 from todo_backend.config import Settings
@@ -56,6 +57,15 @@ def create_app(
     settings_service = SettingsService(resolved_database)
 
     app = FastAPI()
+    allowed_origins = ["tauri://localhost", "http://tauri.localhost"]
+    if resolved_settings.allow_vite_dev_origin:
+        allowed_origins.append("http://localhost:5173")
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=allowed_origins,
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type"],
+    )
     app.dependency_overrides[Settings.from_env] = lambda: resolved_settings
     app.add_exception_handler(TaskNotFoundError, _task_not_found_handler)
     app.add_exception_handler(InvalidTaskOrderError, _invalid_task_order_handler)

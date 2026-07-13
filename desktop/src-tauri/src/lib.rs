@@ -91,8 +91,8 @@ pub fn run() {
             app.manage(ShortcutRegistration::new());
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
-                if let Err(error) = initialize_shortcut(&app_handle).await {
-                    log::error!("backend startup failed: {error}");
+                if initialize_shortcut(&app_handle).await.is_err() {
+                    log::error!("backend initialization failed");
                 }
             });
 

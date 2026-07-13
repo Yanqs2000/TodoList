@@ -11,6 +11,7 @@ class Settings:
     host: str
     port: int
     token: str
+    allow_vite_dev_origin: bool = False
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -21,7 +22,13 @@ class Settings:
             parsed_port = int(port)
         except ValueError as error:
             raise ConfigurationError("TODO_BACKEND_PORT must be an integer") from error
-        return cls(Path(database_path), "127.0.0.1", parsed_port, token)
+        return cls(
+            Path(database_path),
+            "127.0.0.1",
+            parsed_port,
+            token,
+            allow_vite_dev_origin=os.environ.get("TODO_BACKEND_ALLOW_VITE_ORIGIN") == "1",
+        )
 
 
 def _required_environment_value(key: str) -> str:

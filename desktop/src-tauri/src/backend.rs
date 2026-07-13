@@ -315,7 +315,11 @@ impl BackendSupervisor {
             }
             .env("TODO_DATABASE_PATH", &self.database_path)
             .env("TODO_BACKEND_PORT", port.to_string())
-            .env("TODO_BACKEND_TOKEN", &connection.token);
+            .env("TODO_BACKEND_TOKEN", &connection.token)
+            .env(
+                "TODO_BACKEND_ALLOW_VITE_ORIGIN",
+                if cfg!(debug_assertions) { "1" } else { "0" },
+            );
             let (receiver, child) = match command.spawn() {
                 Ok(spawned) => spawned,
                 Err(error) => {

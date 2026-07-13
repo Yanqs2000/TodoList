@@ -19,7 +19,13 @@ def main() -> None:
     settings = Settings.from_env()
     database = Database(settings.database_path, _migrations_dir())
     app = create_app(settings, database)
-    uvicorn.run(app, host=settings.host, port=settings.port)
+    uvicorn.run(
+        app,
+        host=settings.host,
+        port=settings.port,
+        access_log=False,
+        log_level="warning",
+    )
 
 
 if __name__ == "__main__":

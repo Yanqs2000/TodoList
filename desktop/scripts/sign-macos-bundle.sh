@@ -16,6 +16,7 @@ set -euo pipefail
 APP_NAME="Todo List"
 BUNDLE_DIR="src-tauri/target/release/bundle"
 APP_PATH="${BUNDLE_DIR}/macos/${APP_NAME}.app"
+SIDECAR_PATH="${APP_PATH}/Contents/MacOS/todo-backend"
 DMG_DIR="${BUNDLE_DIR}/dmg"
 
 if [ ! -d "${APP_PATH}" ]; then
@@ -24,16 +25,25 @@ if [ ! -d "${APP_PATH}" ]; then
   exit 1
 fi
 
-echo "🔐 签名 .app (深度签名所有资源)..."
-# --deep 已被 Apple 标记为过时但仍可用；对 Tauri 这种简单 bundle 足够。
-# --options runtime 加 hardened runtime，是公证的前置要求（即使现在没公证也加上）。
-codesign --force --deep --sign - \
+if [ ! -f "${SIDECAR_PATH}" ]; then
+  echo "❌ 找不到内嵌 sidecar: ${SIDECAR_PATH}" >&2
+  exit 1
+fi
+
+echo "🔐 先签名内嵌 Python sidecar..."
+codesign --force --sign - \
+  --options runtime \
+  --timestamp=none \
+  "${SIDECAR_PATH}"
+
+echo "🔐 再签名包含它的 .app..."
+codesign --force --sign - \
   --options runtime \
   --timestamp=none \
   "${APP_PATH}"
 
 echo "✅ .app 签名验证:"
-codesign --verify --verbose=2 "${APP_PATH}" 2>&1 | sed 's/^/   /'
+codesign --verify --deep --strict --verbose=2 "${APP_PATH}" 2>&1 | sed 's/^/   /'
 
 # 找到 DMG 文件（文件名带版本号和架构）
 DMG_PATH=$(ls "${DMG_DIR}"/*.dmg 2>/dev/null | head -1 || true)
