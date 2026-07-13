@@ -389,6 +389,7 @@ describe('useTodos database-first mutations', () => {
       editRequest = result.current.editTask(original.id, { text: 'Edited' });
       completionRequest = result.current.toggleTask(original.id);
     });
+    await act(async () => Promise.resolve());
     expect(api.updateTask).toHaveBeenCalledOnce();
     expect(api.setTaskCompletion).toHaveBeenCalledOnce();
 
@@ -414,7 +415,7 @@ describe('useTodos database-first mutations', () => {
     expect(result.current.allTasks[0]).toMatchObject({ text: 'Edited', completed: true });
   });
 
-  it('keeps different task completions when responses resolve in reverse order', async () => {
+  it('serializes different task completions so achievement snapshots apply in database order', async () => {
     const firstCompletion = deferred<CompletionResult>();
     const secondCompletion = deferred<CompletionResult>();
     const first = task({ id: 'first', text: 'First' });
@@ -432,31 +433,83 @@ describe('useTodos database-first mutations', () => {
       firstRequest = result.current.toggleTask(first.id);
       secondRequest = result.current.toggleTask(second.id);
     });
-    const achievementState = {
+    await act(async () => Promise.resolve());
+    expect(api.setTaskCompletion).toHaveBeenCalledTimes(1);
+    const firstAchievementState = {
       unlocked: [],
       streakDays: 1,
       lastActiveDate: '2026-07-13',
       todayCompleted: 1,
       todayDate: '2026-07-13',
     };
-    await act(async () => {
-      secondCompletion.resolve({
-        task: { ...second, completed: true },
-        achievementState,
-        newlyUnlocked: [],
-      });
-      await secondRequest;
+    const secondAchievementState = {
+      ...firstAchievementState,
+      unlocked: ['first-task'],
+      todayCompleted: 2,
+    };
+    secondCompletion.resolve({
+      task: { ...second, completed: true },
+      achievementState: secondAchievementState,
+      newlyUnlocked: ['first-task'],
     });
     await act(async () => {
       firstCompletion.resolve({
         task: { ...first, completed: true },
-        achievementState,
+        achievementState: firstAchievementState,
         newlyUnlocked: [],
       });
       await firstRequest;
     });
+    expect(api.setTaskCompletion).toHaveBeenCalledTimes(2);
+    const secondResult = await secondRequest;
 
     expect(result.current.allTasks.map(item => item.completed)).toEqual([true, true]);
+    expect(secondResult?.achievementState).toEqual(secondAchievementState);
+    expect(secondResult?.newlyUnlocked).toEqual(['first-task']);
+  });
+
+  it('releases the completion queue after a failed request', async () => {
+    const firstCompletion = deferred<CompletionResult>();
+    const secondCompletion = deferred<CompletionResult>();
+    const first = task({ id: 'first', text: 'First' });
+    const second = task({ id: 'second', text: 'Second' });
+    const api = fakeApi({
+      setTaskCompletion: vi.fn()
+        .mockReturnValueOnce(firstCompletion.promise)
+        .mockReturnValueOnce(secondCompletion.promise),
+    });
+    const { result } = renderHook(() => useTodos([first, second], api, vi.fn()));
+
+    let firstRequest!: Promise<CompletionResult | undefined>;
+    let secondRequest!: Promise<CompletionResult | undefined>;
+    act(() => {
+      firstRequest = result.current.toggleTask(first.id);
+      secondRequest = result.current.toggleTask(second.id);
+    });
+    await act(async () => Promise.resolve());
+    expect(api.setTaskCompletion).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      firstCompletion.reject(new ApiError('business', 'INVALID_REQUEST', 'Rejected', 422));
+      await firstRequest;
+    });
+    expect(api.setTaskCompletion).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      secondCompletion.resolve({
+        task: { ...second, completed: true },
+        achievementState: {
+          unlocked: [],
+          streakDays: 1,
+          lastActiveDate: '2026-07-13',
+          todayCompleted: 1,
+          todayDate: '2026-07-13',
+        },
+        newlyUnlocked: [],
+      });
+      await secondRequest;
+    });
+    expect(result.current.allTasks.map(item => item.completed)).toEqual([false, true]);
   });
 
   it('allows edit and completion during reorder without overwriting task fields', async () => {
@@ -480,6 +533,7 @@ describe('useTodos database-first mutations', () => {
       editRequest = result.current.editTask(first.id, { text: 'Edited first' });
       completionRequest = result.current.toggleTask(second.id);
     });
+    await act(async () => Promise.resolve());
     expect(api.replaceTaskOrder).toHaveBeenCalledOnce();
     expect(api.updateTask).toHaveBeenCalledOnce();
     expect(api.setTaskCompletion).toHaveBeenCalledOnce();

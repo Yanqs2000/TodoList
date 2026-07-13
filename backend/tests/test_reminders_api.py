@@ -114,6 +114,7 @@ def test_rescheduling_prunes_old_claim_and_allows_new_claim(
     )
 
     assert response.status_code == 200
+    assert claim(client, headers, task["id"], "2026-07-13T09:00") is False
     assert claim(client, headers, task["id"], "2026-07-13T10:00") is True
     with database.connect() as connection:
         starts = [
@@ -124,6 +125,39 @@ def test_rescheduling_prunes_old_claim_and_allows_new_claim(
             )
         ]
     assert starts == ["2026-07-13T10:00"]
+
+
+def test_completed_task_cannot_claim_its_current_reminder(
+    client: TestClient,
+    headers: dict[str, str],
+    database: Database,
+) -> None:
+    task = create_scheduled_task(client, headers)
+    response = client.put(
+        f"/api/v1/tasks/{task['id']}/completion",
+        headers=headers,
+        json={"completed": True, "localDate": "2026-07-13"},
+    )
+    assert response.status_code == 200
+
+    assert claim(client, headers, task["id"], "2026-07-13T09:00") is False
+    with database.connect() as connection:
+        count = connection.execute(
+            "SELECT COUNT(*) FROM task_reminders WHERE task_id = ?",
+            (task["id"],),
+        ).fetchone()[0]
+    assert count == 0
+
+
+def test_missing_task_claim_returns_false_without_creating_a_record(
+    client: TestClient,
+    headers: dict[str, str],
+    database: Database,
+) -> None:
+    assert claim(client, headers, "missing", "2026-07-13T09:00") is False
+    with database.connect() as connection:
+        count = connection.execute("SELECT COUNT(*) FROM task_reminders").fetchone()[0]
+    assert count == 0
 
 
 def test_clearing_task_time_removes_prior_claim(

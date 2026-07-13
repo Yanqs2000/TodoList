@@ -17,8 +17,14 @@ interface DesktopApi {
   shortcut: string;
   setShortcut: (shortcut: string) => Promise<{ ok: true } | { ok: false; error: string }>;
   autostartEnabled: boolean;
-  toggleAutostart: () => Promise<void>;
+  toggleAutostart: () => Promise<{ ok: true } | { ok: false; error: string }>;
 }
+
+const FATAL_SHORTCUT_ERRORS = [
+  'BACKEND_UNAVAILABLE',
+  'SHORTCUT_ROLLBACK_FAILED',
+  'SHORTCUT_CLEANUP_FAILED',
+] as const;
 
 export function useDesktop(
   initialShortcut: string,
@@ -34,6 +40,9 @@ export function useDesktop(
   const latestIntentRef = useRef(0);
   const generationRef = useRef(0);
   const queueRef = useRef<Promise<void>>(Promise.resolve());
+  const autostartCommittedRef = useRef(false);
+  const autostartIntentRef = useRef(0);
+  const autostartQueueRef = useRef<Promise<void>>(Promise.resolve());
   onOpenRef.current = onOpenCreateModal;
 
   useEffect(() => {
@@ -67,11 +76,15 @@ export function useDesktop(
 
   useEffect(() => {
     if (!desktop) return;
+    const intent = autostartIntentRef.current;
     void (async () => {
       try {
         const { isEnabled } = await import('@tauri-apps/plugin-autostart');
         const enabled = await isEnabled();
-        if (mountedRef.current) setAutostartEnabled(enabled);
+        if (mountedRef.current && intent === autostartIntentRef.current) {
+          autostartCommittedRef.current = enabled;
+          setAutostartEnabled(enabled);
+        }
       } catch {
         // Autostart remains an optional Tauri-only capability.
       }
@@ -96,7 +109,7 @@ export function useDesktop(
       } catch (error) {
         const message = String(error);
         if (
-          message.includes('BACKEND_UNAVAILABLE')
+          FATAL_SHORTCUT_ERRORS.some(code => message.includes(code))
           && mountedRef.current
           && generation === generationRef.current
         ) {
@@ -123,17 +136,32 @@ export function useDesktop(
     ));
   }, [desktop, onInfrastructureError]);
 
-  const toggleAutostart = useCallback(async () => {
-    if (!desktop) return;
-    try {
-      const { enable, disable, isEnabled } = await import('@tauri-apps/plugin-autostart');
-      const current = await isEnabled();
-      if (current) await disable();
-      else await enable();
-      if (mountedRef.current) setAutostartEnabled(!current);
-    } catch {
-      // Keep the last known operating-system state.
+  const toggleAutostart = useCallback(() => {
+    if (!desktop) {
+      return Promise.resolve({ ok: false, error: 'Desktop app required' } as const);
     }
+    const intent = ++autostartIntentRef.current;
+    const operation = autostartQueueRef.current.then(async () => {
+      try {
+        const { enable, disable, isEnabled } = await import('@tauri-apps/plugin-autostart');
+        const current = await isEnabled();
+        if (current) await disable();
+        else await enable();
+        const confirmed = await isEnabled();
+        if (mountedRef.current) autostartCommittedRef.current = confirmed;
+        if (mountedRef.current && intent === autostartIntentRef.current) {
+          setAutostartEnabled(confirmed);
+        }
+        return { ok: true } as const;
+      } catch (error) {
+        if (mountedRef.current && intent === autostartIntentRef.current) {
+          setAutostartEnabled(autostartCommittedRef.current);
+        }
+        return { ok: false, error: String(error) } as const;
+      }
+    });
+    autostartQueueRef.current = operation.then(() => undefined);
+    return operation;
   }, [desktop]);
 
   return {

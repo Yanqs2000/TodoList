@@ -11,7 +11,7 @@ interface SettingsModalProps {
   shortcut: string;
   onSetShortcut: (s: string) => Promise<{ ok: true } | { ok: false; error: string }>;
   autostartEnabled: boolean;
-  onToggleAutostart: () => void;
+  onToggleAutostart: () => Promise<{ ok: true } | { ok: false; error: string }>;
   currentTheme: ThemeId;
   onSelectTheme: (id: ThemeId) => void;
 }
@@ -173,6 +173,12 @@ function SettingsModal({
     }
   }, [onSetShortcut]);
 
+  const handleToggleAutostart = useCallback(async () => {
+    setError(null);
+    const result = await onToggleAutostart();
+    if (!result.ok) setError(result.error);
+  }, [onToggleAutostart]);
+
   if (!open) return null;
 
   const displayShortcut = pendingShortcut ?? shortcut;
@@ -297,7 +303,7 @@ function SettingsModal({
               <input
                 type="checkbox"
                 checked={autostartEnabled}
-                onChange={onToggleAutostart}
+                onChange={() => { void handleToggleAutostart(); }}
                 disabled={!isDesktop}
                 aria-label="开机自启动"
               />

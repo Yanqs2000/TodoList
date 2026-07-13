@@ -22,6 +22,8 @@ use tokio::{
 const MAX_START_ATTEMPTS: usize = 3;
 const STARTUP_TIMEOUT: Duration = Duration::from_secs(10);
 const HEALTH_POLL_INTERVAL: Duration = Duration::from_millis(100);
+const SHORTCUT_ROLLBACK_FAILED: &str = "SHORTCUT_ROLLBACK_FAILED";
+const SHORTCUT_CLEANUP_FAILED: &str = "SHORTCUT_CLEANUP_FAILED";
 
 #[derive(Clone, Copy, Debug)]
 struct StartupBudget {
@@ -679,7 +681,7 @@ fn rollback_shortcut(app: &AppHandle, transaction: &ShortcutTransaction<'_>) -> 
         _ => unreachable!(),
     };
     if remove_result.is_err() || restore_result.is_err() {
-        return Err("SHORTCUT_ROLLBACK_FAILED".to_owned());
+        return Err(SHORTCUT_ROLLBACK_FAILED.to_owned());
     }
     Ok(())
 }
@@ -797,7 +799,9 @@ pub async fn set_global_shortcut(
         _ => unreachable!(),
     };
     if let Err(error) = app.global_shortcut().unregister(unregister_previous) {
-        let _ = app.global_shortcut().unregister(shortcut.as_str());
+        if app.global_shortcut().unregister(shortcut.as_str()).is_err() {
+            return Err(SHORTCUT_CLEANUP_FAILED.to_owned());
+        }
         return Err(error.to_string());
     }
 
@@ -1188,5 +1192,7 @@ mod tests {
                 ShortcutStep::Register("Cmd+Alt+KeyT")
             ]
         );
+        assert_eq!(SHORTCUT_ROLLBACK_FAILED, "SHORTCUT_ROLLBACK_FAILED");
+        assert_eq!(SHORTCUT_CLEANUP_FAILED, "SHORTCUT_CLEANUP_FAILED");
     }
 }

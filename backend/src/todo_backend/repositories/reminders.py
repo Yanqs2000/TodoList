@@ -1,8 +1,6 @@
 import sqlite3
 import time
 
-from todo_backend.repositories.tasks import TaskNotFoundError
-
 
 class ReminderRepository:
     def claim(
@@ -11,18 +9,21 @@ class ReminderRepository:
         task_id: str,
         scheduled_start: str,
     ) -> bool:
-        task_exists = connection.execute(
-            "SELECT 1 FROM tasks WHERE id = ?",
-            (task_id,),
-        ).fetchone()
-        if task_exists is None:
-            raise TaskNotFoundError
         cursor = connection.execute(
             """
             INSERT OR IGNORE INTO task_reminders (task_id, scheduled_start, claimed_at)
-            VALUES (?, ?, ?)
+            SELECT id, ?, ?
+            FROM tasks
+            WHERE id = ?
+              AND completed = 0
+              AND time_start = ?
             """,
-            (task_id, scheduled_start, time.time_ns() // 1_000_000),
+            (
+                scheduled_start,
+                time.time_ns() // 1_000_000,
+                task_id,
+                scheduled_start,
+            ),
         )
         return cursor.rowcount == 1
 

@@ -123,6 +123,7 @@ export function useTodos(
   const reorderPendingRef = useRef(false);
   const clearPendingRef = useRef(false);
   const taskMutationsRef = useRef(new Map<string, Set<TaskMutationKind>>());
+  const completionQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   tasksRef.current = tasks;
 
@@ -218,25 +219,30 @@ export function useTodos(
     }
   }, [api, handleError, priority]);
 
-  const toggleTask = useCallback(async (id: string): Promise<CompletionResult | undefined> => {
+  const toggleTask = useCallback((id: string): Promise<CompletionResult | undefined> => {
     const task = tasksRef.current.find(item => item.id === id);
-    if (!task || !beginTaskMutation(id, 'toggle')) return undefined;
-    try {
-      const result = await api.setTaskCompletion(id, {
-        completed: !task.completed,
-        localDate: localDate(),
-      });
-      if (!mountedRef.current) return undefined;
-      setTasks(current => current.map(item => (
-        item.id === id ? { ...item, completed: result.task.completed } : item
-      )));
-      return result;
-    } catch (error) {
-      handleError(error);
-      return undefined;
-    } finally {
-      endTaskMutation(id, 'toggle');
-    }
+    if (!task || !beginTaskMutation(id, 'toggle')) return Promise.resolve(undefined);
+    const run = async (): Promise<CompletionResult | undefined> => {
+      try {
+        const result = await api.setTaskCompletion(id, {
+          completed: !task.completed,
+          localDate: localDate(),
+        });
+        if (!mountedRef.current) return undefined;
+        setTasks(current => current.map(item => (
+          item.id === id ? { ...item, completed: result.task.completed } : item
+        )));
+        return result;
+      } catch (error) {
+        handleError(error);
+        return undefined;
+      } finally {
+        endTaskMutation(id, 'toggle');
+      }
+    };
+    const operation = completionQueueRef.current.then(run);
+    completionQueueRef.current = operation.then(() => undefined);
+    return operation;
   }, [api, beginTaskMutation, endTaskMutation, handleError]);
 
   const removeTask = useCallback(async (id: string): Promise<boolean> => {

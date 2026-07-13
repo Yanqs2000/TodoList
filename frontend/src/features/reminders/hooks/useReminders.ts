@@ -33,6 +33,12 @@ export function useReminders(
   const processedRef = useRef(new Set<string>());
   const mountedRef = useRef(true);
   const generationRef = useRef(0);
+  const apiRef = useRef(api);
+
+  if (apiRef.current !== api) {
+    apiRef.current = api;
+    generationRef.current += 1;
+  }
 
   tasksRef.current = tasks;
   onReminderRef.current = onReminder;
@@ -42,10 +48,6 @@ export function useReminders(
     mountedRef.current = true;
     return () => { mountedRef.current = false; };
   }, []);
-
-  useEffect(() => {
-    generationRef.current += 1;
-  }, [api]);
 
   const claim = useCallback(async (task: Todo, key: string) => {
     const generation = generationRef.current;

@@ -1,5 +1,6 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createElement, StrictMode, type ReactNode } from 'react';
 import {
   InfrastructureError,
   type TodoApi,
@@ -16,6 +17,10 @@ function makeTask(overrides: Partial<Todo> = {}): Todo {
     createdAt: 0,
     ...overrides,
   };
+}
+
+function strictMode({ children }: { children: ReactNode }) {
+  return createElement(StrictMode, null, children);
 }
 
 describe('useReminders', () => {
@@ -40,6 +45,27 @@ describe('useReminders', () => {
     expect(api.claimReminder).toHaveBeenCalledWith({
       taskId: 't1',
       scheduledStart: '2026-06-18T09:59',
+    });
+  });
+
+  it('notifies exactly once when the first claim resolves after StrictMode effect replay', async () => {
+    let resolve!: (value: boolean) => void;
+    const claim = new Promise<boolean>(res => { resolve = res; });
+    const api = { claimReminder: vi.fn(() => claim) } as unknown as TodoApi;
+    const onReminder = vi.fn();
+    const task = makeTask({ time: { start: '2026-06-18T09:59' } });
+
+    renderHook(() => useReminders([task], api, onReminder, vi.fn()), {
+      wrapper: strictMode,
+    });
+    await waitFor(() => expect(api.claimReminder).toHaveBeenCalledTimes(1));
+    resolve(true);
+    await waitFor(() => expect(onReminder).toHaveBeenCalledTimes(1));
+
+    expect(onReminder).toHaveBeenCalledWith({
+      taskId: 't1',
+      text: 'task',
+      time: '2026-06-18T09:59',
     });
   });
 
