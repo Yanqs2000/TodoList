@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 
-export function useDragDrop(onReorder: (fromId: string, toId: string) => void) {
+export function useDragDrop(onReorder: (fromId: string, toId: string) => Promise<boolean> | void) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
   const lastOverIdRef = useRef<string | null>(null);
@@ -32,7 +32,7 @@ export function useDragDrop(onReorder: (fromId: string, toId: string) => void) {
     e.preventDefault();
     const fromId = e.dataTransfer.getData('text/plain');
     if (fromId && fromId !== toId) {
-      onReorder(fromId, toId);
+      void onReorder(fromId, toId);
     }
     setDraggingId(null);
     setOverId(null);

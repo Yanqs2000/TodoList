@@ -147,6 +147,24 @@ describe('useBootstrap', () => {
     });
   });
 
+  it('lets an in-app infrastructure failure block the current snapshot', async () => {
+    setTauriRuntime(true);
+    tauriMocks.invoke.mockResolvedValue({
+      baseUrl: 'http://127.0.0.1:43123',
+      token: 'first-token',
+    });
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse(FIRST_SNAPSHOT));
+    const { result } = renderHook(() => useBootstrap(fetcher));
+    await waitFor(() => expect(result.current.state.status).toBe('ready'));
+
+    act(() => result.current.block());
+
+    expect(result.current.state).toEqual({
+      status: 'blocked',
+      message: '本地后端不可用，请重试。',
+    });
+  });
+
   it('retries through Tauri and replaces the complete in-memory snapshot', async () => {
     setTauriRuntime(true);
     tauriMocks.invoke.mockImplementation(async (command: string) => (

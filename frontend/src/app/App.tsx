@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { TimeField, Category, Priority } from '@/shared/types';
+import type { BootstrapSnapshot, InfrastructureError, TodoApi } from '@/shared/api/contracts';
 import { DAILY_GOAL } from '@/shared/constants';
 import { useTodos } from '@/features/tasks/hooks/useTodos';
 import { useTheme } from '@/features/theme/hooks/useTheme';
@@ -27,8 +28,14 @@ interface InfoToastState {
   tone: 'success' | 'error';
 }
 
-function TodoApplication() {
-  const todoState = useTodos();
+interface TodoApplicationProps {
+  snapshot: BootstrapSnapshot;
+  api: TodoApi;
+  onInfrastructureError: (error: InfrastructureError) => void;
+}
+
+function TodoApplication({ snapshot, api, onInfrastructureError }: TodoApplicationProps) {
+  const todoState = useTodos(snapshot.tasks, api, onInfrastructureError);
   const { theme, setTheme } = useTheme();
   const sound = useSound();
   const achievements = useAchievements(sound.playAchievement);
@@ -40,11 +47,17 @@ function TodoApplication() {
   const [infoToast, setInfoToast] = useState<InfoToastState | null>(null);
   const infoTimerRef = useRef<number | null>(null);
 
-  const showInfo = (message: string, tone: 'success' | 'error') => {
+  const showInfo = useCallback((message: string, tone: 'success' | 'error') => {
     setInfoToast({ message, tone });
     if (infoTimerRef.current !== null) clearTimeout(infoTimerRef.current);
     infoTimerRef.current = window.setTimeout(() => setInfoToast(null), 2500);
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!todoState.businessError) return;
+    showInfo(todoState.businessError, 'error');
+    todoState.clearBusinessError();
+  }, [showInfo, todoState]);
 
   // Cmd+N shortcut for opening create task modal
   useEffect(() => {
@@ -89,10 +102,10 @@ function TodoApplication() {
 
   const desktop = useDesktop(useCallback(() => setCreateModalOpen(true), []));
 
-  const handleToggle = useCallback((id: string) => {
+  const handleToggle = useCallback(async (id: string) => {
     const task = todoState.allTasks.find(t => t.id === id);
-    todoState.toggleTask(id);
-    if (task && !task.completed) {
+    const result = await todoState.toggleTask(id);
+    if (result && task && !task.completed) {
       achievements.recordCompletion();
       sound.playComplete();
       const el = document.querySelector(`[data-task-id="${id}"]`);
@@ -103,25 +116,27 @@ function TodoApplication() {
     }
   }, [todoState, achievements, sound, confetti]);
 
-  const handleDelete = useCallback((id: string) => {
+  const handleDelete = useCallback(async (id: string): Promise<boolean> => {
+    const removed = await todoState.removeTask(id);
+    if (!removed) return false;
     sound.playDelete();
-    todoState.removeTask(id);
     if (selectedTaskId === id) setSelectedTaskId(null);
+    return true;
   }, [todoState, sound, selectedTaskId]);
 
   const handleSelectTask = useCallback((id: string | null) => {
     setSelectedTaskId(id);
   }, []);
 
-  const handleAddTask = useCallback((text: string, time?: TimeField, category?: Category, priority?: Priority, notes?: string) => {
-    todoState.addTask(text, time, category, notes, priority);
-    setCreateModalOpen(false);
+  const handleAddTask = useCallback(async (text: string, time?: TimeField, category?: Category, priority?: Priority, notes?: string): Promise<boolean> => {
+    const created = await todoState.addTask(text, time, category, notes, priority);
+    return Boolean(created);
   }, [todoState]);
 
-  const handleClearCompleted = useCallback(() => {
-    const cleared = todoState.clearCompleted();
+  const handleClearCompleted = useCallback(async () => {
+    const cleared = await todoState.clearCompleted();
     if (cleared > 0) showInfo(`已清除 ${cleared} 个已完成任务`, 'success');
-  }, [todoState]);
+  }, [showInfo, todoState]);
 
   const selectedTask = selectedTaskId
     ? todoState.allTasks.find(t => t.id === selectedTaskId) ?? null
@@ -141,6 +156,7 @@ function TodoApplication() {
         onClose={() => setCreateModalOpen(false)}
         onAdd={handleAddTask}
         defaultPriority={todoState.priority}
+        pending={todoState.pending.create || todoState.pending.reorder}
       />
 
       <SettingsModal
@@ -214,6 +230,9 @@ function TodoApplication() {
           onDelete={handleDelete}
           onEdit={todoState.editTask}
           onReorder={todoState.reorderTasks}
+          pendingTaskIds={todoState.pending.taskIds}
+          reorderPending={todoState.pending.reorder}
+          reorderDisabled={todoState.pending.create}
           selectedTaskId={selectedTaskId}
           onSelectTask={handleSelectTask}
         />
@@ -221,6 +240,7 @@ function TodoApplication() {
           stats={todoState.stats}
           onClearCompleted={handleClearCompleted}
           achievements={achievements.achievements}
+          clearPending={todoState.pending.clearCompleted}
         />
       </main>
 
@@ -230,6 +250,7 @@ function TodoApplication() {
           onEdit={todoState.editTask}
           onToggle={handleToggle}
           onDelete={handleDelete}
+          pending={selectedTask ? todoState.pending.taskIds.has(selectedTask.id) || todoState.pending.reorder : false}
           onClose={() => setSelectedTaskId(null)}
           stats={todoState.stats}
           todayCompleted={achievements.achievements.todayCompleted}
@@ -243,10 +264,17 @@ function TodoApplication() {
 
 function App() {
   const bootstrap = useBootstrap();
+  const application = bootstrap.state.status === 'ready' ? (
+    <TodoApplication
+      api={bootstrap.state.api}
+      snapshot={bootstrap.state.snapshot}
+      onInfrastructureError={bootstrap.block}
+    />
+  ) : null;
 
   return (
     <StartupGate state={bootstrap.state} onRetry={bootstrap.retry}>
-      <TodoApplication />
+      {application}
     </StartupGate>
   );
 }

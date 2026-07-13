@@ -16,6 +16,7 @@ export type BootstrapState =
 interface BootstrapController {
   state: BootstrapState;
   retry: () => Promise<void>;
+  block: () => void;
 }
 
 type BackendCommand = 'get_backend_connection' | 'retry_backend';
@@ -140,5 +141,10 @@ export function useBootstrap(fetcher: typeof fetch = defaultFetch): BootstrapCon
     }
   }, [bootstrap, ensureBackendListener]);
 
-  return { state, retry };
+  const block = useCallback(() => {
+    operationRef.current += 1;
+    setState({ status: 'blocked', message: BACKEND_UNAVAILABLE_MESSAGE });
+  }, []);
+
+  return { state, retry, block };
 }

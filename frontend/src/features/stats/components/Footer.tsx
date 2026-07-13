@@ -12,9 +12,10 @@ interface FooterProps {
   };
   onClearCompleted: () => void;
   achievements?: AchievementState;
+  clearPending?: boolean;
 }
 
-function Footer({ stats, onClearCompleted, achievements }: FooterProps) {
+function Footer({ stats, onClearCompleted, achievements, clearPending = false }: FooterProps) {
   const todayCompleted = achievements?.todayCompleted ?? 0;
   const streakDays = achievements?.streakDays ?? 0;
   const confirm = useConfirm();
@@ -67,7 +68,7 @@ function Footer({ stats, onClearCompleted, achievements }: FooterProps) {
         <button
           type="button"
           className="btn-clear"
-          disabled={stats.completed === 0}
+          disabled={stats.completed === 0 || clearPending}
           onClick={handleClearCompleted}
         >
           清除已完成

@@ -13,10 +13,13 @@ interface TaskListProps {
   hasAnyTasks: boolean;
   sortMode: 'manual' | 'time';
   onToggleSortMode: (mode: 'manual' | 'time') => void;
-  onToggle: (id: string) => void;
-  onDelete: (id: string) => void;
-  onEdit?: (id: string, updates: Partial<Pick<Todo, 'text' | 'priority' | 'time' | 'category' | 'notes'>>) => void;
-  onReorder: (fromId: string, toId: string) => void;
+  onToggle: (id: string) => Promise<unknown> | void;
+  onDelete: (id: string) => Promise<boolean> | void;
+  onEdit?: (id: string, updates: Partial<Pick<Todo, 'text' | 'priority' | 'time' | 'category' | 'notes'>>) => Promise<boolean> | void;
+  onReorder: (fromId: string, toId: string) => Promise<boolean> | void;
+  pendingTaskIds?: ReadonlySet<string>;
+  reorderPending?: boolean;
+  reorderDisabled?: boolean;
   selectedTaskId?: string | null;
   onSelectTask?: (id: string | null) => void;
   /** Override "now" for testing; live Date.now() when omitted. */
@@ -47,7 +50,7 @@ function groupByProximity(tasks: Todo[], now: number): TaskGroup[] {
   ].filter(g => g.items.length > 0);
 }
 
-function TaskList({ tasks, filter, hasAnyTasks, sortMode, onToggleSortMode, onToggle, onDelete, onEdit, onReorder, selectedTaskId, onSelectTask, now: nowProp }: TaskListProps) {
+function TaskList({ tasks, filter, hasAnyTasks, sortMode, onToggleSortMode, onToggle, onDelete, onEdit, onReorder, pendingTaskIds = new Set(), reorderPending = false, reorderDisabled = false, selectedTaskId, onSelectTask, now: nowProp }: TaskListProps) {
   const drag = useDragDrop(onReorder);
   const [nowState, setNowState] = useState(() => Date.now());
   useEffect(() => {
@@ -73,14 +76,15 @@ function TaskList({ tasks, filter, hasAnyTasks, sortMode, onToggleSortMode, onTo
       onToggle={onToggle}
       onDelete={onDelete}
       onEdit={onEdit}
+      pending={pendingTaskIds.has(task.id) || reorderPending}
       onSelect={onSelectTask}
       draggingId={drag.draggingId}
       overId={drag.overId}
-      onDragStart={drag.handleDragStart}
-      onDragOver={drag.handleDragOver}
-      onDragLeave={drag.handleDragLeave}
-      onDrop={drag.handleDrop}
-      onDragEnd={drag.handleDragEnd}
+      onDragStart={!reorderDisabled && !reorderPending && pendingTaskIds.size === 0 ? drag.handleDragStart : undefined}
+      onDragOver={!reorderDisabled && !reorderPending && pendingTaskIds.size === 0 ? drag.handleDragOver : undefined}
+      onDragLeave={!reorderDisabled && !reorderPending && pendingTaskIds.size === 0 ? drag.handleDragLeave : undefined}
+      onDrop={!reorderDisabled && !reorderPending && pendingTaskIds.size === 0 ? drag.handleDrop : undefined}
+      onDragEnd={!reorderDisabled && !reorderPending && pendingTaskIds.size === 0 ? drag.handleDragEnd : undefined}
     />
   );
 

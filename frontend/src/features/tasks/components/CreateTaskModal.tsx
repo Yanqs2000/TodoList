@@ -9,8 +9,9 @@ import '../styles/CreateTaskModal.css';
 interface CreateTaskModalProps {
   open: boolean;
   onClose: () => void;
-  onAdd: (text: string, time?: TimeField, category?: Category, priority?: Priority, notes?: string) => void;
+  onAdd: (text: string, time?: TimeField, category?: Category, priority?: Priority, notes?: string) => Promise<boolean>;
   defaultPriority: Priority;
+  pending?: boolean;
 }
 
 const priorityOptions = PRIORITIES.map(p => ({ value: p, label: PRIORITY_LABELS[p] }));
@@ -19,7 +20,7 @@ function formatTimeDisplay(t: TimeField): string {
   return formatTimeField(t);
 }
 
-function CreateTaskModal({ open, onClose, onAdd, defaultPriority }: CreateTaskModalProps) {
+function CreateTaskModal({ open, onClose, onAdd, defaultPriority, pending = false }: CreateTaskModalProps) {
   const [text, setText] = useState('');
   const [priority, setPriority] = useState<Priority>(defaultPriority);
   const [category, setCategory] = useState<Category>('other');
@@ -50,10 +51,17 @@ function CreateTaskModal({ open, onClose, onAdd, defaultPriority }: CreateTaskMo
   const defaultPriorityRef = useRef(defaultPriority);
   defaultPriorityRef.current = defaultPriority;
 
-  const submit = (): void => {
+  const submit = async (): Promise<void> => {
     const trimmed = textRef.current.trim();
-    if (!trimmed) return;
-    onAddRef.current(trimmed, timeRef.current, categoryRef.current, priorityRef.current, notesRef.current);
+    if (!trimmed || pending) return;
+    const saved = await onAddRef.current(
+      trimmed,
+      timeRef.current,
+      categoryRef.current,
+      priorityRef.current,
+      notesRef.current,
+    );
+    if (!saved) return;
     setText('');
     setPriority(defaultPriorityRef.current);
     setCategory('other');
@@ -100,7 +108,7 @@ function CreateTaskModal({ open, onClose, onAdd, defaultPriority }: CreateTaskMo
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
         if (isComposingRef.current) return;
         e.preventDefault();
-        submitRef.current();
+        void submitRef.current();
       }
     };
     document.addEventListener('keydown', handleKeyDown);
@@ -114,7 +122,7 @@ function CreateTaskModal({ open, onClose, onAdd, defaultPriority }: CreateTaskMo
     // the old value when the second handler fires).
     if (e.key === 'Enter' && !e.metaKey && !e.ctrlKey && !isComposingRef.current) {
       e.preventDefault();
-      submit();
+      void submit();
     }
   };
 
@@ -259,8 +267,8 @@ function CreateTaskModal({ open, onClose, onAdd, defaultPriority }: CreateTaskMo
           <button
             type="button"
             className="create-modal__submit"
-            onClick={submit}
-            disabled={!text.trim()}
+            onClick={() => void submit()}
+            disabled={!text.trim() || pending}
           >
             创建任务
           </button>

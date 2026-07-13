@@ -61,4 +61,27 @@ describe('TaskList grouping (Today Focus)', () => {
     expect(screen.queryByText('今天')).not.toBeInTheDocument();
     expect(screen.queryByText('待安排')).not.toBeInTheDocument();
   });
+
+  it('disables mutation controls only for the pending task', () => {
+    const tasks = [
+      makeTask({ id: '1', text: '正在保存' }),
+      makeTask({ id: '2', text: '仍可操作' }),
+    ];
+    render(
+      <TaskList
+        {...baseProps}
+        tasks={tasks}
+        sortMode="manual"
+        pendingTaskIds={new Set(['1'])}
+        reorderPending={false}
+      />,
+    );
+
+    const pendingItem = document.querySelector('[data-task-id="1"]');
+    const availableItem = document.querySelector('[data-task-id="2"]');
+    expect(pendingItem?.querySelector('button[aria-label="标记为已完成"]')).toBeDisabled();
+    expect(pendingItem?.querySelector('button[aria-label="编辑任务"]')).toBeDisabled();
+    expect(pendingItem?.querySelector('button[aria-label="删除任务"]')).toBeDisabled();
+    expect(availableItem?.querySelector('button[aria-label="标记为已完成"]')).toBeEnabled();
+  });
 });
