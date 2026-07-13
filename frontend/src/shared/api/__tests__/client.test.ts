@@ -126,6 +126,52 @@ describe('createTodoApi', () => {
     });
   });
 
+  it('classifies malformed successful JSON as a sanitized protocol failure', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(
+      'private malformed response body',
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    ));
+    const api = createTodoApi({ baseUrl: 'http://127.0.0.1:43123', token: 'run-token' }, fetcher);
+
+    await expect(api.bootstrap('workspace-light')).rejects.toMatchObject({
+      name: 'InfrastructureError',
+      kind: 'infrastructure',
+      code: 'INVALID_RESPONSE',
+      message: 'Invalid backend response',
+      status: 200,
+    });
+  });
+
+  it('clears the ten-second timeout after a completed request', async () => {
+    vi.useFakeTimers();
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse(EMPTY_SNAPSHOT));
+    const api = createTodoApi({ baseUrl: 'http://127.0.0.1:43123', token: 'run-token' }, fetcher);
+
+    await api.bootstrap('workspace-light');
+
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('still times out when a successful response body resolves after the deadline', async () => {
+    vi.useFakeTimers();
+    const response = jsonResponse(EMPTY_SNAPSHOT);
+    vi.spyOn(response, 'json').mockImplementation(() => new Promise(resolve => {
+      setTimeout(() => resolve(EMPTY_SNAPSHOT), REQUEST_TIMEOUT_MS + 1);
+    }));
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(response);
+    const api = createTodoApi({ baseUrl: 'http://127.0.0.1:43123', token: 'run-token' }, fetcher);
+
+    const request = api.bootstrap('workspace-light');
+    const assertion = expect(request).rejects.toMatchObject({
+      kind: 'timeout',
+      code: 'REQUEST_TIMEOUT',
+    });
+    await vi.advanceTimersByTimeAsync(REQUEST_TIMEOUT_MS + 1);
+
+    await assertion;
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it('maps the remaining typed operations to their backend routes', async () => {
     const task = {
       id: 'task/1',

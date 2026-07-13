@@ -70,6 +70,14 @@ function encodedTaskPath(taskId: string): string {
   return `/api/v1/tasks/${encodeURIComponent(taskId)}`;
 }
 
+function timeoutError(): InfrastructureError {
+  return new InfrastructureError(
+    'timeout',
+    'REQUEST_TIMEOUT',
+    'Request timed out',
+  );
+}
+
 export function createTodoApi(
   connection: BackendConnection,
   fetcher: typeof fetch = fetch,
@@ -84,32 +92,46 @@ export function createTodoApi(
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
-      const response = await fetcher(`${baseUrl}${path}`, {
-        method,
-        headers: {
-          Authorization: `Bearer ${connection.token}`,
-          'Content-Type': 'application/json',
-        },
-        body: body === undefined ? undefined : JSON.stringify(body),
-        signal: controller.signal,
-      });
-      if (!response.ok) throw await responseError(response);
-      if (response.status === 204) return undefined as T;
-      return await response.json() as T;
-    } catch (error) {
-      if (error instanceof ApiError) throw error;
-      if (controller.signal.aborted) {
+      let response: Response;
+      try {
+        response = await fetcher(`${baseUrl}${path}`, {
+          method,
+          headers: {
+            Authorization: `Bearer ${connection.token}`,
+            'Content-Type': 'application/json',
+          },
+          body: body === undefined ? undefined : JSON.stringify(body),
+          signal: controller.signal,
+        });
+      } catch {
+        if (controller.signal.aborted) throw timeoutError();
         throw new InfrastructureError(
-          'timeout',
-          'REQUEST_TIMEOUT',
-          'Request timed out',
+          'network',
+          'NETWORK_ERROR',
+          'Network request failed',
         );
       }
-      throw new InfrastructureError(
-        'network',
-        'NETWORK_ERROR',
-        'Network request failed',
-      );
+      if (!response.ok) {
+        const error = await responseError(response);
+        if (controller.signal.aborted) throw timeoutError();
+        throw error;
+      }
+      if (controller.signal.aborted) throw timeoutError();
+      if (response.status === 204) return undefined as T;
+      let payload: T;
+      try {
+        payload = await response.json() as T;
+      } catch {
+        if (controller.signal.aborted) throw timeoutError();
+        throw new InfrastructureError(
+          'infrastructure',
+          'INVALID_RESPONSE',
+          'Invalid backend response',
+          response.status,
+        );
+      }
+      if (controller.signal.aborted) throw timeoutError();
+      return payload;
     } finally {
       clearTimeout(timeout);
     }
