@@ -70,6 +70,35 @@ def test_reminder_claim_returns_true_then_false_atomically(
     assert claim(client, headers, task["id"], "2026-07-13T09:00") is False
 
 
+@pytest.mark.parametrize(
+    "scheduled_start",
+    [
+        "2026-02-30T09:00",
+        "2026-07-13 09:00",
+        "2026-07-13T9:00",
+        "2026-07-13T09:00:00",
+        "2026-07-13T09:00Z",
+    ],
+)
+def test_reminder_claim_rejects_invalid_local_iso_minute_start(
+    client: TestClient,
+    headers: dict[str, str],
+    scheduled_start: str,
+) -> None:
+    task = create_scheduled_task(client, headers)
+
+    response = client.post(
+        "/api/v1/reminders/claim",
+        headers=headers,
+        json={"taskId": task["id"], "scheduledStart": scheduled_start},
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {
+        "error": {"code": "INVALID_REQUEST", "message": "Invalid request"}
+    }
+
+
 def test_rescheduling_prunes_old_claim_and_allows_new_claim(
     client: TestClient,
     headers: dict[str, str],
@@ -95,6 +124,58 @@ def test_rescheduling_prunes_old_claim_and_allows_new_claim(
             )
         ]
     assert starts == ["2026-07-13T10:00"]
+
+
+def test_clearing_task_time_removes_prior_claim(
+    client: TestClient,
+    headers: dict[str, str],
+    database: Database,
+) -> None:
+    task = create_scheduled_task(client, headers)
+    assert claim(client, headers, task["id"], "2026-07-13T09:00") is True
+
+    response = client.patch(
+        f"/api/v1/tasks/{task['id']}",
+        headers=headers,
+        json={"time": None},
+    )
+
+    assert response.status_code == 200
+    with database.connect() as connection:
+        count = connection.execute(
+            "SELECT COUNT(*) FROM task_reminders WHERE task_id = ?",
+            (task["id"],),
+        ).fetchone()[0]
+    assert count == 0
+
+
+def test_editing_same_start_retains_current_claim(
+    client: TestClient,
+    headers: dict[str, str],
+    database: Database,
+) -> None:
+    task = create_scheduled_task(client, headers)
+    assert claim(client, headers, task["id"], "2026-07-13T09:00") is True
+
+    response = client.patch(
+        f"/api/v1/tasks/{task['id']}",
+        headers=headers,
+        json={
+            "time": {
+                "start": "2026-07-13T09:00",
+                "end": "2026-07-13T10:00",
+            }
+        },
+    )
+
+    assert response.status_code == 200
+    assert claim(client, headers, task["id"], "2026-07-13T09:00") is False
+    with database.connect() as connection:
+        count = connection.execute(
+            "SELECT COUNT(*) FROM task_reminders WHERE task_id = ?",
+            (task["id"],),
+        ).fetchone()[0]
+    assert count == 1
 
 
 def test_deleting_task_cascades_reminder_claim(

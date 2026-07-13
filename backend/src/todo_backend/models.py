@@ -2,7 +2,7 @@ import re
 from datetime import date, datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 StrictText = Annotated[str, Field(strict=True, min_length=1, max_length=10_000)]
@@ -18,9 +18,20 @@ ThemeId = Literal[
     "paper-dark",
 ]
 LocalDate = Annotated[str, Field(strict=True, pattern=r"^\d{4}-\d{2}-\d{2}$")]
+
+
+def validate_local_datetime(value: str) -> str:
+    try:
+        datetime.strptime(value, "%Y-%m-%dT%H:%M")
+    except ValueError:
+        raise ValueError("time must be a valid local ISO minute datetime") from None
+    return value
+
+
 LocalDateTime = Annotated[
     str,
     Field(strict=True, pattern=r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$"),
+    AfterValidator(validate_local_datetime),
 ]
 
 
@@ -31,17 +42,6 @@ class WireModel(BaseModel):
 class TimeField(WireModel):
     start: LocalDateTime
     end: LocalDateTime | None = None
-
-    @field_validator("start", "end")
-    @classmethod
-    def validate_local_datetime(cls, value: str | None) -> str | None:
-        if value is None:
-            return value
-        try:
-            datetime.strptime(value, "%Y-%m-%dT%H:%M")
-        except ValueError:
-            raise ValueError("time must be a valid local ISO minute datetime") from None
-        return value
 
 
 class Task(WireModel):
