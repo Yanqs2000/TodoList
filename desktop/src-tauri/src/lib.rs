@@ -1,15 +1,15 @@
 mod backend;
 
 use backend::{
-    get_backend_connection, retry_backend, set_global_shortcut, BackendSupervisor,
-    ShortcutRegistration, DEFAULT_SHORTCUT,
+    get_backend_connection, initialize_shortcut, retry_backend, set_global_shortcut,
+    BackendSupervisor, ShortcutRegistration,
 };
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     AppHandle, Emitter, Manager, WindowEvent,
 };
-use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
+use tauri_plugin_global_shortcut::ShortcutState;
 
 fn show_main_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
@@ -47,11 +47,6 @@ fn show_window(app: AppHandle) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Default: Cmd+Option+T on macOS, Ctrl+Alt+T elsewhere. Tauri's
-    // Modifiers::SUPER maps to Cmd on macOS / Win on Windows / Super on Linux.
-    let default_shortcut: Shortcut =
-        Shortcut::new(Some(Modifiers::SUPER | Modifiers::ALT), Code::KeyT);
-
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             show_main_window(app);
@@ -90,21 +85,14 @@ pub fn run() {
                 )?;
             }
 
-            // Register the default global shortcut at startup.
-            let _ = app.global_shortcut().register(default_shortcut);
-            app.manage(ShortcutRegistration::new(DEFAULT_SHORTCUT));
-
             let app_data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&app_data_dir)?;
             app.manage(BackendSupervisor::new(app_data_dir.join("todo.sqlite3")));
+            app.manage(ShortcutRegistration::new());
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
-                if let Err(error) = app_handle
-                    .state::<BackendSupervisor>()
-                    .ensure_running(&app_handle)
-                    .await
-                {
-                    log::error!("backend startup failed: {}", error.public_message());
+                if let Err(error) = initialize_shortcut(&app_handle).await {
+                    log::error!("backend startup failed: {error}");
                 }
             });
 

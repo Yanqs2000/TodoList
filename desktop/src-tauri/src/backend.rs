@@ -7,18 +7,43 @@ use std::{
 
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State, Theme};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 use tauri_plugin_shell::{
     process::{CommandChild, CommandEvent},
     ShellExt,
 };
-use tokio::{sync::Mutex, time::Instant};
+use tokio::{
+    sync::{watch, Mutex},
+    time::Instant,
+};
 
 const MAX_START_ATTEMPTS: usize = 3;
 const STARTUP_TIMEOUT: Duration = Duration::from_secs(10);
 const HEALTH_POLL_INTERVAL: Duration = Duration::from_millis(100);
-pub const DEFAULT_SHORTCUT: &str = "Cmd+Alt+KeyT";
+
+#[derive(Clone, Copy, Debug)]
+struct StartupBudget {
+    deadline: Instant,
+}
+
+impl StartupBudget {
+    fn new(started: Instant, timeout: Duration) -> Self {
+        Self {
+            deadline: started + timeout,
+        }
+    }
+
+    fn remaining(&self, now: Instant) -> Option<Duration> {
+        self.deadline
+            .checked_duration_since(now)
+            .filter(|value| !value.is_zero())
+    }
+
+    fn bounded(&self, now: Instant, maximum: Duration) -> Option<Duration> {
+        self.remaining(now).map(|remaining| remaining.min(maximum))
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -71,6 +96,7 @@ impl BackendLifecycle {
 pub(crate) enum BackendError {
     PortBinding(String),
     Sidecar(String),
+    SidecarExited,
     HealthCheck(String),
     NotRunning,
 }
@@ -88,6 +114,7 @@ impl std::fmt::Display for BackendError {
                 write!(formatter, "failed to reserve loopback port: {detail}")
             }
             Self::Sidecar(detail) => write!(formatter, "sidecar process failed: {detail}"),
+            Self::SidecarExited => formatter.write_str("sidecar exited before becoming ready"),
             Self::HealthCheck(detail) => write!(formatter, "sidecar health check failed: {detail}"),
             Self::NotRunning => formatter.write_str("sidecar is not running"),
         }
@@ -101,6 +128,34 @@ struct SupervisorInner {
     connection: Option<BackendConnection>,
     generation: u64,
     shutting_down: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ExitDisposition {
+    Stale,
+    StartupFailed,
+    EmitUnavailable,
+}
+
+impl SupervisorInner {
+    fn record_process_exit(&mut self, generation: u64) -> ExitDisposition {
+        if self.generation != generation {
+            return ExitDisposition::Stale;
+        }
+
+        let disposition = if self.lifecycle.phase() == BackendPhase::Running {
+            ExitDisposition::EmitUnavailable
+        } else {
+            ExitDisposition::StartupFailed
+        };
+        self.generation = self.generation.wrapping_add(1);
+        if let Some(child) = self.child.take() {
+            let _ = child.kill();
+        }
+        self.connection = None;
+        self.lifecycle.mark_stopped();
+        disposition
+    }
 }
 
 pub struct BackendSupervisor {
@@ -162,9 +217,13 @@ impl BackendSupervisor {
             }
             inner.lifecycle.begin_restart();
         }
+        let budget = StartupBudget::new(Instant::now(), STARTUP_TIMEOUT);
         let mut last_error = None;
 
         for _ in 0..MAX_START_ATTEMPTS {
+            if budget.remaining(Instant::now()).is_none() {
+                break;
+            }
             if self.inner.lock().await.shutting_down {
                 return Err(BackendError::NotRunning);
             }
@@ -202,11 +261,15 @@ impl BackendSupervisor {
                 }
                 inner.generation = inner.generation.wrapping_add(1);
                 inner.child = Some(child);
+                inner.lifecycle.begin_restart();
                 inner.generation
             };
-            monitor_sidecar(app.clone(), receiver, generation);
+            let process_exit = monitor_sidecar(app.clone(), receiver, generation);
 
-            match self.wait_for_health(&connection).await {
+            match self
+                .wait_for_health(&connection, budget, process_exit)
+                .await
+            {
                 Ok(()) => {
                     let mut inner = self.inner.lock().await;
                     if inner.generation == generation
@@ -248,23 +311,51 @@ impl BackendSupervisor {
         Err(last_error.unwrap_or(BackendError::NotRunning))
     }
 
-    async fn wait_for_health(&self, connection: &BackendConnection) -> Result<(), BackendError> {
-        let deadline = Instant::now() + STARTUP_TIMEOUT;
+    async fn wait_for_health(
+        &self,
+        connection: &BackendConnection,
+        budget: StartupBudget,
+        mut process_exit: watch::Receiver<bool>,
+    ) -> Result<(), BackendError> {
         let health_url = format!("{}/api/v1/health", connection.base_url);
         loop {
-            let detail = match self
+            if *process_exit.borrow() {
+                return Err(BackendError::SidecarExited);
+            }
+            let request_timeout = budget
+                .bounded(Instant::now(), Duration::from_secs(1))
+                .ok_or_else(startup_timeout_error)?;
+            let request = self
                 .client
                 .get(&health_url)
                 .bearer_auth(&connection.token)
-                .timeout(Duration::from_secs(1))
-                .send()
-                .await
-            {
+                .timeout(request_timeout)
+                .send();
+            let response = tokio::select! {
+                response = request => response,
+                _ = process_exit.changed() => return Err(BackendError::SidecarExited),
+            };
+            if budget.remaining(Instant::now()).is_none() {
+                return Err(startup_timeout_error());
+            }
+
+            let detail = match response {
                 Ok(response) if response.status().is_success() => {
-                    match response.json::<HealthResponse>().await {
-                        Ok(health) if health.status == "ok" => return Ok(()),
-                        Ok(_) => "unexpected health payload".to_owned(),
-                        Err(error) => error.to_string(),
+                    let parse_timeout = budget
+                        .remaining(Instant::now())
+                        .ok_or_else(startup_timeout_error)?;
+                    let parsed = tokio::select! {
+                        parsed = tokio::time::timeout(parse_timeout, response.json::<HealthResponse>()) => parsed,
+                        _ = process_exit.changed() => return Err(BackendError::SidecarExited),
+                    };
+                    if budget.remaining(Instant::now()).is_none() {
+                        return Err(startup_timeout_error());
+                    }
+                    match parsed {
+                        Ok(Ok(health)) if health.status == "ok" => return Ok(()),
+                        Ok(Ok(_)) => "unexpected health payload".to_owned(),
+                        Ok(Err(error)) => error.to_string(),
+                        Err(_) => return Err(startup_timeout_error()),
                     }
                 }
                 Ok(response) => {
@@ -273,29 +364,26 @@ impl BackendSupervisor {
                 Err(error) => error.to_string(),
             };
 
-            if Instant::now() >= deadline {
+            let poll_delay = budget
+                .bounded(Instant::now(), HEALTH_POLL_INTERVAL)
+                .ok_or_else(|| BackendError::HealthCheck(detail.clone()))?;
+            tokio::select! {
+                _ = tokio::time::sleep(poll_delay) => {}
+                _ = process_exit.changed() => return Err(BackendError::SidecarExited),
+            }
+            if budget.remaining(Instant::now()).is_none() {
                 return Err(BackendError::HealthCheck(detail));
             }
-            tokio::time::sleep(HEALTH_POLL_INTERVAL).await;
         }
     }
 
     async fn mark_unexpected_exit(&self, app: &AppHandle, generation: u64) {
-        let should_emit = {
+        let disposition = {
             let mut inner = self.inner.lock().await;
-            if inner.generation != generation {
-                false
-            } else {
-                let was_running = inner.lifecycle.phase() == BackendPhase::Running;
-                inner.generation = inner.generation.wrapping_add(1);
-                inner.child = None;
-                inner.connection = None;
-                inner.lifecycle.mark_stopped();
-                was_running
-            }
+            inner.record_process_exit(generation)
         };
 
-        if should_emit {
+        if disposition == ExitDisposition::EmitUnavailable {
             let _ = app.emit("backend-unavailable", ());
         }
     }
@@ -333,11 +421,52 @@ impl BackendSupervisor {
             )))
         }
     }
+
+    async fn ensure_bootstrap(
+        &self,
+        connection: &BackendConnection,
+        preferred_theme: &str,
+    ) -> Result<String, BackendError> {
+        let response = self
+            .client
+            .post(format!("{}/api/v1/bootstrap", connection.base_url))
+            .bearer_auth(&connection.token)
+            .json(&serde_json::json!({ "preferredTheme": preferred_theme }))
+            .timeout(Duration::from_secs(10))
+            .send()
+            .await
+            .map_err(|error| BackendError::HealthCheck(error.to_string()))?;
+        if !response.status().is_success() {
+            return Err(BackendError::HealthCheck(format!(
+                "bootstrap returned HTTP {}",
+                response.status().as_u16()
+            )));
+        }
+        response
+            .json::<BootstrapResponse>()
+            .await
+            .map(|bootstrap| bootstrap.settings.shortcut)
+            .map_err(|error| BackendError::HealthCheck(error.to_string()))
+    }
+}
+
+fn startup_timeout_error() -> BackendError {
+    BackendError::HealthCheck("startup timed out".to_owned())
 }
 
 #[derive(Deserialize)]
 struct HealthResponse {
     status: String,
+}
+
+#[derive(Deserialize)]
+struct BootstrapResponse {
+    settings: BootstrapSettings,
+}
+
+#[derive(Deserialize)]
+struct BootstrapSettings {
+    shortcut: String,
 }
 
 fn stop_child(inner: &mut SupervisorInner) {
@@ -349,20 +478,40 @@ fn stop_child(inner: &mut SupervisorInner) {
     inner.lifecycle.mark_stopped();
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum MonitorAction {
+    Continue,
+    UnexpectedExit,
+}
+
+fn monitor_action(event: Option<&CommandEvent>) -> MonitorAction {
+    match event {
+        Some(CommandEvent::Stdout(_) | CommandEvent::Stderr(_)) => MonitorAction::Continue,
+        Some(CommandEvent::Error(_) | CommandEvent::Terminated(_)) | None => {
+            MonitorAction::UnexpectedExit
+        }
+        Some(_) => MonitorAction::Continue,
+    }
+}
+
 fn monitor_sidecar(
     app: AppHandle,
     mut receiver: tauri::async_runtime::Receiver<CommandEvent>,
     generation: u64,
-) {
+) -> watch::Receiver<bool> {
+    let (process_exit_tx, process_exit_rx) = watch::channel(false);
     tauri::async_runtime::spawn(async move {
-        while let Some(event) = receiver.recv().await {
-            if matches!(event, CommandEvent::Terminated(_)) {
+        loop {
+            let event = receiver.recv().await;
+            if monitor_action(event.as_ref()) == MonitorAction::UnexpectedExit {
                 let supervisor = app.state::<BackendSupervisor>();
                 supervisor.mark_unexpected_exit(&app, generation).await;
+                let _ = process_exit_tx.send(true);
                 break;
             }
         }
     });
+    process_exit_rx
 }
 
 fn reserve_loopback_port() -> Result<u16, BackendError> {
@@ -385,21 +534,24 @@ fn generate_token() -> String {
 }
 
 pub struct ShortcutRegistration {
-    current: Mutex<String>,
+    current: Mutex<Option<String>>,
 }
 
 impl ShortcutRegistration {
-    pub fn new(shortcut: impl Into<String>) -> Self {
+    pub fn new() -> Self {
         Self {
-            current: Mutex::new(shortcut.into()),
+            current: Mutex::new(None),
         }
     }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum ShortcutStep<'a> {
+    EnsureRunning,
+    EnsureBootstrap,
     Register(&'a str),
     Unregister(&'a str),
+    Persist(&'a str),
 }
 
 struct ShortcutTransaction<'a> {
@@ -412,10 +564,13 @@ impl<'a> ShortcutTransaction<'a> {
         Self { previous, next }
     }
 
-    fn apply_steps(&self) -> [ShortcutStep<'a>; 2] {
+    fn workflow_steps(&self) -> [ShortcutStep<'a>; 5] {
         [
+            ShortcutStep::EnsureRunning,
+            ShortcutStep::EnsureBootstrap,
             ShortcutStep::Register(self.next),
             ShortcutStep::Unregister(self.previous),
+            ShortcutStep::Persist(self.next),
         ]
     }
 
@@ -432,16 +587,63 @@ fn rollback_shortcut(app: &AppHandle, transaction: &ShortcutTransaction<'_>) -> 
     let steps = transaction.rollback_steps();
     let remove_result = match steps[0] {
         ShortcutStep::Unregister(shortcut) => manager.unregister(shortcut),
-        ShortcutStep::Register(_) => unreachable!(),
+        _ => unreachable!(),
     };
     let restore_result = match steps[1] {
         ShortcutStep::Register(shortcut) => manager.register(shortcut),
-        ShortcutStep::Unregister(_) => unreachable!(),
+        _ => unreachable!(),
     };
     if remove_result.is_err() || restore_result.is_err() {
         return Err("SHORTCUT_ROLLBACK_FAILED".to_owned());
     }
     Ok(())
+}
+
+fn preferred_theme(app: &AppHandle) -> &'static str {
+    let theme = app
+        .get_webview_window("main")
+        .and_then(|window| window.theme().ok());
+    preferred_theme_for(theme)
+}
+
+fn preferred_theme_for(theme: Option<Theme>) -> &'static str {
+    if theme == Some(Theme::Dark) {
+        "workspace-dark"
+    } else {
+        "workspace-light"
+    }
+}
+
+async fn ensure_shortcut_registered(
+    app: &AppHandle,
+    registration: &ShortcutRegistration,
+    stored_shortcut: String,
+) -> Result<(), String> {
+    let mut current = registration.current.lock().await;
+    if current.is_some() {
+        return Ok(());
+    }
+    let _: Shortcut = stored_shortcut
+        .parse()
+        .map_err(|error| format!("invalid stored shortcut: {error}"))?;
+    app.global_shortcut()
+        .register(stored_shortcut.as_str())
+        .map_err(|error| error.to_string())?;
+    *current = Some(stored_shortcut);
+    Ok(())
+}
+
+pub async fn initialize_shortcut(app: &AppHandle) -> Result<(), String> {
+    let supervisor = app.state::<BackendSupervisor>();
+    let connection = supervisor
+        .ensure_running(app)
+        .await
+        .map_err(|error| error.public_message().to_owned())?;
+    let stored_shortcut = supervisor
+        .ensure_bootstrap(&connection, preferred_theme(app))
+        .await
+        .map_err(|error| error.public_message().to_owned())?;
+    ensure_shortcut_registered(app, &app.state::<ShortcutRegistration>(), stored_shortcut).await
 }
 
 #[tauri::command]
@@ -476,33 +678,54 @@ pub async fn set_global_shortcut(
     let _: Shortcut = shortcut
         .parse()
         .map_err(|error| format!("invalid shortcut: {error}"))?;
+    let connection = supervisor
+        .ensure_running(&app)
+        .await
+        .map_err(|error| error.public_message().to_owned())?;
+    let stored_shortcut = supervisor
+        .ensure_bootstrap(&connection, preferred_theme(&app))
+        .await
+        .map_err(|error| error.public_message().to_owned())?;
+    ensure_shortcut_registered(&app, &registration, stored_shortcut).await?;
+
     let mut previous = registration.current.lock().await;
-    if *previous == shortcut {
+    let previous_shortcut = previous
+        .as_deref()
+        .ok_or_else(|| "SHORTCUT_NOT_INITIALIZED".to_owned())?;
+    if previous_shortcut == shortcut {
         return supervisor
             .persist_shortcut(&shortcut)
             .await
             .map_err(|error| error.public_message().to_owned());
     }
 
-    let transaction = ShortcutTransaction::new(&previous, &shortcut);
-    let apply_steps = transaction.apply_steps();
+    let transaction = ShortcutTransaction::new(previous_shortcut, &shortcut);
+    let workflow_steps = transaction.workflow_steps();
     app.global_shortcut()
-        .register(match apply_steps[0] {
+        .register(match workflow_steps[2] {
             ShortcutStep::Register(value) => value,
-            ShortcutStep::Unregister(_) => unreachable!(),
+            _ => unreachable!(),
         })
         .map_err(|error| error.to_string())?;
-    if let Err(error) = app.global_shortcut().unregister(previous.as_str()) {
+    let unregister_previous = match workflow_steps[3] {
+        ShortcutStep::Unregister(value) => value,
+        _ => unreachable!(),
+    };
+    if let Err(error) = app.global_shortcut().unregister(unregister_previous) {
         let _ = app.global_shortcut().unregister(shortcut.as_str());
         return Err(error.to_string());
     }
 
-    if let Err(error) = supervisor.persist_shortcut(&shortcut).await {
+    let persist_next = match workflow_steps[4] {
+        ShortcutStep::Persist(value) => value,
+        _ => unreachable!(),
+    };
+    if let Err(error) = supervisor.persist_shortcut(persist_next).await {
         rollback_shortcut(&app, &transaction)?;
         return Err(error.public_message().to_owned());
     }
 
-    *previous = shortcut;
+    *previous = Some(shortcut);
     Ok(())
 }
 
@@ -555,14 +778,118 @@ mod tests {
     }
 
     #[test]
-    fn shortcut_transaction_registers_next_first_and_restores_previous_on_rollback() {
+    fn one_startup_budget_is_shared_across_all_attempts() {
+        let started = Instant::now();
+        let budget = StartupBudget::new(started, Duration::from_secs(10));
+
+        assert_eq!(
+            budget.remaining(started + Duration::from_secs(3)),
+            Some(Duration::from_secs(7))
+        );
+        assert_eq!(
+            budget.remaining(started + Duration::from_secs(9)),
+            Some(Duration::from_secs(1))
+        );
+        assert_eq!(budget.remaining(started + Duration::from_secs(10)), None);
+    }
+
+    #[test]
+    fn request_and_poll_delays_are_bounded_by_remaining_budget() {
+        let started = Instant::now();
+        let budget = StartupBudget::new(started, Duration::from_secs(10));
+        let nearly_expired = started + Duration::from_millis(9_950);
+
+        assert_eq!(
+            budget.bounded(nearly_expired, Duration::from_secs(1)),
+            Some(Duration::from_millis(50))
+        );
+        assert_eq!(
+            budget.bounded(nearly_expired, HEALTH_POLL_INTERVAL),
+            Some(Duration::from_millis(50))
+        );
+    }
+
+    #[test]
+    fn active_running_exit_invalidates_connection_once() {
+        let mut inner = SupervisorInner::default();
+        inner.generation = 7;
+        inner.lifecycle.mark_running();
+        inner.connection = Some(BackendConnection::loopback(43_123, "token".to_owned()));
+
+        assert_eq!(
+            inner.record_process_exit(7),
+            ExitDisposition::EmitUnavailable
+        );
+        assert_eq!(inner.lifecycle.phase(), BackendPhase::Stopped);
+        assert!(inner.connection.is_none());
+        assert_eq!(inner.record_process_exit(7), ExitDisposition::Stale);
+    }
+
+    #[test]
+    fn active_startup_exit_invalidates_without_emitting() {
+        let mut inner = SupervisorInner::default();
+        inner.generation = 3;
+        inner.lifecycle.begin_restart();
+
+        assert_eq!(inner.record_process_exit(3), ExitDisposition::StartupFailed);
+        assert_eq!(inner.lifecycle.phase(), BackendPhase::Stopped);
+        assert_eq!(inner.record_process_exit(2), ExitDisposition::Stale);
+    }
+
+    #[test]
+    fn stale_generation_does_not_invalidate_active_connection() {
+        let mut inner = SupervisorInner::default();
+        inner.generation = 8;
+        inner.lifecycle.mark_running();
+        inner.connection = Some(BackendConnection::loopback(43_123, "token".to_owned()));
+
+        assert_eq!(inner.record_process_exit(7), ExitDisposition::Stale);
+        assert_eq!(inner.lifecycle.phase(), BackendPhase::Running);
+        assert!(inner.connection.is_some());
+        assert_eq!(inner.generation, 8);
+    }
+
+    #[test]
+    fn monitor_treats_error_termination_and_channel_close_as_exit() {
+        assert_eq!(
+            monitor_action(Some(&CommandEvent::Stdout(vec![]))),
+            MonitorAction::Continue
+        );
+        assert_eq!(
+            monitor_action(Some(&CommandEvent::Error("wait failed".to_owned()))),
+            MonitorAction::UnexpectedExit
+        );
+        assert_eq!(
+            monitor_action(Some(&CommandEvent::Terminated(
+                tauri_plugin_shell::process::TerminatedPayload {
+                    code: Some(1),
+                    signal: None,
+                }
+            ))),
+            MonitorAction::UnexpectedExit
+        );
+        assert_eq!(monitor_action(None), MonitorAction::UnexpectedExit);
+    }
+
+    #[test]
+    fn bootstrap_preferred_theme_follows_dark_system_theme() {
+        assert_eq!(preferred_theme_for(Some(Theme::Dark)), "workspace-dark");
+        assert_eq!(preferred_theme_for(Some(Theme::Light)), "workspace-light");
+        assert_eq!(preferred_theme_for(None), "workspace-light");
+    }
+
+    #[test]
+    fn shortcut_workflow_initializes_backend_before_registration_and_restores_on_rollback() {
         let transaction = ShortcutTransaction::new("Cmd+Alt+KeyT", "Cmd+Shift+KeyN");
 
         assert_eq!(
-            transaction.apply_steps(),
+            transaction.workflow_steps(),
             [
+                ShortcutStep::EnsureRunning,
+                ShortcutStep::EnsureBootstrap,
                 ShortcutStep::Register("Cmd+Shift+KeyN"),
-                ShortcutStep::Unregister("Cmd+Alt+KeyT")
+                ShortcutStep::Unregister("Cmd+Alt+KeyT"),
+                ShortcutStep::Persist("Cmd+Shift+KeyN")
             ]
         );
         assert_eq!(
