@@ -55,6 +55,14 @@ npm --prefix desktop run sign:macos
 - `desktop/src-tauri/target/release/bundle/macos/Todo List.app`
 - `desktop/src-tauri/target/release/bundle/dmg/`
 
+## 开发约定
+
+- 前端跨功能模块使用 `@/*` 导入；持久化数据只能通过后端读写，不能增加 `localStorage` 降级路径。
+- 后端由 repository 负责 SQL、service 负责事务；数据库结构变更使用新的编号迁移，不修改已经发布的迁移。
+- 桌面端 Rust 负责 sidecar 的启动、健康检查、重试、监控和关闭；前端 JavaScript 不获得 shell 执行权限。
+- 服务只监听本机回环地址并使用 Bearer token；日志不得包含 token、任务正文、备注、数据库路径或 SQL 参数。
+- 修改后运行与受影响层对应的最小检查；具体命令和设计细节参见下方文档。
+
 ## 文档
 
 - [项目总览](docs/project-overview.md)
