@@ -1,8 +1,7 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
+import { ApiError, type TodoApi } from '@/shared/api/contracts';
 import type { Todo } from '@/shared/types';
-import { safeSetItem, safeGetItem } from '@/shared/lib/storage';
 
-const STORAGE_KEY = 'todo-reminded';
 const CHECK_INTERVAL_MS = 30_000;
 const STALE_THRESHOLD_MS = 24 * 60 * 60 * 1000;
 
@@ -12,97 +11,106 @@ export interface ReminderEvent {
   time: string;
 }
 
-function loadReminded(): Set<string> {
-  const raw = safeGetItem(STORAGE_KEY);
-  if (!raw) return new Set();
-  try {
-    const arr = JSON.parse(raw);
-    return Array.isArray(arr) ? new Set(arr.filter(x => typeof x === 'string')) : new Set();
-  } catch {
-    return new Set();
-  }
-}
-
-function persistReminded(set: Set<string>) {
-  safeSetItem(STORAGE_KEY, JSON.stringify([...set]));
-}
-
 function parseTimeStart(iso: string): number | null {
-  // ISO format: "YYYY-MM-DDTHH:mm" (interpreted as local time per app convention)
-  const ts = new Date(iso).getTime();
-  return Number.isFinite(ts) ? ts : null;
+  const timestamp = new Date(iso).getTime();
+  return Number.isFinite(timestamp) ? timestamp : null;
 }
 
-/**
- * Watches todos with `time.start` set, fires `onReminder` when their reminder time
- * passes. De-duplicates via localStorage so a task is reminded at most once even
- * across app restarts. Skips reminders that are >24h late to avoid spam on launch.
- *
- * Pruning: when a task is removed or its time is changed/cleared, its entry is
- * removed from the reminded set so a re-set can fire again.
- */
+function reminderKey(task: Todo): string | null {
+  return task.time?.start ? `${task.id}|${task.time.start}` : null;
+}
+
 export function useReminders(
   tasks: Todo[],
+  api: TodoApi,
   onReminder: (event: ReminderEvent) => void,
+  onError: (error: unknown) => void,
 ) {
-  const remindedRef = useRef<Set<string>>(loadReminded());
-  const onReminderRef = useRef(onReminder);
-  onReminderRef.current = onReminder;
   const tasksRef = useRef(tasks);
+  const onReminderRef = useRef(onReminder);
+  const onErrorRef = useRef(onError);
+  const pendingRef = useRef(new Set<string>());
+  const processedRef = useRef(new Set<string>());
+  const mountedRef = useRef(true);
+  const generationRef = useRef(0);
+
   tasksRef.current = tasks;
+  onReminderRef.current = onReminder;
+  onErrorRef.current = onError;
 
-  const check = useCallback(() => {
-    const now = Date.now();
-    const reminded = remindedRef.current;
-    let dirty = false;
-
-    // Reminder key: `${id}|${time.start}` — changes if user re-schedules.
-    const activeKeys = new Set<string>();
-    for (const task of tasksRef.current) {
-      if (!task.time?.start) continue;
-      activeKeys.add(`${task.id}|${task.time.start}`);
-    }
-
-    // Prune entries that no longer correspond to any task's current schedule.
-    for (const key of [...reminded]) {
-      if (!activeKeys.has(key)) {
-        reminded.delete(key);
-        dirty = true;
-      }
-    }
-
-    for (const task of tasksRef.current) {
-      if (task.completed) continue;
-      if (!task.time?.start) continue;
-
-      const key = `${task.id}|${task.time.start}`;
-      if (reminded.has(key)) continue;
-
-      const due = parseTimeStart(task.time.start);
-      if (due === null) continue;
-      if (due > now) continue;
-      if (now - due > STALE_THRESHOLD_MS) {
-        // Mark stale ones as reminded silently to avoid repeated checks.
-        reminded.add(key);
-        dirty = true;
-        continue;
-      }
-
-      reminded.add(key);
-      dirty = true;
-      onReminderRef.current({ taskId: task.id, text: task.text, time: task.time.start });
-    }
-
-    if (dirty) persistReminded(reminded);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
   }, []);
 
   useEffect(() => {
+    generationRef.current += 1;
+  }, [api]);
+
+  const claim = useCallback(async (task: Todo, key: string) => {
+    const generation = generationRef.current;
+    pendingRef.current.add(key);
+    try {
+      const claimed = await api.claimReminder({
+        taskId: task.id,
+        scheduledStart: task.time!.start,
+      });
+      if (generation !== generationRef.current) return;
+      processedRef.current.add(key);
+      const stillCurrent = tasksRef.current.some(current => (
+        current.id === task.id
+        && !current.completed
+        && current.time?.start === task.time!.start
+      ));
+      if (claimed && mountedRef.current && stillCurrent) {
+        onReminderRef.current({
+          taskId: task.id,
+          text: task.text,
+          time: task.time!.start,
+        });
+      }
+    } catch (error) {
+      if (generation !== generationRef.current) return;
+      if (error instanceof ApiError && error.kind === 'business') {
+        processedRef.current.add(key);
+      }
+      if (mountedRef.current) onErrorRef.current(error);
+    } finally {
+      pendingRef.current.delete(key);
+    }
+  }, [api]);
+
+  const check = useCallback(() => {
+    const now = Date.now();
+    const activeKeys = new Set(tasksRef.current.flatMap(task => {
+      const key = reminderKey(task);
+      return key ? [key] : [];
+    }));
+    for (const key of processedRef.current) {
+      if (!activeKeys.has(key)) processedRef.current.delete(key);
+    }
+
+    for (const task of tasksRef.current) {
+      if (task.completed || !task.time?.start) continue;
+      const key = reminderKey(task)!;
+      if (pendingRef.current.has(key) || processedRef.current.has(key)) continue;
+
+      const due = parseTimeStart(task.time.start);
+      if (due === null || due > now) continue;
+      if (now - due > STALE_THRESHOLD_MS) {
+        processedRef.current.add(key);
+        continue;
+      }
+      void claim(task, key);
+    }
+  }, [claim]);
+
+  useEffect(() => {
     check();
-    const id = window.setInterval(check, CHECK_INTERVAL_MS);
-    return () => window.clearInterval(id);
+    const interval = window.setInterval(check, CHECK_INTERVAL_MS);
+    return () => window.clearInterval(interval);
   }, [check]);
 
-  // Also check when tasks change (e.g., user just edited a time).
   useEffect(() => {
     check();
   }, [tasks, check]);

@@ -1,88 +1,86 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { AchievementState } from '@/shared/types';
 import { useAchievements } from '../useAchievements';
 
+const INITIAL_STATE: AchievementState = {
+  unlocked: ['first-task'],
+  streakDays: 2,
+  lastActiveDate: '2026-07-12',
+  todayCompleted: 3,
+  todayDate: '2026-07-13',
+};
+
 describe('useAchievements', () => {
-  beforeEach(() => {
-    localStorage.clear();
-    vi.useFakeTimers();
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it('initializes progress from the bootstrap snapshot', () => {
+    const { result } = renderHook(() => useAchievements(INITIAL_STATE));
+
+    expect(result.current.achievements).toEqual(INITIAL_STATE);
   });
 
-  afterEach(() => {
-    vi.useRealTimers();
+  it('replaces progress with the completion response without recalculating it', () => {
+    const serverState: AchievementState = {
+      unlocked: ['first-task', 'streak-7'],
+      streakDays: 7,
+      lastActiveDate: '2026-07-13',
+      todayCompleted: 42,
+      todayDate: '2026-07-13',
+    };
+    const { result } = renderHook(() => useAchievements(INITIAL_STATE));
+
+    act(() => result.current.applyCompletion(serverState, []));
+
+    expect(result.current.achievements).toEqual(serverState);
+    expect(result.current.toast).toBeNull();
   });
 
-  it('should initialize with no achievements unlocked', () => {
-    const { result } = renderHook(() => useAchievements());
-    expect(result.current.achievements.unlocked).toEqual([]);
+  it('shows feedback only for IDs newly unlocked by the server', () => {
+    const playUnlock = vi.fn();
+    const serverState = { ...INITIAL_STATE, unlocked: ['first-task', 'streak-7'] };
+    const { result } = renderHook(() => useAchievements(INITIAL_STATE, playUnlock));
+
+    act(() => result.current.applyCompletion(serverState, ['streak-7']));
+
+    expect(result.current.toast?.id).toBe('streak-7');
+    expect(playUnlock).toHaveBeenCalledTimes(1);
+
+    act(() => vi.advanceTimersByTime(3_000));
+    expect(result.current.toast).toBeNull();
   });
 
-  it('should unlock first-task achievement', () => {
-    const { result } = renderHook(() => useAchievements());
+  it('ignores unknown server achievement IDs for local presentation', () => {
+    const playUnlock = vi.fn();
+    const { result } = renderHook(() => useAchievements(INITIAL_STATE, playUnlock));
 
-    act(() => {
-      result.current.recordCompletion();
-    });
+    act(() => result.current.applyCompletion(INITIAL_STATE, ['future-achievement']));
 
-    expect(result.current.achievements.unlocked).toContain('first-task');
+    expect(result.current.toast).toBeNull();
+    expect(playUnlock).not.toHaveBeenCalled();
   });
 
-  it('should show toast on achievement unlock', () => {
-    const { result } = renderHook(() => useAchievements());
+  it('dismisses the active toast', () => {
+    const { result } = renderHook(() => useAchievements(INITIAL_STATE));
 
-    act(() => {
-      result.current.recordCompletion();
-    });
-
-    expect(result.current.toast).not.toBeNull();
-    expect(result.current.toast?.id).toBe('first-task');
-  });
-
-  it('should dismiss toast', () => {
-    const { result } = renderHook(() => useAchievements());
-
-    act(() => {
-      result.current.recordCompletion();
-    });
-
-    act(() => {
-      result.current.dismissToast();
-    });
+    act(() => result.current.applyCompletion(INITIAL_STATE, ['first-task']));
+    act(() => result.current.dismissToast());
 
     expect(result.current.toast).toBeNull();
   });
 
-  it('should track today completed count', () => {
-    const { result } = renderHook(() => useAchievements());
+  it('replaces progress and clears stale feedback on a new bootstrap snapshot', () => {
+    const replacement = { ...INITIAL_STATE, todayCompleted: 9 };
+    const { result, rerender } = renderHook(
+      ({ state }) => useAchievements(state),
+      { initialProps: { state: INITIAL_STATE } },
+    );
+    act(() => result.current.applyCompletion(INITIAL_STATE, ['first-task']));
 
-    act(() => {
-      result.current.recordCompletion();
-      result.current.recordCompletion();
-    });
+    rerender({ state: replacement });
 
-    expect(result.current.achievements.todayCompleted).toBe(2);
-  });
-
-  it('should unlock speed-demon after 10 completions', () => {
-    const { result } = renderHook(() => useAchievements());
-
-    act(() => {
-      for (let i = 0; i < 10; i++) {
-        result.current.recordCompletion();
-      }
-    });
-
-    expect(result.current.achievements.unlocked).toContain('speed-demon');
-  });
-
-  it('should persist achievements to localStorage', () => {
-    const { result } = renderHook(() => useAchievements());
-
-    act(() => {
-      result.current.recordCompletion();
-    });
-
-    const stored = JSON.parse(localStorage.getItem('todo-achievements') || '{}');
-    expect(stored.unlocked).toContain('first-task');
+    expect(result.current.achievements).toEqual(replacement);
+    expect(result.current.toast).toBeNull();
   });
 });

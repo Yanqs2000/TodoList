@@ -1,11 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
-import { safeSetItem, safeGetItem } from '@/shared/lib/storage';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { TodoApi } from '@/shared/api/contracts';
 
 export type ThemeStyle = 'workspace' | 'mint' | 'paper';
 export type ThemeMode = 'light' | 'dark';
 export type ThemeId = `${ThemeStyle}-${ThemeMode}`;
-
-const STORAGE_KEY = 'todo-theme';
 
 export const THEME_IDS: ThemeId[] = [
   'workspace-light',
@@ -62,55 +60,61 @@ export const THEMES: Record<ThemeId, ThemeMeta> = {
   },
 };
 
-function isValidThemeId(value: string | null): value is ThemeId {
-  return value !== null && THEME_IDS.includes(value as ThemeId);
-}
+export function useTheme(
+  initialTheme: ThemeId,
+  api: TodoApi,
+  onError: (error: unknown) => void,
+) {
+  const [theme, setThemeState] = useState<ThemeId>(initialTheme);
+  const mountedRef = useRef(true);
+  const committedRef = useRef(initialTheme);
+  const latestIntentRef = useRef(0);
+  const generationRef = useRef(0);
+  const queueRef = useRef<Promise<void>>(Promise.resolve());
 
-function migrateLegacy(value: string | null): ThemeId | null {
-  if (value === 'light') return 'workspace-light';
-  if (value === 'dark') return 'workspace-dark';
-  if (value === 'editor-light') return 'mint-light';
-  if (value === 'editor-dark') return 'mint-dark';
-  return null;
-}
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
-function getInitialTheme(): ThemeId {
-  const stored = safeGetItem(STORAGE_KEY);
-  if (isValidThemeId(stored)) return stored;
-  const migrated = migrateLegacy(stored);
-  if (migrated) return migrated;
-  try {
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    return prefersDark ? 'workspace-dark' : 'workspace-light';
-  } catch {
-    return 'workspace-light';
-  }
-}
+  useEffect(() => {
+    committedRef.current = initialTheme;
+    latestIntentRef.current += 1;
+    generationRef.current += 1;
+    queueRef.current = Promise.resolve();
+    setThemeState(initialTheme);
+  }, [api, initialTheme]);
 
-export function useTheme() {
-  const [theme, setThemeState] = useState<ThemeId>(getInitialTheme);
-
-  // Sync data-theme attribute on every theme change. We do NOT persist here:
-  // persistence is reserved for explicit user actions in setTheme below, so
-  // a `prefers-color-scheme` probe on first launch does not get baked into
-  // localStorage (which would break system-theme follow-along).
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
-  // One-time migration: if storage holds a legacy value, normalize it on mount.
-  useEffect(() => {
-    const stored = safeGetItem(STORAGE_KEY);
-    if (stored !== null && !isValidThemeId(stored) && migrateLegacy(stored)) {
-      safeSetItem(STORAGE_KEY, theme);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const setTheme = useCallback((id: ThemeId) => {
-    setThemeState(id);
-    safeSetItem(STORAGE_KEY, id);
-  }, []);
+  const setTheme = useCallback((id: ThemeId): Promise<boolean> => {
+    const intent = ++latestIntentRef.current;
+    const generation = generationRef.current;
+    const operation = queueRef.current.then(async () => {
+      let succeeded = false;
+      try {
+        const settings = await api.updateSettings({ theme: id });
+        if (mountedRef.current && generation === generationRef.current) {
+          committedRef.current = settings.theme;
+          succeeded = true;
+        }
+      } catch (error) {
+        if (mountedRef.current && generation === generationRef.current) onError(error);
+      }
+      if (
+        mountedRef.current
+        && generation === generationRef.current
+        && intent === latestIntentRef.current
+      ) {
+        setThemeState(committedRef.current);
+      }
+      return succeeded;
+    });
+    queueRef.current = operation.then(() => undefined);
+    return operation;
+  }, [api, onError]);
 
   return { theme, setTheme };
 }

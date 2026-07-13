@@ -1,119 +1,138 @@
-import { useEffect, useCallback, useState, useRef } from 'react';
-import { safeSetItem, safeGetItem } from '@/shared/lib/storage';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { InfrastructureError } from '@/shared/api/contracts';
 
-const SHORTCUT_KEY = 'todo-shortcut';
 export const DEFAULT_SHORTCUT = 'Cmd+Alt+KeyT';
 
-/**
- * Detects whether the app is running inside Tauri. We avoid hard-importing the
- * Tauri APIs at module top-level so the web build still works (e.g. `npm run dev`
- * in a regular browser, or running tests under jsdom).
- */
 function isTauri(): boolean {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+}
+
+interface ShortcutResult {
+  ok: boolean;
+  error?: string;
 }
 
 interface DesktopApi {
   isDesktop: boolean;
   shortcut: string;
-  setShortcut: (s: string) => Promise<{ ok: true } | { ok: false; error: string }>;
+  setShortcut: (shortcut: string) => Promise<{ ok: true } | { ok: false; error: string }>;
   autostartEnabled: boolean;
   toggleAutostart: () => Promise<void>;
 }
 
-/**
- * Bridges renderer <-> Tauri for desktop-only features:
- * - listens for the `open-create-modal` event (fired by the global shortcut and tray menu)
- * - reads/writes the configured global shortcut
- * - reads/writes the auto-start preference
- *
- * On non-Tauri environments (web preview / tests), `isDesktop` is false and all
- * mutators are no-ops. The hook still returns sensible defaults so callers don't
- * need null checks for every field.
- */
-export function useDesktop(onOpenCreateModal: () => void): DesktopApi {
+export function useDesktop(
+  initialShortcut: string,
+  onOpenCreateModal: () => void,
+  onInfrastructureError: (error: InfrastructureError) => void,
+): DesktopApi {
   const desktop = isTauri();
-  const [shortcut, setShortcutState] = useState<string>(
-    () => safeGetItem(SHORTCUT_KEY) ?? DEFAULT_SHORTCUT,
-  );
+  const [shortcut, setShortcutState] = useState(initialShortcut);
   const [autostartEnabled, setAutostartEnabled] = useState(false);
-
   const onOpenRef = useRef(onOpenCreateModal);
+  const mountedRef = useRef(true);
+  const committedRef = useRef(initialShortcut);
+  const latestIntentRef = useRef(0);
+  const generationRef = useRef(0);
+  const queueRef = useRef<Promise<void>>(Promise.resolve());
   onOpenRef.current = onOpenCreateModal;
 
-  // Listen for the open-create-modal event from Rust.
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  useEffect(() => {
+    committedRef.current = initialShortcut;
+    latestIntentRef.current += 1;
+    generationRef.current += 1;
+    queueRef.current = Promise.resolve();
+    setShortcutState(initialShortcut);
+  }, [initialShortcut]);
+
   useEffect(() => {
     if (!desktop) return;
+    let disposed = false;
     let unlisten: (() => void) | undefined;
-    (async () => {
+    void (async () => {
       const { listen } = await import('@tauri-apps/api/event');
-      unlisten = await listen('open-create-modal', () => {
-        onOpenRef.current();
-      });
+      const stopListening = await listen('open-create-modal', () => onOpenRef.current());
+      if (disposed) stopListening();
+      else unlisten = stopListening;
     })();
     return () => {
+      disposed = true;
       unlisten?.();
     };
   }, [desktop]);
 
-  // Read current autostart state on mount.
   useEffect(() => {
     if (!desktop) return;
-    (async () => {
+    void (async () => {
       try {
         const { isEnabled } = await import('@tauri-apps/plugin-autostart');
-        setAutostartEnabled(await isEnabled());
+        const enabled = await isEnabled();
+        if (mountedRef.current) setAutostartEnabled(enabled);
       } catch {
-        // ignore — plugin not available
+        // Autostart remains an optional Tauri-only capability.
       }
     })();
   }, [desktop]);
 
-  // If the user has a stored shortcut different from the default, apply it on launch.
-  useEffect(() => {
-    if (!desktop) return;
-    const stored = safeGetItem(SHORTCUT_KEY);
-    if (!stored || stored === DEFAULT_SHORTCUT) return;
-    (async () => {
+  const setShortcut = useCallback((next: string) => {
+    if (!desktop) {
+      return Promise.resolve({ ok: false, error: 'Desktop app required' } as const);
+    }
+    const intent = ++latestIntentRef.current;
+    const generation = generationRef.current;
+    const operation = queueRef.current.then(async (): Promise<ShortcutResult> => {
       try {
         const { invoke } = await import('@tauri-apps/api/core');
-        await invoke('set_global_shortcut', { shortcut: stored });
-      } catch {
-        // fall back to default; surface no error since it's startup
+        await invoke('set_global_shortcut', { shortcut: next });
+        if (mountedRef.current && generation === generationRef.current) {
+          committedRef.current = next;
+          return { ok: true };
+        }
+        return { ok: false, error: 'Shortcut request superseded' };
+      } catch (error) {
+        const message = String(error);
+        if (
+          message.includes('BACKEND_UNAVAILABLE')
+          && mountedRef.current
+          && generation === generationRef.current
+        ) {
+          onInfrastructureError(new InfrastructureError(
+            'infrastructure',
+            'BACKEND_UNAVAILABLE',
+            'Backend unavailable',
+          ));
+        }
+        return { ok: false, error: message };
+      } finally {
+        if (
+          mountedRef.current
+          && generation === generationRef.current
+          && intent === latestIntentRef.current
+        ) {
+          setShortcutState(committedRef.current);
+        }
       }
-    })();
-  }, [desktop]);
-
-  const setShortcut = useCallback(async (next: string): Promise<{ ok: true } | { ok: false; error: string }> => {
-    if (!desktop) {
-      setShortcutState(next);
-      safeSetItem(SHORTCUT_KEY, next);
-      return { ok: true };
-    }
-    try {
-      const { invoke } = await import('@tauri-apps/api/core');
-      await invoke('set_global_shortcut', { shortcut: next });
-      setShortcutState(next);
-      safeSetItem(SHORTCUT_KEY, next);
-      return { ok: true };
-    } catch (err) {
-      return { ok: false, error: String(err) };
-    }
-  }, [desktop]);
+    });
+    queueRef.current = operation.then(() => undefined);
+    return operation.then(result => (
+      result.ok ? { ok: true } as const : { ok: false, error: result.error ?? 'Shortcut update failed' } as const
+    ));
+  }, [desktop, onInfrastructureError]);
 
   const toggleAutostart = useCallback(async () => {
     if (!desktop) return;
     try {
       const { enable, disable, isEnabled } = await import('@tauri-apps/plugin-autostart');
       const current = await isEnabled();
-      if (current) {
-        await disable();
-      } else {
-        await enable();
-      }
-      setAutostartEnabled(!current);
+      if (current) await disable();
+      else await enable();
+      if (mountedRef.current) setAutostartEnabled(!current);
     } catch {
-      // ignore
+      // Keep the last known operating-system state.
     }
   }, [desktop]);
 

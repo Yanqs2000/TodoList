@@ -1,6 +1,11 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { TimeField, Category, Priority } from '@/shared/types';
-import type { BootstrapSnapshot, InfrastructureError, TodoApi } from '@/shared/api/contracts';
+import {
+  ApiError,
+  InfrastructureError,
+  type BootstrapSnapshot,
+  type TodoApi,
+} from '@/shared/api/contracts';
 import { DAILY_GOAL } from '@/shared/constants';
 import { useTodos } from '@/features/tasks/hooks/useTodos';
 import { useTheme } from '@/features/theme/hooks/useTheme';
@@ -36,10 +41,6 @@ interface TodoApplicationProps {
 
 function TodoApplication({ snapshot, api, onInfrastructureError }: TodoApplicationProps) {
   const todoState = useTodos(snapshot.tasks, api, onInfrastructureError);
-  const { theme, setTheme } = useTheme();
-  const sound = useSound();
-  const achievements = useAchievements(sound.playAchievement);
-  const confetti = useConfetti();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -52,6 +53,34 @@ function TodoApplication({ snapshot, api, onInfrastructureError }: TodoApplicati
     if (infoTimerRef.current !== null) clearTimeout(infoTimerRef.current);
     infoTimerRef.current = window.setTimeout(() => setInfoToast(null), 2500);
   }, []);
+
+  const handleApplicationError = useCallback((error: unknown) => {
+    if (error instanceof InfrastructureError) {
+      onInfrastructureError(error);
+      return;
+    }
+    if (error instanceof ApiError && error.kind === 'business') {
+      showInfo(error.message, 'error');
+      return;
+    }
+    onInfrastructureError(new InfrastructureError(
+      'infrastructure',
+      'UNEXPECTED_CLIENT_ERROR',
+      'Unexpected backend error',
+    ));
+  }, [onInfrastructureError, showInfo]);
+
+  const { theme, setTheme } = useTheme(
+    snapshot.settings.theme,
+    api,
+    handleApplicationError,
+  );
+  const sound = useSound(snapshot.settings.muted, api, handleApplicationError);
+  const achievements = useAchievements(
+    snapshot.achievementState,
+    sound.playAchievement,
+  );
+  const confetti = useConfetti();
 
   useEffect(() => {
     if (!todoState.businessError) return;
@@ -98,15 +127,21 @@ function TodoApplication({ snapshot, api, onInfrastructureError }: TodoApplicati
     }
   }, [sound]);
 
-  useReminders(todoState.allTasks, handleReminder);
+  useReminders(todoState.allTasks, api, handleReminder, handleApplicationError);
 
-  const desktop = useDesktop(useCallback(() => setCreateModalOpen(true), []));
+  const desktop = useDesktop(
+    snapshot.settings.shortcut,
+    useCallback(() => setCreateModalOpen(true), []),
+    onInfrastructureError,
+  );
 
   const handleToggle = useCallback(async (id: string) => {
     const task = todoState.allTasks.find(t => t.id === id);
     const result = await todoState.toggleTask(id);
+    if (result) {
+      achievements.applyCompletion(result.achievementState, result.newlyUnlocked);
+    }
     if (result && task && !task.completed) {
-      achievements.recordCompletion();
       sound.playComplete();
       const el = document.querySelector(`[data-task-id="${id}"]`);
       if (el) {

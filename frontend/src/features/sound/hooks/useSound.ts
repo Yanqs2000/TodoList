@@ -1,11 +1,5 @@
-import { useState, useCallback, useRef } from 'react';
-import { safeSetItem, safeGetItem } from '@/shared/lib/storage';
-
-const STORAGE_KEY = 'todo-muted';
-
-function getInitialMuted(): boolean {
-  return safeGetItem(STORAGE_KEY) === 'true';
-}
+import { useState, useCallback, useEffect, useRef } from 'react';
+import type { TodoApi } from '@/shared/api/contracts';
 
 function createAudioContext(): AudioContext | null {
   try {
@@ -15,9 +9,33 @@ function createAudioContext(): AudioContext | null {
   }
 }
 
-export function useSound() {
-  const [muted, setMutedState] = useState(getInitialMuted);
+export function useSound(
+  initialMuted: boolean,
+  api: TodoApi,
+  onError: (error: unknown) => void,
+) {
+  const [muted, setMutedState] = useState(initialMuted);
   const ctxRef = useRef<AudioContext | null>(null);
+  const mountedRef = useRef(true);
+  const committedRef = useRef(initialMuted);
+  const intendedRef = useRef(initialMuted);
+  const latestIntentRef = useRef(0);
+  const generationRef = useRef(0);
+  const queueRef = useRef<Promise<void>>(Promise.resolve());
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  useEffect(() => {
+    committedRef.current = initialMuted;
+    intendedRef.current = initialMuted;
+    latestIntentRef.current += 1;
+    generationRef.current += 1;
+    queueRef.current = Promise.resolve();
+    setMutedState(initialMuted);
+  }, [api, initialMuted]);
 
   const getCtx = useCallback(async () => {
     if (!ctxRef.current) ctxRef.current = createAudioContext();
@@ -70,13 +88,35 @@ export function useSound() {
     }
   }, [playTone]);
 
-  const toggleMuted = useCallback(() => {
-    setMutedState(prev => {
-      const next = !prev;
-      safeSetItem(STORAGE_KEY, String(next));
-      return next;
+  const toggleMuted = useCallback((): Promise<boolean> => {
+    const next = !intendedRef.current;
+    intendedRef.current = next;
+    const intent = ++latestIntentRef.current;
+    const generation = generationRef.current;
+    const operation = queueRef.current.then(async () => {
+      let succeeded = false;
+      try {
+        const settings = await api.updateSettings({ muted: next });
+        if (mountedRef.current && generation === generationRef.current) {
+          committedRef.current = settings.muted;
+          succeeded = true;
+        }
+      } catch (error) {
+        if (mountedRef.current && generation === generationRef.current) onError(error);
+      }
+      if (
+        mountedRef.current
+        && generation === generationRef.current
+        && intent === latestIntentRef.current
+      ) {
+        intendedRef.current = committedRef.current;
+        setMutedState(committedRef.current);
+      }
+      return succeeded;
     });
-  }, []);
+    queueRef.current = operation.then(() => undefined);
+    return operation;
+  }, [api, onError]);
 
   return { muted, toggleMuted, playComplete, playDelete, playAchievement, playReminder };
 }
