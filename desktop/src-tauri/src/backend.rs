@@ -1,5 +1,6 @@
 use std::{
     fmt::Write as _,
+    future::Future,
     net::{Ipv4Addr, TcpListener},
     path::PathBuf,
     time::Duration,
@@ -92,13 +93,61 @@ impl BackendLifecycle {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum BackendError {
     PortBinding(String),
     Sidecar(String),
     SidecarExited,
     HealthCheck(String),
     NotRunning,
+}
+
+#[derive(Default)]
+struct StartupCoordinator {
+    wave: Mutex<()>,
+    cached_failure: Mutex<Option<BackendError>>,
+}
+
+impl StartupCoordinator {
+    async fn ensure<F, Fut>(&self, start: F) -> Result<BackendConnection, BackendError>
+    where
+        F: FnOnce() -> Fut,
+        Fut: Future<Output = Result<BackendConnection, BackendError>>,
+    {
+        if let Some(error) = self.cached_failure.lock().await.clone() {
+            return Err(error);
+        }
+
+        let _wave = self.wave.lock().await;
+        if let Some(error) = self.cached_failure.lock().await.clone() {
+            return Err(error);
+        }
+        self.run_and_cache(start).await
+    }
+
+    async fn retry<F, Fut>(&self, start: F) -> Result<BackendConnection, BackendError>
+    where
+        F: FnOnce() -> Fut,
+        Fut: Future<Output = Result<BackendConnection, BackendError>>,
+    {
+        let _wave = self.wave.lock().await;
+        *self.cached_failure.lock().await = None;
+        self.run_and_cache(start).await
+    }
+
+    async fn run_and_cache<F, Fut>(&self, start: F) -> Result<BackendConnection, BackendError>
+    where
+        F: FnOnce() -> Fut,
+        Fut: Future<Output = Result<BackendConnection, BackendError>>,
+    {
+        let result = start().await;
+        *self.cached_failure.lock().await = result.as_ref().err().cloned();
+        result
+    }
+
+    async fn cache_failure(&self, error: BackendError) {
+        *self.cached_failure.lock().await = Some(error);
+    }
 }
 
 impl BackendError {
@@ -161,7 +210,7 @@ impl SupervisorInner {
 pub struct BackendSupervisor {
     database_path: PathBuf,
     client: reqwest::Client,
-    operation: Mutex<()>,
+    coordinator: StartupCoordinator,
     inner: Mutex<SupervisorInner>,
 }
 
@@ -170,7 +219,7 @@ impl BackendSupervisor {
         Self {
             database_path,
             client: reqwest::Client::new(),
-            operation: Mutex::new(()),
+            coordinator: StartupCoordinator::default(),
             inner: Mutex::new(SupervisorInner::default()),
         }
     }
@@ -179,27 +228,29 @@ impl BackendSupervisor {
         &self,
         app: &AppHandle,
     ) -> Result<BackendConnection, BackendError> {
-        if let Some(connection) = self.running_connection().await {
-            return Ok(connection);
-        }
-
-        let _operation = self.operation.lock().await;
-        if let Some(connection) = self.running_connection().await {
-            return Ok(connection);
-        }
-        self.start(app).await
+        self.coordinator
+            .ensure(|| async {
+                if let Some(connection) = self.running_connection().await {
+                    return Ok(connection);
+                }
+                self.start(app).await
+            })
+            .await
     }
 
     async fn restart(&self, app: &AppHandle) -> Result<BackendConnection, BackendError> {
-        let _operation = self.operation.lock().await;
-        {
-            let mut inner = self.inner.lock().await;
-            if inner.shutting_down {
-                return Err(BackendError::NotRunning);
-            }
-            stop_child(&mut inner);
-        }
-        self.start(app).await
+        self.coordinator
+            .retry(|| async {
+                {
+                    let mut inner = self.inner.lock().await;
+                    if inner.shutting_down {
+                        return Err(BackendError::NotRunning);
+                    }
+                    stop_child(&mut inner);
+                }
+                self.start(app).await
+            })
+            .await
     }
 
     async fn running_connection(&self) -> Option<BackendConnection> {
@@ -378,9 +429,21 @@ impl BackendSupervisor {
     }
 
     async fn mark_unexpected_exit(&self, app: &AppHandle, generation: u64) {
-        let disposition = {
+        let was_running = {
+            let inner = self.inner.lock().await;
+            inner.generation == generation && inner.lifecycle.phase() == BackendPhase::Running
+        };
+        let disposition = if was_running {
+            let _wave = self.coordinator.wave.lock().await;
             let mut inner = self.inner.lock().await;
+            if inner.generation == generation && inner.lifecycle.phase() == BackendPhase::Running {
+                self.coordinator
+                    .cache_failure(BackendError::SidecarExited)
+                    .await;
+            }
             inner.record_process_exit(generation)
+        } else {
+            self.inner.lock().await.record_process_exit(generation)
         };
 
         if disposition == ExitDisposition::EmitUnavailable {
@@ -389,6 +452,9 @@ impl BackendSupervisor {
     }
 
     pub async fn shutdown(&self) {
+        self.coordinator
+            .cache_failure(BackendError::NotRunning)
+            .await;
         let mut inner = self.inner.lock().await;
         inner.shutting_down = true;
         stop_child(&mut inner);
@@ -733,6 +799,10 @@ pub async fn set_global_shortcut(
 mod tests {
     use super::*;
     use serde_json::json;
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    };
 
     #[test]
     fn token_has_256_bits_of_hex_entropy() {
@@ -876,6 +946,82 @@ mod tests {
         assert_eq!(preferred_theme_for(Some(Theme::Dark)), "workspace-dark");
         assert_eq!(preferred_theme_for(Some(Theme::Light)), "workspace-light");
         assert_eq!(preferred_theme_for(None), "workspace-light");
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn concurrent_ensure_callers_share_failure_until_explicit_retry() {
+        let coordinator = Arc::new(StartupCoordinator::default());
+        let starts = Arc::new(AtomicUsize::new(0));
+        let first_failure = BackendError::HealthCheck("first wave failed".to_owned());
+        let mut callers = Vec::new();
+
+        for _ in 0..8 {
+            let coordinator = coordinator.clone();
+            let starts = starts.clone();
+            let first_failure = first_failure.clone();
+            callers.push(tokio::spawn(async move {
+                coordinator
+                    .ensure(|| async move {
+                        starts.fetch_add(1, Ordering::SeqCst);
+                        tokio::task::yield_now().await;
+                        Err(first_failure)
+                    })
+                    .await
+            }));
+        }
+
+        for caller in callers {
+            assert_eq!(caller.await.unwrap().unwrap_err(), first_failure);
+        }
+        assert_eq!(starts.load(Ordering::SeqCst), 1);
+
+        let retry_failure = BackendError::HealthCheck("retry wave failed".to_owned());
+        let retry_started = Arc::new(tokio::sync::Notify::new());
+        let release_retry = Arc::new(tokio::sync::Notify::new());
+        let retry_task = tokio::spawn({
+            let coordinator = coordinator.clone();
+            let retry_started = retry_started.clone();
+            let release_retry = release_retry.clone();
+            let retry_failure = retry_failure.clone();
+            let starts = starts.clone();
+            async move {
+                coordinator
+                    .retry(|| async move {
+                        starts.fetch_add(1, Ordering::SeqCst);
+                        retry_started.notify_one();
+                        release_retry.notified().await;
+                        Err(retry_failure)
+                    })
+                    .await
+            }
+        });
+        retry_started.notified().await;
+
+        let mut retry_joiners = Vec::new();
+        for _ in 0..4 {
+            let coordinator = coordinator.clone();
+            retry_joiners.push(tokio::spawn(async move {
+                coordinator
+                    .ensure(|| async { panic!("ensure caller must join the active retry wave") })
+                    .await
+            }));
+        }
+        tokio::task::yield_now().await;
+        release_retry.notify_one();
+
+        assert_eq!(retry_task.await.unwrap().unwrap_err(), retry_failure);
+        for joiner in retry_joiners {
+            assert_eq!(joiner.await.unwrap().unwrap_err(), retry_failure);
+        }
+        assert_eq!(starts.load(Ordering::SeqCst), 2);
+        assert_eq!(
+            coordinator
+                .ensure(|| async { panic!("cached retry failure must suppress a new wave") })
+                .await
+                .unwrap_err(),
+            retry_failure
+        );
+        assert_eq!(starts.load(Ordering::SeqCst), 2);
     }
 
     #[test]
