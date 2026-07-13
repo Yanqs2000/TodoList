@@ -1,4 +1,5 @@
-from datetime import date
+import re
+from datetime import date, datetime
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -8,7 +9,19 @@ StrictText = Annotated[str, Field(strict=True, min_length=1, max_length=10_000)]
 StrictNotes = Annotated[str, Field(strict=True, max_length=10_000)]
 Priority = Literal["low", "medium", "high"]
 Category = Literal["work", "study", "life", "other"]
+ThemeId = Literal[
+    "workspace-light",
+    "mint-light",
+    "paper-light",
+    "workspace-dark",
+    "mint-dark",
+    "paper-dark",
+]
 LocalDate = Annotated[str, Field(strict=True, pattern=r"^\d{4}-\d{2}-\d{2}$")]
+LocalDateTime = Annotated[
+    str,
+    Field(strict=True, pattern=r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$"),
+]
 
 
 class WireModel(BaseModel):
@@ -16,8 +29,19 @@ class WireModel(BaseModel):
 
 
 class TimeField(WireModel):
-    start: StrictText
-    end: StrictText | None = None
+    start: LocalDateTime
+    end: LocalDateTime | None = None
+
+    @field_validator("start", "end")
+    @classmethod
+    def validate_local_datetime(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        try:
+            datetime.strptime(value, "%Y-%m-%dT%H:%M")
+        except ValueError:
+            raise ValueError("time must be a valid local ISO minute datetime") from None
+        return value
 
 
 class Task(WireModel):
@@ -73,7 +97,49 @@ class CompletionCommand(WireModel):
 
 
 class BootstrapCommand(WireModel):
-    pass
+    preferred_theme: ThemeId = Field(default="workspace-light", alias="preferredTheme")
+
+
+class AppSettings(WireModel):
+    theme: ThemeId
+    muted: bool
+    shortcut: Annotated[str, Field(strict=True, min_length=1, max_length=200)]
+
+
+class SettingsPatchCommand(WireModel):
+    theme: ThemeId | None = None
+    muted: bool | None = None
+    shortcut: Annotated[str, Field(strict=True, min_length=1, max_length=200)] | None = None
+
+    @field_validator("shortcut")
+    @classmethod
+    def validate_shortcut(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        parts = value.split("+")
+        modifiers = {"Cmd", "CmdOrCtrl", "Ctrl", "Alt", "Shift", "Super", "Meta"}
+        if (
+            len(parts) < 2
+            or any(part not in modifiers for part in parts[:-1])
+            or len(set(parts[:-1])) != len(parts[:-1])
+            or parts[-1] in modifiers
+            or re.fullmatch(r"[A-Za-z][A-Za-z0-9]*", parts[-1]) is None
+        ):
+            raise ValueError("shortcut must contain a modifier and key")
+        return value
+
+    @model_validator(mode="after")
+    def reject_empty_or_null_patch(self) -> "SettingsPatchCommand":
+        if not self.model_fields_set:
+            raise ValueError("settings patch cannot be empty")
+        if any(getattr(self, field_name) is None for field_name in self.model_fields_set):
+            raise ValueError("settings fields cannot be null")
+        return self
+
+
+class ReminderClaimCommand(WireModel):
+    task_id: StrictText = Field(alias="taskId")
+    scheduled_start: LocalDateTime = Field(alias="scheduledStart")
 
 
 class TaskResponse(WireModel):
@@ -82,6 +148,20 @@ class TaskResponse(WireModel):
 
 class TaskListResponse(WireModel):
     tasks: list[Task]
+
+
+class BootstrapResponse(WireModel):
+    tasks: list[Task]
+    settings: AppSettings
+    achievement_state: "AchievementState" = Field(alias="achievementState")
+
+
+class SettingsResponse(WireModel):
+    settings: AppSettings
+
+
+class ReminderClaimResponse(WireModel):
+    claimed: bool
 
 
 class AchievementState(WireModel):

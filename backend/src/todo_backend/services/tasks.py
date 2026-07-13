@@ -7,6 +7,7 @@ from todo_backend.models import (
     UpdateTaskCommand,
 )
 from todo_backend.repositories.tasks import TaskRepository
+from todo_backend.repositories.reminders import ReminderRepository
 from todo_backend.services.achievements import AchievementService
 
 
@@ -16,10 +17,12 @@ class TaskService:
         database: Database,
         repository: TaskRepository | None = None,
         achievement_service: AchievementService | None = None,
+        reminder_repository: ReminderRepository | None = None,
     ) -> None:
         self.database = database
         self.repository = repository or TaskRepository()
         self.achievement_service = achievement_service or AchievementService()
+        self.reminder_repository = reminder_repository or ReminderRepository()
 
     def list_all(self) -> list[Task]:
         connection = self.database.connect()
@@ -34,7 +37,14 @@ class TaskService:
 
     def update(self, task_id: str, command: UpdateTaskCommand) -> Task:
         with self.database.transaction() as connection:
-            return self.repository.update(connection, task_id, command)
+            task = self.repository.update(connection, task_id, command)
+            if "time" in command.model_fields_set:
+                self.reminder_repository.prune_stale(
+                    connection,
+                    task_id,
+                    task.time.start if task.time else None,
+                )
+            return task
 
     def delete(self, task_id: str) -> None:
         with self.database.transaction() as connection:

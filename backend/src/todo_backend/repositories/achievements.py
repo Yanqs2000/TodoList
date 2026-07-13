@@ -4,6 +4,15 @@ from todo_backend.models import AchievementState
 
 
 class AchievementRepository:
+    def ensure_state(self, connection: sqlite3.Connection) -> None:
+        connection.execute(
+            """
+            INSERT OR IGNORE INTO achievement_state (
+                id, streak_days, last_active_date, today_completed, today_date
+            ) VALUES (1, 0, '', 0, '')
+            """
+        )
+
     def load_state(self, connection: sqlite3.Connection) -> AchievementState:
         row = connection.execute(
             """

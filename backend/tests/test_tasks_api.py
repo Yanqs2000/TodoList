@@ -182,6 +182,31 @@ def test_create_rejects_invalid_text_enums_notes_and_extra_fields(
     assert response.status_code == 422
 
 
+@pytest.mark.parametrize(
+    "task_time",
+    [
+        {"start": "2026-02-30T09:00"},
+        {"start": "2026-07-13 09:00"},
+        {"start": "2026-07-13T9:00"},
+        {"start": "2026-07-13T09:00:00"},
+        {"start": "2026-07-13T09:00Z"},
+        {"start": "2026-07-13T09:00", "end": "2026-02-30T10:00"},
+    ],
+)
+def test_create_rejects_invalid_local_iso_minute_times(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    task_time: dict[str, str],
+) -> None:
+    response = client.post(
+        "/api/v1/tasks",
+        headers=auth_headers,
+        json={"text": "Task", "priority": "medium", "time": task_time},
+    )
+
+    assert response.status_code == 422
+
+
 @pytest.mark.parametrize("method", ["patch", "delete"])
 def test_mutating_missing_task_returns_stable_error(
     client: TestClient,
