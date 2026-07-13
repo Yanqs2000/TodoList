@@ -16,7 +16,9 @@ interface TaskItemProps {
   onToggle: (id: string) => Promise<unknown> | void;
   onDelete: (id: string) => Promise<boolean> | void;
   onEdit?: (id: string, updates: Partial<Pick<Todo, 'text' | 'priority' | 'time' | 'category' | 'notes'>>) => Promise<boolean> | void;
-  pending?: boolean;
+  togglePending?: boolean;
+  editPending?: boolean;
+  deletePending?: boolean;
   onSelect?: (id: string | null) => void;
   draggingId?: string | null;
   overId?: string | null;
@@ -36,7 +38,9 @@ function TaskItem({
   onToggle,
   onDelete,
   onEdit,
-  pending = false,
+  togglePending = false,
+  editPending = false,
+  deletePending = false,
   onSelect,
   draggingId,
   overId,
@@ -72,8 +76,8 @@ function TaskItem({
 
   const handleToggle = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!pending) void onToggle(task.id);
-  }, [onToggle, pending, task.id]);
+    if (!togglePending) void onToggle(task.id);
+  }, [onToggle, task.id, togglePending]);
 
   const handleSelect = useCallback(() => {
     if (isEditing) return;
@@ -103,7 +107,7 @@ function TaskItem({
 
   const handleDelete = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (pending) return;
+    if (deletePending) return;
     const ok = await confirm({
       title: '删除任务',
       message: `确定要删除任务「${task.text}」吗？`,
@@ -112,7 +116,7 @@ function TaskItem({
     });
     if (!ok) return;
     await onDelete(task.id);
-  }, [onDelete, pending, task.id, task.text, confirm]);
+  }, [confirm, deletePending, onDelete, task.id, task.text]);
 
   const isDragging = draggingId === task.id;
   const isOver = overId === task.id && draggingId !== task.id;
@@ -146,7 +150,7 @@ function TaskItem({
           onClick={handleToggle}
           aria-label={task.completed ? '标记为未完成' : '标记为已完成'}
           aria-pressed={task.completed}
-          disabled={pending}
+          disabled={togglePending}
         >
           <span className={`checkbox${task.completed ? ' checked' : ''}`}>
             <svg className="checkbox-mark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true">
@@ -168,7 +172,7 @@ function TaskItem({
             onClick={(e) => e.stopPropagation()}
             onBlur={handleEditSubmit}
             onKeyDown={handleEditKeyDown}
-            disabled={pending}
+            disabled={editPending}
           />
         ) : (
           <span className="task-text" onClick={handleTextClick}>
@@ -190,7 +194,7 @@ function TaskItem({
           className="btn-edit"
           aria-label="编辑任务"
           onClick={handleEditButtonClick}
-          disabled={pending}
+          disabled={editPending}
         >
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z" />
@@ -202,7 +206,7 @@ function TaskItem({
           className="btn-delete"
           aria-label="删除任务"
           onClick={handleDelete}
-          disabled={pending}
+          disabled={deletePending}
         >
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
             <path

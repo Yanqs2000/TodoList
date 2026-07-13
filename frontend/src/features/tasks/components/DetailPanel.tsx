@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import type { Todo, Category, TimeField } from '@/shared/types';
+import type { TaskMutationKind } from '../hooks/useTodos';
 import { CATEGORY_LABELS, PRIORITY_LABELS, PRIORITIES } from '@/shared/constants';
 import { useConfirm } from '@/shared/components/ConfirmDialog';
 import { formatTimeField } from '../lib/formatTime';
@@ -11,7 +12,8 @@ interface DetailPanelProps {
   onEdit: (id: string, updates: Partial<Pick<Todo, 'text' | 'priority' | 'time' | 'category' | 'notes'>>) => Promise<boolean> | void;
   onToggle: (id: string) => Promise<unknown> | void;
   onDelete: (id: string) => Promise<boolean> | void;
-  pending?: boolean;
+  pendingMutations?: ReadonlySet<TaskMutationKind>;
+  deleteBlocked?: boolean;
   onClose: () => void;
   stats: { total: number; active: number; completed: number };
   todayCompleted: number;
@@ -30,13 +32,18 @@ function DetailPanel({
   onEdit,
   onToggle,
   onDelete,
-  pending = false,
+  pendingMutations,
+  deleteBlocked = false,
   onClose,
   stats,
   todayCompleted,
   dailyGoal,
   streakDays,
 }: DetailPanelProps) {
+  const exclusivePending = pendingMutations?.has('delete') || pendingMutations?.has('clear');
+  const editPending = Boolean(exclusivePending || pendingMutations?.has('edit'));
+  const togglePending = Boolean(exclusivePending || pendingMutations?.has('toggle'));
+  const deletePending = deleteBlocked || Boolean(pendingMutations?.size);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editTitle, setEditTitle] = useState(selectedTask?.text ?? '');
   const [notesDraft, setNotesDraft] = useState(selectedTask?.notes ?? '');
@@ -200,7 +207,7 @@ function DetailPanel({
               onBlur={submitTitle}
               onKeyDown={handleTitleKeyDown}
               aria-label="编辑任务标题"
-              disabled={pending}
+              disabled={editPending}
             />
           ) : (
             <h2
@@ -225,7 +232,7 @@ function DetailPanel({
         className={`detail__status${selectedTask.completed ? ' detail__status--done' : ''}`}
         onClick={handleStatusToggle}
         aria-label={selectedTask.completed ? '标记为未完成' : '标记为已完成'}
-        disabled={pending}
+        disabled={togglePending}
       >
         {selectedTask.completed && (
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -245,7 +252,7 @@ function DetailPanel({
                 className={`detail__btn${selectedTask.priority === opt.value ? ' detail__btn--active' : ''}`}
                 data-priority={opt.value}
                 onClick={() => onEdit(selectedTask.id, { priority: opt.value })}
-                disabled={pending}
+                disabled={editPending}
               >
                 {opt.label}
               </button>
@@ -261,7 +268,7 @@ function DetailPanel({
                 key={cat}
                 className={`detail__btn${selectedTask.category === cat ? ' detail__btn--active' : ''}`}
                 onClick={() => onEdit(selectedTask.id, { category: cat })}
-                disabled={pending}
+                disabled={editPending}
               >
                 {CATEGORY_LABELS[cat]}
               </button>
@@ -282,7 +289,7 @@ function DetailPanel({
                   className="detail__time-clear"
                   onClick={handleClearTime}
                   aria-label="清除时间"
-                  disabled={pending}
+                  disabled={editPending}
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -297,7 +304,7 @@ function DetailPanel({
               className="detail__btn detail__time-edit"
               onClick={() => setShowTimePicker((s) => !s)}
               aria-expanded={showTimePicker}
-              disabled={pending}
+              disabled={editPending}
             >
               {showTimePicker ? '收起' : selectedTask.time ? '修改时间' : '设置时间'}
             </button>
@@ -322,7 +329,7 @@ function DetailPanel({
             onChange={(e) => setNotesDraft(e.target.value)}
             onBlur={handleNotesBlur}
             placeholder="添加备注…"
-            disabled={pending}
+            disabled={editPending}
           />
         </section>
       </div>
@@ -331,7 +338,7 @@ function DetailPanel({
         <button
           className="detail__delete"
           onClick={handleDelete}
-          disabled={pending}
+          disabled={deletePending}
         >
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />

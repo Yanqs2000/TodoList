@@ -1,4 +1,5 @@
 import { act, renderHook } from '@testing-library/react';
+import { createElement, StrictMode, type ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import {
   ApiError,
@@ -43,6 +44,10 @@ function fakeApi(overrides: Partial<TodoApi> = {}): TodoApi {
     updateSettings: vi.fn(),
     ...overrides,
   };
+}
+
+function strictMode({ children }: { children: ReactNode }) {
+  return createElement(StrictMode, null, children);
 }
 
 describe('useTodos database-first mutations', () => {
@@ -117,7 +122,7 @@ describe('useTodos database-first mutations', () => {
     });
 
     expect(result.current.allTasks).toEqual([original]);
-    expect(result.current.pending.taskIds.has(original.id)).toBe(true);
+    expect(result.current.pending.taskMutations.get(original.id)?.has('edit')).toBe(true);
 
     await act(async () => {
       pending.resolve(updated);
@@ -321,5 +326,249 @@ describe('useTodos database-first mutations', () => {
     await request;
 
     expect(onInfrastructureError).not.toHaveBeenCalled();
+  });
+
+  it('publishes successful mutations and releases pending state in StrictMode', async () => {
+    const pending = deferred<Todo>();
+    const original = task();
+    const api = fakeApi({ updateTask: vi.fn(() => pending.promise) });
+    const { result } = renderHook(
+      () => useTodos([original], api, vi.fn()),
+      { wrapper: strictMode },
+    );
+
+    let request!: Promise<boolean>;
+    act(() => {
+      request = result.current.editTask(original.id, { text: 'Strict update' });
+    });
+    expect(result.current.pending.taskMutations.get(original.id)?.has('edit')).toBe(true);
+
+    await act(async () => {
+      pending.resolve(task({ text: 'Strict update' }));
+      await request;
+    });
+
+    expect(result.current.allTasks[0].text).toBe('Strict update');
+    expect(result.current.pending.taskMutations.has(original.id)).toBe(false);
+  });
+
+  it('publishes StrictMode errors and releases their pending state', async () => {
+    const original = task();
+    const api = fakeApi({
+      updateTask: vi.fn().mockRejectedValue(
+        new ApiError('business', 'INVALID_TASK', 'Strict failure', 422),
+      ),
+    });
+    const { result } = renderHook(
+      () => useTodos([original], api, vi.fn()),
+      { wrapper: strictMode },
+    );
+
+    await act(async () => {
+      await result.current.editTask(original.id, { text: 'Rejected' });
+    });
+
+    expect(result.current.businessError).toBe('Strict failure');
+    expect(result.current.pending.taskMutations.has(original.id)).toBe(false);
+    expect(result.current.allTasks).toEqual([original]);
+  });
+
+  it('allows edit and completion on one task and merges out-of-order responses', async () => {
+    const edit = deferred<Todo>();
+    const completion = deferred<CompletionResult>();
+    const original = task();
+    const api = fakeApi({
+      updateTask: vi.fn(() => edit.promise),
+      setTaskCompletion: vi.fn(() => completion.promise),
+    });
+    const { result } = renderHook(() => useTodos([original], api, vi.fn()));
+
+    let editRequest!: Promise<boolean>;
+    let completionRequest!: Promise<CompletionResult | undefined>;
+    act(() => {
+      editRequest = result.current.editTask(original.id, { text: 'Edited' });
+      completionRequest = result.current.toggleTask(original.id);
+    });
+    expect(api.updateTask).toHaveBeenCalledOnce();
+    expect(api.setTaskCompletion).toHaveBeenCalledOnce();
+
+    await act(async () => {
+      edit.resolve(task({ text: 'Edited', completed: false }));
+      await editRequest;
+    });
+    await act(async () => {
+      completion.resolve({
+        task: task({ text: 'Initial task', completed: true }),
+        achievementState: {
+          unlocked: [],
+          streakDays: 1,
+          lastActiveDate: '2026-07-13',
+          todayCompleted: 1,
+          todayDate: '2026-07-13',
+        },
+        newlyUnlocked: [],
+      });
+      await completionRequest;
+    });
+
+    expect(result.current.allTasks[0]).toMatchObject({ text: 'Edited', completed: true });
+  });
+
+  it('keeps different task completions when responses resolve in reverse order', async () => {
+    const firstCompletion = deferred<CompletionResult>();
+    const secondCompletion = deferred<CompletionResult>();
+    const first = task({ id: 'first', text: 'First' });
+    const second = task({ id: 'second', text: 'Second' });
+    const api = fakeApi({
+      setTaskCompletion: vi.fn()
+        .mockReturnValueOnce(firstCompletion.promise)
+        .mockReturnValueOnce(secondCompletion.promise),
+    });
+    const { result } = renderHook(() => useTodos([first, second], api, vi.fn()));
+
+    let firstRequest!: Promise<CompletionResult | undefined>;
+    let secondRequest!: Promise<CompletionResult | undefined>;
+    act(() => {
+      firstRequest = result.current.toggleTask(first.id);
+      secondRequest = result.current.toggleTask(second.id);
+    });
+    const achievementState = {
+      unlocked: [],
+      streakDays: 1,
+      lastActiveDate: '2026-07-13',
+      todayCompleted: 1,
+      todayDate: '2026-07-13',
+    };
+    await act(async () => {
+      secondCompletion.resolve({
+        task: { ...second, completed: true },
+        achievementState,
+        newlyUnlocked: [],
+      });
+      await secondRequest;
+    });
+    await act(async () => {
+      firstCompletion.resolve({
+        task: { ...first, completed: true },
+        achievementState,
+        newlyUnlocked: [],
+      });
+      await firstRequest;
+    });
+
+    expect(result.current.allTasks.map(item => item.completed)).toEqual([true, true]);
+  });
+
+  it('allows edit and completion during reorder without overwriting task fields', async () => {
+    const reorder = deferred<Todo[]>();
+    const edit = deferred<Todo>();
+    const completion = deferred<CompletionResult>();
+    const first = task({ id: 'first', text: 'First' });
+    const second = task({ id: 'second', text: 'Second' });
+    const api = fakeApi({
+      replaceTaskOrder: vi.fn(() => reorder.promise),
+      updateTask: vi.fn(() => edit.promise),
+      setTaskCompletion: vi.fn(() => completion.promise),
+    });
+    const { result } = renderHook(() => useTodos([first, second], api, vi.fn()));
+
+    let reorderRequest!: Promise<boolean>;
+    let editRequest!: Promise<boolean>;
+    let completionRequest!: Promise<CompletionResult | undefined>;
+    act(() => {
+      reorderRequest = result.current.reorderTasks(first.id, second.id);
+      editRequest = result.current.editTask(first.id, { text: 'Edited first' });
+      completionRequest = result.current.toggleTask(second.id);
+    });
+    expect(api.replaceTaskOrder).toHaveBeenCalledOnce();
+    expect(api.updateTask).toHaveBeenCalledOnce();
+    expect(api.setTaskCompletion).toHaveBeenCalledOnce();
+
+    await act(async () => {
+      edit.resolve({ ...first, text: 'Edited first' });
+      await editRequest;
+    });
+    await act(async () => {
+      completion.resolve({
+        task: { ...second, completed: true },
+        achievementState: {
+          unlocked: [],
+          streakDays: 1,
+          lastActiveDate: '2026-07-13',
+          todayCompleted: 1,
+          todayDate: '2026-07-13',
+        },
+        newlyUnlocked: [],
+      });
+      await completionRequest;
+    });
+    await act(async () => {
+      reorder.resolve([second, first]);
+      await reorderRequest;
+    });
+
+    expect(result.current.allTasks.map(item => item.id)).toEqual(['second', 'first']);
+    expect(result.current.allTasks[0].completed).toBe(true);
+    expect(result.current.allTasks[1].text).toBe('Edited first');
+  });
+
+  it('blocks collection mutations while reorder is pending but still allows field mutations', async () => {
+    const reorder = deferred<Todo[]>();
+    const edit = deferred<Todo>();
+    const first = task({ id: 'first', text: 'First' });
+    const second = task({ id: 'second', text: 'Second' });
+    const api = fakeApi({
+      replaceTaskOrder: vi.fn(() => reorder.promise),
+      updateTask: vi.fn(() => edit.promise),
+    });
+    const { result } = renderHook(() => useTodos([first, second], api, vi.fn()));
+
+    let reorderRequest!: Promise<boolean>;
+    act(() => {
+      reorderRequest = result.current.reorderTasks(first.id, second.id);
+    });
+
+    await expect(result.current.addTask('Blocked create')).resolves.toBeUndefined();
+    await expect(result.current.removeTask(first.id)).resolves.toBe(false);
+    expect(api.createTask).not.toHaveBeenCalled();
+    expect(api.deleteTask).not.toHaveBeenCalled();
+
+    let editRequest!: Promise<boolean>;
+    act(() => {
+      editRequest = result.current.editTask(first.id, { text: 'Allowed edit' });
+    });
+    expect(api.updateTask).toHaveBeenCalledOnce();
+    await act(async () => {
+      edit.resolve({ ...first, text: 'Allowed edit' });
+      await editRequest;
+      reorder.resolve([second, first]);
+      await reorderRequest;
+    });
+    expect(result.current.allTasks[1].text).toBe('Allowed edit');
+  });
+
+  it('keeps partial clear success and releases all pending state after a later failure', async () => {
+    const active = task({ id: 'active' });
+    const completedOne = task({ id: 'done-1', completed: true });
+    const completedTwo = task({ id: 'done-2', completed: true });
+    const api = fakeApi({
+      deleteTask: vi.fn()
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new ApiError('business', 'DELETE_FAILED', '无法删除', 409)),
+    });
+    const { result } = renderHook(() => (
+      useTodos([active, completedOne, completedTwo], api, vi.fn())
+    ));
+
+    let cleared = 0;
+    await act(async () => {
+      cleared = await result.current.clearCompleted();
+    });
+
+    expect(cleared).toBe(1);
+    expect(result.current.allTasks.map(item => item.id)).toEqual(['active', 'done-2']);
+    expect(result.current.businessError).toBe('无法删除');
+    expect(result.current.pending.clearCompleted).toBe(false);
+    expect(result.current.pending.taskMutations.size).toBe(0);
   });
 });

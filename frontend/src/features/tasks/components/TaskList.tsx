@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { Todo, FilterType } from '@/shared/types';
+import type { TaskMutationKind } from '../hooks/useTodos';
 import { useDragDrop } from '../hooks/useDragDrop';
 import { proximityOf, type Proximity } from '../lib/timeProximity';
 import '../styles/TaskList.css';
@@ -17,7 +18,7 @@ interface TaskListProps {
   onDelete: (id: string) => Promise<boolean> | void;
   onEdit?: (id: string, updates: Partial<Pick<Todo, 'text' | 'priority' | 'time' | 'category' | 'notes'>>) => Promise<boolean> | void;
   onReorder: (fromId: string, toId: string) => Promise<boolean> | void;
-  pendingTaskIds?: ReadonlySet<string>;
+  pendingMutations?: ReadonlyMap<string, ReadonlySet<TaskMutationKind>>;
   reorderPending?: boolean;
   reorderDisabled?: boolean;
   selectedTaskId?: string | null;
@@ -50,7 +51,7 @@ function groupByProximity(tasks: Todo[], now: number): TaskGroup[] {
   ].filter(g => g.items.length > 0);
 }
 
-function TaskList({ tasks, filter, hasAnyTasks, sortMode, onToggleSortMode, onToggle, onDelete, onEdit, onReorder, pendingTaskIds = new Set(), reorderPending = false, reorderDisabled = false, selectedTaskId, onSelectTask, now: nowProp }: TaskListProps) {
+function TaskList({ tasks, filter, hasAnyTasks, sortMode, onToggleSortMode, onToggle, onDelete, onEdit, onReorder, pendingMutations = new Map(), reorderPending = false, reorderDisabled = false, selectedTaskId, onSelectTask, now: nowProp }: TaskListProps) {
   const drag = useDragDrop(onReorder);
   const [nowState, setNowState] = useState(() => Date.now());
   useEffect(() => {
@@ -67,8 +68,15 @@ function TaskList({ tasks, filter, hasAnyTasks, sortMode, onToggleSortMode, onTo
   const grouped = isActive && sortMode === 'time' ? groupByProximity(tasks, now) : null;
   const proximityFor = (t: Todo): Proximity | undefined => (isActive ? proximityOf(t.time, now) : undefined);
 
-  const renderItem = (task: Todo) => (
-    <TaskItem
+  const collectionMutationPending = [...pendingMutations.values()].some(mutations => (
+    mutations.has('delete') || mutations.has('clear')
+  ));
+  const dragDisabled = reorderDisabled || reorderPending || collectionMutationPending;
+
+  const renderItem = (task: Todo) => {
+    const mutations = pendingMutations.get(task.id);
+    const exclusive = mutations?.has('delete') || mutations?.has('clear');
+    return <TaskItem
       key={task.id}
       task={task}
       selected={selectedTaskId === task.id}
@@ -76,17 +84,19 @@ function TaskList({ tasks, filter, hasAnyTasks, sortMode, onToggleSortMode, onTo
       onToggle={onToggle}
       onDelete={onDelete}
       onEdit={onEdit}
-      pending={pendingTaskIds.has(task.id) || reorderPending}
+      togglePending={exclusive || mutations?.has('toggle')}
+      editPending={exclusive || mutations?.has('edit')}
+      deletePending={Boolean(mutations?.size) || reorderPending}
       onSelect={onSelectTask}
       draggingId={drag.draggingId}
       overId={drag.overId}
-      onDragStart={!reorderDisabled && !reorderPending && pendingTaskIds.size === 0 ? drag.handleDragStart : undefined}
-      onDragOver={!reorderDisabled && !reorderPending && pendingTaskIds.size === 0 ? drag.handleDragOver : undefined}
-      onDragLeave={!reorderDisabled && !reorderPending && pendingTaskIds.size === 0 ? drag.handleDragLeave : undefined}
-      onDrop={!reorderDisabled && !reorderPending && pendingTaskIds.size === 0 ? drag.handleDrop : undefined}
-      onDragEnd={!reorderDisabled && !reorderPending && pendingTaskIds.size === 0 ? drag.handleDragEnd : undefined}
+      onDragStart={!dragDisabled ? drag.handleDragStart : undefined}
+      onDragOver={!dragDisabled ? drag.handleDragOver : undefined}
+      onDragLeave={!dragDisabled ? drag.handleDragLeave : undefined}
+      onDrop={!dragDisabled ? drag.handleDrop : undefined}
+      onDragEnd={!dragDisabled ? drag.handleDragEnd : undefined}
     />
-  );
+  };
 
   return (
     <div className="task-list">

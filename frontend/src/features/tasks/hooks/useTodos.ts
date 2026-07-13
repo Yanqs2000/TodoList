@@ -13,8 +13,10 @@ export interface PendingMutations {
   create: boolean;
   reorder: boolean;
   clearCompleted: boolean;
-  taskIds: ReadonlySet<string>;
+  taskMutations: ReadonlyMap<string, ReadonlySet<TaskMutationKind>>;
 }
+
+export type TaskMutationKind = 'edit' | 'toggle' | 'delete' | 'clear';
 
 export interface TodoState {
   tasks: Todo[];
@@ -56,7 +58,7 @@ const EMPTY_PENDING: PendingMutations = {
   create: false,
   reorder: false,
   clearCompleted: false,
-  taskIds: new Set(),
+  taskMutations: new Map(),
 };
 
 function localDate(): string {
@@ -79,6 +81,28 @@ function toUpdateInput(
   return input;
 }
 
+function mergeEditedFields(
+  current: Todo,
+  updated: Todo,
+  requested: Partial<Pick<Todo, 'text' | 'priority' | 'time' | 'category' | 'notes'>>,
+): Todo {
+  const merged = { ...current };
+  if ('text' in requested) merged.text = updated.text;
+  if ('priority' in requested) merged.priority = updated.priority;
+  if ('category' in requested) merged.category = updated.category;
+  if ('time' in requested) merged.time = updated.time;
+  if ('notes' in requested) merged.notes = updated.notes;
+  return merged;
+}
+
+function cloneTaskMutations(
+  source: Map<string, Set<TaskMutationKind>>,
+): ReadonlyMap<string, ReadonlySet<TaskMutationKind>> {
+  return new Map(
+    [...source].map(([taskId, mutations]) => [taskId, new Set(mutations)]),
+  );
+}
+
 export function useTodos(
   initialTasks: Todo[],
   api: TodoApi,
@@ -98,12 +122,15 @@ export function useTodos(
   const createPendingRef = useRef(false);
   const reorderPendingRef = useRef(false);
   const clearPendingRef = useRef(false);
-  const pendingTaskIdsRef = useRef(new Set<string>());
+  const taskMutationsRef = useRef(new Map<string, Set<TaskMutationKind>>());
 
   tasksRef.current = tasks;
 
-  useEffect(() => () => {
-    mountedRef.current = false;
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
   }, []);
 
   const handleError = useCallback((error: unknown) => {
@@ -123,23 +150,37 @@ export function useTodos(
     ));
   }, [onInfrastructureError]);
 
-  const beginTaskMutation = useCallback((taskId: string): boolean => {
-    if (reorderPendingRef.current || pendingTaskIdsRef.current.has(taskId)) return false;
-    pendingTaskIdsRef.current.add(taskId);
+  const beginTaskMutation = useCallback((
+    taskId: string,
+    mutation: TaskMutationKind,
+  ): boolean => {
+    const current = taskMutationsRef.current.get(taskId) ?? new Set<TaskMutationKind>();
+    const hasExclusiveMutation = current.has('delete') || current.has('clear');
+    const requestsExclusiveMutation = mutation === 'delete' || mutation === 'clear';
+    if (
+      current.has(mutation)
+      || hasExclusiveMutation
+      || (requestsExclusiveMutation && current.size > 0)
+      || (requestsExclusiveMutation && reorderPendingRef.current)
+    ) return false;
+    current.add(mutation);
+    taskMutationsRef.current.set(taskId, current);
     setBusinessError(null);
     setPending(current => ({
       ...current,
-      taskIds: new Set(pendingTaskIdsRef.current),
+      taskMutations: cloneTaskMutations(taskMutationsRef.current),
     }));
     return true;
   }, []);
 
-  const endTaskMutation = useCallback((taskId: string) => {
-    pendingTaskIdsRef.current.delete(taskId);
+  const endTaskMutation = useCallback((taskId: string, mutation: TaskMutationKind) => {
+    const current = taskMutationsRef.current.get(taskId);
+    current?.delete(mutation);
+    if (current?.size === 0) taskMutationsRef.current.delete(taskId);
     if (!mountedRef.current) return;
     setPending(current => ({
       ...current,
-      taskIds: new Set(pendingTaskIdsRef.current),
+      taskMutations: cloneTaskMutations(taskMutationsRef.current),
     }));
   }, []);
 
@@ -179,25 +220,27 @@ export function useTodos(
 
   const toggleTask = useCallback(async (id: string): Promise<CompletionResult | undefined> => {
     const task = tasksRef.current.find(item => item.id === id);
-    if (!task || !beginTaskMutation(id)) return undefined;
+    if (!task || !beginTaskMutation(id, 'toggle')) return undefined;
     try {
       const result = await api.setTaskCompletion(id, {
         completed: !task.completed,
         localDate: localDate(),
       });
       if (!mountedRef.current) return undefined;
-      setTasks(current => current.map(item => item.id === id ? result.task : item));
+      setTasks(current => current.map(item => (
+        item.id === id ? { ...item, completed: result.task.completed } : item
+      )));
       return result;
     } catch (error) {
       handleError(error);
       return undefined;
     } finally {
-      endTaskMutation(id);
+      endTaskMutation(id, 'toggle');
     }
   }, [api, beginTaskMutation, endTaskMutation, handleError]);
 
   const removeTask = useCallback(async (id: string): Promise<boolean> => {
-    if (!tasksRef.current.some(item => item.id === id) || !beginTaskMutation(id)) return false;
+    if (!tasksRef.current.some(item => item.id === id) || !beginTaskMutation(id, 'delete')) return false;
     try {
       await api.deleteTask(id);
       if (!mountedRef.current) return false;
@@ -207,7 +250,7 @@ export function useTodos(
       handleError(error);
       return false;
     } finally {
-      endTaskMutation(id);
+      endTaskMutation(id, 'delete');
     }
   }, [api, beginTaskMutation, endTaskMutation, handleError]);
 
@@ -215,17 +258,19 @@ export function useTodos(
     id: string,
     updates: Partial<Pick<Todo, 'text' | 'priority' | 'time' | 'category' | 'notes'>>,
   ): Promise<boolean> => {
-    if (!tasksRef.current.some(item => item.id === id) || !beginTaskMutation(id)) return false;
+    if (!tasksRef.current.some(item => item.id === id) || !beginTaskMutation(id, 'edit')) return false;
     try {
       const updated = await api.updateTask(id, toUpdateInput(updates));
       if (!mountedRef.current) return false;
-      setTasks(current => current.map(item => item.id === id ? updated : item));
+      setTasks(current => current.map(item => (
+        item.id === id ? mergeEditedFields(item, updated, updates) : item
+      )));
       return true;
     } catch (error) {
       handleError(error);
       return false;
     } finally {
-      endTaskMutation(id);
+      endTaskMutation(id, 'edit');
     }
   }, [api, beginTaskMutation, endTaskMutation, handleError]);
 
@@ -234,7 +279,10 @@ export function useTodos(
       fromId === toId
       || reorderPendingRef.current
       || createPendingRef.current
-      || pendingTaskIdsRef.current.size > 0
+      || clearPendingRef.current
+      || [...taskMutationsRef.current.values()].some(mutations => (
+        mutations.has('delete') || mutations.has('clear')
+      ))
     ) return false;
     const fromIdx = tasksRef.current.findIndex(item => item.id === fromId);
     const toIdx = tasksRef.current.findIndex(item => item.id === toId);
@@ -249,7 +297,16 @@ export function useTodos(
     try {
       const ordered = await api.replaceTaskOrder(proposed.map(item => item.id));
       if (!mountedRef.current) return false;
-      setTasks(ordered);
+      const orderedIds = ordered.map(item => item.id);
+      setTasks(current => {
+        const currentById = new Map(current.map(item => [item.id, item]));
+        const reordered = orderedIds.flatMap(id => {
+          const item = currentById.get(id);
+          return item ? [item] : [];
+        });
+        const orderedIdSet = new Set(orderedIds);
+        return [...reordered, ...current.filter(item => !orderedIdSet.has(item.id))];
+      });
       setSortMode('manual');
       return true;
     } catch (error) {
@@ -269,16 +326,18 @@ export function useTodos(
       completed.length === 0
       || clearPendingRef.current
       || reorderPendingRef.current
-      || completed.some(item => pendingTaskIdsRef.current.has(item.id))
+      || completed.some(item => taskMutationsRef.current.has(item.id))
     ) return 0;
 
     clearPendingRef.current = true;
-    completed.forEach(item => pendingTaskIdsRef.current.add(item.id));
+    completed.forEach(item => {
+      taskMutationsRef.current.set(item.id, new Set(['clear']));
+    });
     setBusinessError(null);
     setPending(current => ({
       ...current,
       clearCompleted: true,
-      taskIds: new Set(pendingTaskIdsRef.current),
+      taskMutations: cloneTaskMutations(taskMutationsRef.current),
     }));
     let cleared = 0;
     try {
@@ -296,12 +355,12 @@ export function useTodos(
       return cleared;
     } finally {
       clearPendingRef.current = false;
-      completed.forEach(item => pendingTaskIdsRef.current.delete(item.id));
+      completed.forEach(item => taskMutationsRef.current.delete(item.id));
       if (mountedRef.current) {
         setPending(current => ({
           ...current,
           clearCompleted: false,
-          taskIds: new Set(pendingTaskIdsRef.current),
+          taskMutations: cloneTaskMutations(taskMutationsRef.current),
         }));
       }
     }

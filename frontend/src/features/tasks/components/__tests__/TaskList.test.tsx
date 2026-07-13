@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import TaskList from '../TaskList';
 import type { Todo } from '@/shared/types';
+import type { TaskMutationKind } from '../../hooks/useTodos';
 
 // Fixed "now": 2026-06-23T13:00 local.
 const NOW = new Date('2026-06-23T13:00').getTime();
@@ -62,17 +63,20 @@ describe('TaskList grouping (Today Focus)', () => {
     expect(screen.queryByText('待安排')).not.toBeInTheDocument();
   });
 
-  it('disables mutation controls only for the pending task', () => {
+  it('disables only the pending mutation control and its destructive conflicts', () => {
     const tasks = [
-      makeTask({ id: '1', text: '正在保存' }),
-      makeTask({ id: '2', text: '仍可操作' }),
+      makeTask({ id: '1', text: '正在完成' }),
+      makeTask({ id: '2', text: '正在编辑' }),
     ];
     render(
       <TaskList
         {...baseProps}
         tasks={tasks}
         sortMode="manual"
-        pendingTaskIds={new Set(['1'])}
+        pendingMutations={new Map<string, Set<TaskMutationKind>>([
+          ['1', new Set(['toggle'])],
+          ['2', new Set(['edit'])],
+        ])}
         reorderPending={false}
       />,
     );
@@ -80,8 +84,28 @@ describe('TaskList grouping (Today Focus)', () => {
     const pendingItem = document.querySelector('[data-task-id="1"]');
     const availableItem = document.querySelector('[data-task-id="2"]');
     expect(pendingItem?.querySelector('button[aria-label="标记为已完成"]')).toBeDisabled();
-    expect(pendingItem?.querySelector('button[aria-label="编辑任务"]')).toBeDisabled();
+    expect(pendingItem?.querySelector('button[aria-label="编辑任务"]')).toBeEnabled();
     expect(pendingItem?.querySelector('button[aria-label="删除任务"]')).toBeDisabled();
     expect(availableItem?.querySelector('button[aria-label="标记为已完成"]')).toBeEnabled();
+    expect(availableItem?.querySelector('button[aria-label="编辑任务"]')).toBeDisabled();
+    expect(availableItem?.querySelector('button[aria-label="删除任务"]')).toBeDisabled();
+  });
+
+  it('keeps edit and completion available while reorder is pending', () => {
+    const tasks = [makeTask({ id: '1', text: '可编辑任务' })];
+    render(
+      <TaskList
+        {...baseProps}
+        tasks={tasks}
+        sortMode="manual"
+        reorderPending
+      />,
+    );
+
+    const item = document.querySelector('[data-task-id="1"]');
+    expect(item).toHaveAttribute('draggable', 'false');
+    expect(item?.querySelector('button[aria-label="标记为已完成"]')).toBeEnabled();
+    expect(item?.querySelector('button[aria-label="编辑任务"]')).toBeEnabled();
+    expect(item?.querySelector('button[aria-label="删除任务"]')).toBeDisabled();
   });
 });

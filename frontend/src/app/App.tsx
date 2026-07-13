@@ -141,6 +141,9 @@ function TodoApplication({ snapshot, api, onInfrastructureError }: TodoApplicati
   const selectedTask = selectedTaskId
     ? todoState.allTasks.find(t => t.id === selectedTaskId) ?? null
     : null;
+  const completedMutationPending = todoState.allTasks.some(task => (
+    task.completed && Boolean(todoState.pending.taskMutations.get(task.id)?.size)
+  ));
 
   return (
     <div className="app-shell">
@@ -230,9 +233,9 @@ function TodoApplication({ snapshot, api, onInfrastructureError }: TodoApplicati
           onDelete={handleDelete}
           onEdit={todoState.editTask}
           onReorder={todoState.reorderTasks}
-          pendingTaskIds={todoState.pending.taskIds}
+          pendingMutations={todoState.pending.taskMutations}
           reorderPending={todoState.pending.reorder}
-          reorderDisabled={todoState.pending.create}
+          reorderDisabled={todoState.pending.create || todoState.pending.clearCompleted}
           selectedTaskId={selectedTaskId}
           onSelectTask={handleSelectTask}
         />
@@ -241,6 +244,7 @@ function TodoApplication({ snapshot, api, onInfrastructureError }: TodoApplicati
           onClearCompleted={handleClearCompleted}
           achievements={achievements.achievements}
           clearPending={todoState.pending.clearCompleted}
+          clearDisabled={todoState.pending.reorder || completedMutationPending}
         />
       </main>
 
@@ -250,7 +254,8 @@ function TodoApplication({ snapshot, api, onInfrastructureError }: TodoApplicati
           onEdit={todoState.editTask}
           onToggle={handleToggle}
           onDelete={handleDelete}
-          pending={selectedTask ? todoState.pending.taskIds.has(selectedTask.id) || todoState.pending.reorder : false}
+          pendingMutations={selectedTask ? todoState.pending.taskMutations.get(selectedTask.id) : undefined}
+          deleteBlocked={todoState.pending.reorder}
           onClose={() => setSelectedTaskId(null)}
           stats={todoState.stats}
           todayCompleted={achievements.achievements.todayCompleted}
