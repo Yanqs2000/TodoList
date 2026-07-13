@@ -1,102 +1,46 @@
-# TodoList 测试指南
+# 前端测试指南
 
-## 概述
+前端位于 `frontend/`，使用 Vitest 和 Testing Library。测试以 typed API fake、deferred Promise 和组件交互验证数据库优先更新、pending 控件及失败恢复；不会启动真实 Python sidecar。
 
-本项目使用 Vitest 作为测试框架，@testing-library/react 用于组件测试。
-
-## 运行测试
+## 安装与运行
 
 ```bash
-# 运行所有测试
-npm test
-
-# 监听模式
-npm run test:watch
-
-# 生成覆盖率报告
-npm run test:coverage
+npm --prefix frontend install
+npm --prefix frontend test
+npm --prefix frontend run build
 ```
 
-## 测试结构
+开发时可只跑一个文件：
 
-```
-src/
-├── utils/__tests__/
-│   └── escapeHtml.test.ts      # 工具函数测试
-├── hooks/__tests__/
-│   ├── useTodos.test.ts        # 任务管理hook测试
-│   ├── useTheme.test.ts        # 主题hook测试
-│   └── useAchievements.test.ts # 成就系统hook测试
-└── components/__tests__/
-    ├── EmptyState.test.tsx     # 空状态组件测试
-    └── ProgressRing.test.tsx   # 进度环组件测试
+```bash
+npm --prefix frontend test -- src/features/tasks/hooks/__tests__/useTodos.test.ts
 ```
 
-## 编写测试
+其他脚本：
 
-### 测试Hook
-
-```typescript
-import { renderHook, act } from '@testing-library/react';
-import { useMyHook } from '../useMyHook';
-
-describe('useMyHook', () => {
-  it('should do something', () => {
-    const { result } = renderHook(() => useMyHook());
-    
-    act(() => {
-      result.current.doSomething();
-    });
-
-    expect(result.current.value).toBe(expected);
-  });
-});
+```bash
+npm --prefix frontend run test:watch
+npm --prefix frontend run test:coverage
+npm --prefix frontend run dev
 ```
 
-### 测试组件
+直接运行 Vite 只适合 UI 开发；普通浏览器会显示“不支持”启动页，不提供持久化数据。完整交互应使用 `npm --prefix desktop run dev`。
 
-```typescript
-import { render, screen, fireEvent } from '@testing-library/react';
-import MyComponent from '../MyComponent';
+## 测试分布
 
-describe('MyComponent', () => {
-  it('should render correctly', () => {
-    render(<MyComponent />);
-    expect(screen.getByText('Hello')).toBeInTheDocument();
-  });
+- `src/shared/api/__tests__/`：Bearer header、超时、错误分类和 API 路由
+- `src/app/**/__tests__/`：bootstrap、重试、阻断门禁和 App 接线
+- `src/features/tasks/`：数据库优先 mutation、并发与局部 pending
+- `src/features/achievements/`：服务端成就快照与 toast
+- `src/features/reminders/`：到期扫描和 atomic claim
+- `src/features/theme/`、`sound/`、`desktop/`：设置提交与 Tauri bridge
 
-  it('should handle click', () => {
-    const handleClick = vi.fn();
-    render(<MyComponent onClick={handleClick} />);
-    
-    fireEvent.click(screen.getByRole('button'));
-    
-    expect(handleClick).toHaveBeenCalled();
-  });
-});
-```
+## 编写原则
 
-## 测试覆盖的模块
+- 行为变更先写一条能失败的最小测试，再实现。
+- mutation 测试应确认 API resolve 前 state 不变，成功后使用服务端响应，失败后保持最后确认状态。
+- 基础设施错误应进入 blocker；业务错误只做局部反馈。
+- 测异步状态时使用 deferred Promise 和 `act`，不要依赖真实时间或网络。
+- 不重复覆盖 Rust 已保证的 sidecar/快捷键事务内部细节。
 
-| 模块 | 测试文件 | 测试用例数 |
-|------|----------|-----------|
-| escapeHtml | escapeHtml.test.ts | 8 |
-| useTodos | useTodos.test.ts | 12 |
-| useTheme | useTheme.test.ts | 5 |
-| useAchievements | useAchievements.test.ts | 7 |
-| EmptyState | EmptyState.test.tsx | 3 |
-| ProgressRing | ProgressRing.test.tsx | 3 |
-
-**总计: 38 个测试用例**
-
-## 已修复的Bug
-
-在添加测试之前，我们修复了以下问题：
-
-1. **Category类型** - 移除了`| string`联合类型
-2. **双重转义** - 移除了TaskItem中多余的escapeHtml调用
-3. **AudioContext** - 添加了resume()调用以支持浏览器自动播放策略
-4. **localStorage错误处理** - 添加了try/catch包装
-5. **死代码** - 移除了useAchievements中的无用代码
-6. **确认对话框** - 为清除已完成操作添加了确认提示
-7. **常量提取** - 将CATEGORY_LABELS提取到共享constants.ts
+Node 可能打印 experimental `localStorage` warning；它来自 jsdom/测试环境，生产前端没有 `localStorage` 访问。

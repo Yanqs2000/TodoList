@@ -1,116 +1,59 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
-## Tech Stack
-
-- **Framework**: React 19 + TypeScript 5.8
-- **Build**: Vite 7 with `@vitejs/plugin-react`
-- **Styling**: Plain CSS with custom properties (CSS variables) for theming
-- **State**: React hooks with localStorage persistence
-- **Desktop**: Tauri 2 (Rust-based, wraps web app as native Mac .app)
-- **Testing**: Vitest 4 + @testing-library/react
-- **Zero runtime deps** beyond React — Canvas API for particles, Web Audio API for sound
-
-## Commands
-
-- `npm run dev` - Start dev server (Vite)
-- `npm run build` - Type-check with `tsc -b` then build with Vite
-- `npm run preview` - Preview production build
-- `npm test` - Run Vitest test suite
-- `npm run test:watch` - Watch mode
-- `npm run test:coverage` - Coverage report
-- `npm run tauri dev` - Run as desktop app in development mode
-- `npm run tauri build` - Build standalone Mac .app and .dmg
-
-## Project Structure (feature-based)
-
-```
-src/
-├── app/                          # App entry
-│   ├── App.tsx                   # Root component, orchestrates hooks
-│   ├── main.tsx                  # ReactDOM render
-│   └── styles/App.css            # Global styles + theme variables
-├── features/                     # Business features
-│   ├── tasks/                    # Task management
-│   │   ├── components/           # TaskList, TaskItem, Sidebar, DetailPanel,
-│   │   │                         # CreateTaskModal, TimePicker, EmptyState
-│   │   ├── hooks/                # useTodos, useDragDrop
-│   │   ├── lib/                  # validateTodo, id, formatTime
-│   │   └── styles/
-│   ├── achievements/             # AchievementDrawer, Toast, useAchievements
-│   ├── theme/                    # useTheme (6 themes; switcher UI lives in features/desktop/SettingsModal)
-│   ├── sound/                    # useSound (complete/delete/achievement/reminder tones)
-│   ├── reminders/                # useReminders (time-based reminders + Notification)
-│   ├── desktop/                  # useDesktop, SettingsModal (Tauri tray/shortcut/autostart bridge)
-│   ├── confetti/                 # ConfettiCanvas + useConfetti
-│   ├── feedback/                 # InfoToast
-│   ├── header/                   # Header
-│   └── stats/                    # Footer + ProgressRing
-├── shared/                       # Cross-feature shared code
-│   ├── lib/storage.ts            # safeSetItem / safeGetItem
-│   ├── constants.ts              # CATEGORIES, CATEGORY_LABELS, PRIORITY_LABELS, DAILY_GOAL
-│   └── types.ts                  # Todo, Priority, FilterType, Category, TimeField, etc.
-├── test/setup.ts
-└── vite-env.d.ts
-```
-
-**Path alias**: `@/*` → `src/*`. Use absolute imports for cross-feature references:
-
-```typescript
-import { useTodos } from '@/features/tasks/hooks/useTodos';
-import { safeSetItem } from '@/shared/lib/storage';
-import type { Todo } from '@/shared/types';
-```
-
-Relative imports (`./`, `../`) are fine for intra-feature references (e.g. `./TaskItem` within `features/tasks/components/`).
+Current repository guidance for coding agents.
 
 ## Architecture
 
-Single-page todo list app with Chinese UI, gamification, and visual effects. Components use function declarations with default exports.
+- `frontend/`: React 19, TypeScript 5.8, Vite 7, Plain CSS, Vitest.
+- `backend/`: Python 3.12, uv, FastAPI, Pydantic, standard-library `sqlite3`, pytest.
+- `desktop/`: Tauri 2 and Rust; owns the Python sidecar, tray, shortcut, autostart, and packaging.
+- `docs/`: current documentation separated by frontend, backend, and architecture.
 
-**Data flow**: `app/App.tsx` orchestrates hooks → passes state/handlers down as props → components trigger hook methods → state updates persist to localStorage.
+The desktop app has no accounts or cloud sync. SQLite is the only production persistence layer. Do not add `localStorage` fallbacks or a browser data mode. Browser startup must remain unsupported.
 
-**Hooks**:
-- `useTodos` (`features/tasks/hooks/`) — task CRUD, filtering, sortMode (manual/time), reorder, search, import/export, localStorage sync
-- `useTheme` (`features/theme/hooks/`) — 6 themes (workspace/mint/paper × light/dark), `data-theme` attribute on `<html>`, localStorage persistence with legacy migration
-- `useSound` (`features/sound/hooks/`) — Web Audio API oscillator synthesis (complete/delete/achievement/reminder sounds), mute toggle
-- `useReminders` (`features/reminders/hooks/`) — watches tasks with `time.start`, fires reminder when due (~30s tick), de-dupes via localStorage `todo-reminded`
-- `useDesktop` (`features/desktop/hooks/`) — Tauri bridge: listens for `open-create-modal` event, manages global shortcut + autostart preferences. Detects Tauri via `__TAURI_INTERNALS__`; no-op on web.
-- `useAchievements` (`features/achievements/hooks/`) — achievement unlock tracking, streak calculation, toast notifications
-- `useDragDrop` (`features/tasks/hooks/`) — HTML5 drag & drop state, dragover throttled via ref
-- `useConfetti` (in `features/confetti/components/ConfettiCanvas.tsx`) — Canvas particle burst system
+## Commands
 
-**Types** (`src/shared/types.ts`): `Todo`, `Priority`, `FilterType`, `Category`, `TimeField`, `AchievementDef`, `AchievementState`
+```bash
+uv sync --directory backend --frozen
+uv run --directory backend pytest
+uv run --directory backend ruff check .
+uv run --directory backend pyright
 
-**CSS theming**: 3-layer cascade — `:root` (universal tokens), `[data-theme$="-light/-dark"]` (mode-shared tokens), `[data-theme="<id>"]` (theme-specific overrides). 6 themes: workspace/mint/paper × light/dark. All components use `var(--*)` references including `--category-*` and `--priority-*`. New components use BEM class naming. CSS files live alongside their feature in `features/<name>/styles/`.
+npm --prefix frontend test
+npm --prefix frontend run build
 
-**Layout**: CSS Grid three-column shell (Sidebar 240px + List + Detail 320px), responsive breakpoints at 1024px and 720px. Task items use dual-row design (main row + sub row for tags).
+bash desktop/scripts/build-sidecar.sh
+npm --prefix desktop run dev
+npm --prefix desktop run build
+cargo test --manifest-path desktop/src-tauri/Cargo.toml
+cargo clippy --manifest-path desktop/src-tauri/Cargo.toml -- -D warnings
+```
 
-**localStorage keys**: `todo-tasks`, `todo-theme`, `todo-muted`, `todo-achievements`, `todo-reminded`, `todo-shortcut`
+## Data and failure rules
 
-## Documentation
+- Bootstrap is the authoritative initial snapshot for tasks, settings, and achievements.
+- Mutations publish React state only after the backend succeeds.
+- Infrastructure failures replace the main UI with the blocking startup gate.
+- Retry starts a new backend connection and replaces the full snapshot.
+- Task completion and achievement updates remain atomic in the backend.
+- Reminder notifications require an atomic successful claim.
+- Shortcut OS registration and SQLite persistence are coordinated by the Rust command; do not duplicate the settings write in React.
 
-- `README.md` - project intro (latest version), mirrored in `docs/project-overview.md`
-- `docs/CLAUDE.md` - documentation index (navigation entry for `docs/`)
-- `docs/project-overview.md` - project overview (tech stack, features, version history table)
-- `docs/development-logs/` - per-version development logs (`v0.1.0-*.md` through `v0.5.0-today-focus.md`)
-- `docs/bug-fixes/` - standalone bug records (fixes currently logged within version dev-logs)
-- `docs/plans/` - module design specs / feature planning
-- `docs/guides/` - operation guides (`installation-guide.md`, `testing-guide.md`)
+## Code conventions
 
-## Tauri Desktop Build
+- Keep cross-feature frontend imports on the `@/*` alias; relative imports are fine inside a feature.
+- Preserve TypeScript strict mode and remove unused values.
+- Keep Python wire models strict and camelCase-compatible; repositories own SQL, services own transactions.
+- Never log bearer tokens, request bodies, task text, notes, database paths, SQL parameters, or raw tracebacks.
+- Do not grant JavaScript shell spawn/execute permissions; Rust owns the sidecar.
+- Make small, task-scoped changes and run the relevant layer's tests before the full gates.
 
-Config: `src-tauri/tauri.conf.json`. Window: 1080×720 (min 720×560), resizable. Identifier: `com.todo-app.desktop`.
+## Important paths
 
-Output:
-- `.app`: `src-tauri/target/release/bundle/macos/Todo List.app`
-- `.dmg`: `src-tauri/target/release/bundle/dmg/Todo List_0.5.0_aarch64.dmg`
-
-Tauri plugins enabled: `tauri-plugin-log`, `tauri-plugin-notification`, `tauri-plugin-autostart`, `tauri-plugin-global-shortcut`. Tray + close-to-tray + global shortcut handling lives in `src-tauri/src/lib.rs`.
-
-Requires Rust toolchain (`rustup`). In China, configure crates.io mirror in `~/.cargo/config.toml` (USTC mirror works).
-
-## TypeScript Config
-
-Strict mode enabled. `noUnusedLocals` and `noUnusedParameters` are enforced - remove any unused imports/variables. `@/*` path alias configured in `tsconfig.json`.
+- Frontend bootstrap: `frontend/src/app/hooks/useBootstrap.ts`
+- Typed API client: `frontend/src/shared/api/`
+- Backend entry: `backend/src/todo_backend/sidecar.py`
+- SQL migrations: `backend/migrations/`
+- Sidecar supervisor: `desktop/src-tauri/src/backend.rs`
+- Tauri config: `desktop/src-tauri/tauri.conf.json`
+- Documentation index: `docs/CLAUDE.md`
