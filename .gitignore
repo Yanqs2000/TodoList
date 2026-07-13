@@ -10,7 +10,10 @@ __pycache__/
 .ruff_cache/
 *.py[cod]
 *.sqlite
+*.sqlite-*
 *.sqlite3
 *.sqlite3-*
+*.db
+*.db-*
 backend/build/
 desktop/src-tauri/binaries/

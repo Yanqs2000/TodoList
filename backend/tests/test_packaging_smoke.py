@@ -1,5 +1,6 @@
 import os
 import socket
+import sqlite3
 import subprocess
 import time
 from pathlib import Path
@@ -73,3 +74,15 @@ def test_packaged_sidecar_starts_and_stops(tmp_path: Path) -> None:
             process.kill()
             process.wait()
             pytest.fail("sidecar did not exit within five seconds")
+
+    with sqlite3.connect(database_path) as connection:
+        user_version = connection.execute("PRAGMA user_version").fetchone()[0]
+        tables = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            )
+        }
+
+    assert user_version == 1
+    assert "tasks" in tables
