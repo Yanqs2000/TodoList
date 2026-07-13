@@ -10,6 +10,8 @@ from todo_backend.config import Settings
 from todo_backend.database import Database
 from todo_backend.models import (
     BootstrapCommand,
+    CompletionCommand,
+    CompletionResponse,
     CreateTaskCommand,
     ReplaceTaskOrderCommand,
     TaskListResponse,
@@ -72,6 +74,17 @@ def create_app(
     )
     def _replace_task_order(command: ReplaceTaskOrderCommand) -> TaskListResponse:
         return TaskListResponse(tasks=service.replace_order(command.task_ids))
+
+    @router.put(
+        "/tasks/{task_id}/completion",
+        response_model=CompletionResponse,
+        response_model_exclude_none=True,
+    )
+    def _set_task_completion(
+        task_id: str,
+        command: CompletionCommand,
+    ) -> CompletionResponse:
+        return service.set_completion(task_id, command)
 
     app.include_router(router)
     return app

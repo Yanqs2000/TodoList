@@ -1,12 +1,14 @@
+from datetime import date
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 StrictText = Annotated[str, Field(strict=True, min_length=1, max_length=10_000)]
 StrictNotes = Annotated[str, Field(strict=True, max_length=10_000)]
 Priority = Literal["low", "medium", "high"]
 Category = Literal["work", "study", "life", "other"]
+LocalDate = Annotated[str, Field(strict=True, pattern=r"^\d{4}-\d{2}-\d{2}$")]
 
 
 class WireModel(BaseModel):
@@ -56,6 +58,20 @@ class ReplaceTaskOrderCommand(WireModel):
     task_ids: list[str] = Field(alias="taskIds")
 
 
+class CompletionCommand(WireModel):
+    completed: bool
+    local_date: LocalDate = Field(alias="localDate")
+
+    @field_validator("local_date")
+    @classmethod
+    def validate_local_date(cls, value: str) -> str:
+        try:
+            date.fromisoformat(value)
+        except ValueError:
+            raise ValueError("localDate must be a valid ISO date") from None
+        return value
+
+
 class BootstrapCommand(WireModel):
     pass
 
@@ -66,3 +82,17 @@ class TaskResponse(WireModel):
 
 class TaskListResponse(WireModel):
     tasks: list[Task]
+
+
+class AchievementState(WireModel):
+    unlocked: list[str]
+    streak_days: int = Field(alias="streakDays")
+    last_active_date: str = Field(alias="lastActiveDate")
+    today_completed: int = Field(alias="todayCompleted")
+    today_date: str = Field(alias="todayDate")
+
+
+class CompletionResponse(WireModel):
+    task: Task
+    achievement_state: AchievementState = Field(alias="achievementState")
+    newly_unlocked: list[str] = Field(alias="newlyUnlocked")

@@ -98,6 +98,22 @@ class TaskRepository:
             (row["position"],),
         )
 
+    def set_completion(
+        self,
+        connection: sqlite3.Connection,
+        task_id: str,
+        completed: bool,
+    ) -> tuple[Task, bool]:
+        task = self._get(connection, task_id)
+        records_progress = not task.completed and completed
+        if task.completed != completed:
+            connection.execute(
+                "UPDATE tasks SET completed = ? WHERE id = ?",
+                (completed, task_id),
+            )
+            task = self._get(connection, task_id)
+        return task, records_progress
+
     def replace_order(
         self,
         connection: sqlite3.Connection,
