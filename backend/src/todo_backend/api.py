@@ -74,6 +74,10 @@ def create_app(
         dependencies=[Depends(require_token), Depends(_require_database)],
     )
 
+    @router.get("/health")
+    def _health() -> dict[str, str]:
+        return {"status": "ok"}
+
     @router.post("/bootstrap", response_model=BootstrapResponse, response_model_exclude_none=True)
     def _bootstrap(command: BootstrapCommand) -> BootstrapResponse:
         return bootstrap_service.bootstrap(command.preferred_theme)
