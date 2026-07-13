@@ -1,0 +1,60 @@
+.startup-gate {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 24px;
+  background: var(--bg, #fafaf7);
+  color: var(--text, #1f2937);
+  text-align: center;
+}
+
+.startup-gate__card {
+  width: min(100%, 440px);
+  padding: 32px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: var(--radius-lg, 16px);
+  background: var(--card-bg, #fff);
+  box-shadow: var(--shadow-md, 0 4px 12px rgb(0 0 0 / 6%));
+}
+
+.startup-gate__card h1 {
+  margin-bottom: 8px;
+  font-size: 1.35rem;
+}
+
+.startup-gate__card p,
+.startup-gate > p {
+  color: var(--text-muted, #4b5563);
+}
+
+.startup-gate__card button {
+  margin-top: 24px;
+  padding: 9px 24px;
+  border: 0;
+  border-radius: var(--radius-sm, 8px);
+  background: var(--primary, #0d9488);
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+}
+
+.startup-gate__card button:hover {
+  background: var(--primary-light, #14b8a6);
+}
+
+.startup-gate__spinner {
+  width: 28px;
+  height: 28px;
+  margin-bottom: 12px;
+  border: 3px solid var(--border, #e5e7eb);
+  border-top-color: var(--primary, #0d9488);
+  border-radius: 50%;
+  animation: startup-gate-spin 700ms linear infinite;
+}
+
+@keyframes startup-gate-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

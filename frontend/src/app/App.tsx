@@ -18,6 +18,8 @@ import CreateTaskModal from '@/features/tasks/components/CreateTaskModal';
 import { useReminders, type ReminderEvent } from '@/features/reminders/hooks/useReminders';
 import { useDesktop } from '@/features/desktop/hooks/useDesktop';
 import SettingsModal from '@/features/desktop/components/SettingsModal';
+import StartupGate from './components/StartupGate';
+import { useBootstrap } from './hooks/useBootstrap';
 import './styles/App.css';
 
 interface InfoToastState {
@@ -25,7 +27,7 @@ interface InfoToastState {
   tone: 'success' | 'error';
 }
 
-function App() {
+function TodoApplication() {
   const todoState = useTodos();
   const { theme, setTheme } = useTheme();
   const sound = useSound();
@@ -236,6 +238,16 @@ function App() {
         />
       </aside>
     </div>
+  );
+}
+
+function App() {
+  const bootstrap = useBootstrap();
+
+  return (
+    <StartupGate state={bootstrap.state} onRetry={bootstrap.retry}>
+      <TodoApplication />
+    </StartupGate>
   );
 }
 
