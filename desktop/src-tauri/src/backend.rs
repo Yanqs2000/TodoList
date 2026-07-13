@@ -114,10 +114,6 @@ impl StartupCoordinator {
         F: FnOnce() -> Fut,
         Fut: Future<Output = Result<BackendConnection, BackendError>>,
     {
-        if let Some(error) = self.cached_failure.lock().await.clone() {
-            return Err(error);
-        }
-
         let _wave = self.wave.lock().await;
         if let Some(error) = self.cached_failure.lock().await.clone() {
             return Err(error);
@@ -175,6 +171,7 @@ struct SupervisorInner {
     lifecycle: BackendLifecycle,
     child: Option<CommandChild>,
     connection: Option<BackendConnection>,
+    ordinary_failure: Option<BackendError>,
     generation: u64,
     shutting_down: bool,
 }
@@ -192,10 +189,12 @@ impl SupervisorInner {
             return ExitDisposition::Stale;
         }
 
-        let disposition = if self.lifecycle.phase() == BackendPhase::Running {
-            ExitDisposition::EmitUnavailable
-        } else {
-            ExitDisposition::StartupFailed
+        let disposition = match self.lifecycle.phase() {
+            BackendPhase::Running => {
+                self.ordinary_failure = Some(BackendError::SidecarExited);
+                ExitDisposition::EmitUnavailable
+            }
+            BackendPhase::Stopped | BackendPhase::Restarting => ExitDisposition::StartupFailed,
         };
         self.generation = self.generation.wrapping_add(1);
         if let Some(child) = self.child.take() {
@@ -228,17 +227,42 @@ impl BackendSupervisor {
         &self,
         app: &AppHandle,
     ) -> Result<BackendConnection, BackendError> {
+        self.ensure_with(|| self.start(app)).await
+    }
+
+    async fn ensure_with<F, Fut>(&self, start: F) -> Result<BackendConnection, BackendError>
+    where
+        F: FnOnce() -> Fut,
+        Fut: Future<Output = Result<BackendConnection, BackendError>>,
+    {
         self.coordinator
             .ensure(|| async {
-                if let Some(connection) = self.running_connection().await {
+                let connection = {
+                    let inner = self.inner.lock().await;
+                    if let Some(error) = inner.ordinary_failure.clone() {
+                        return Err(error);
+                    }
+                    (inner.lifecycle.phase() == BackendPhase::Running)
+                        .then(|| inner.connection.clone())
+                        .flatten()
+                };
+                if let Some(connection) = connection {
                     return Ok(connection);
                 }
-                self.start(app).await
+                start().await
             })
             .await
     }
 
     async fn restart(&self, app: &AppHandle) -> Result<BackendConnection, BackendError> {
+        self.retry_with(|| self.start(app)).await
+    }
+
+    async fn retry_with<F, Fut>(&self, start: F) -> Result<BackendConnection, BackendError>
+    where
+        F: FnOnce() -> Fut,
+        Fut: Future<Output = Result<BackendConnection, BackendError>>,
+    {
         self.coordinator
             .retry(|| async {
                 {
@@ -246,18 +270,12 @@ impl BackendSupervisor {
                     if inner.shutting_down {
                         return Err(BackendError::NotRunning);
                     }
+                    inner.ordinary_failure = None;
                     stop_child(&mut inner);
                 }
-                self.start(app).await
+                start().await
             })
             .await
-    }
-
-    async fn running_connection(&self) -> Option<BackendConnection> {
-        let inner = self.inner.lock().await;
-        (inner.lifecycle.phase() == BackendPhase::Running)
-            .then(|| inner.connection.clone())
-            .flatten()
     }
 
     async fn start(&self, app: &AppHandle) -> Result<BackendConnection, BackendError> {
@@ -429,35 +447,36 @@ impl BackendSupervisor {
     }
 
     async fn mark_unexpected_exit(&self, app: &AppHandle, generation: u64) {
-        let was_running = {
-            let inner = self.inner.lock().await;
-            inner.generation == generation && inner.lifecycle.phase() == BackendPhase::Running
-        };
-        let disposition = if was_running {
-            let _wave = self.coordinator.wave.lock().await;
-            let mut inner = self.inner.lock().await;
-            if inner.generation == generation && inner.lifecycle.phase() == BackendPhase::Running {
-                self.coordinator
-                    .cache_failure(BackendError::SidecarExited)
-                    .await;
-            }
-            inner.record_process_exit(generation)
-        } else {
-            self.inner.lock().await.record_process_exit(generation)
-        };
+        let disposition = self.invalidate_unexpected_exit(generation).await;
 
         if disposition == ExitDisposition::EmitUnavailable {
             let _ = app.emit("backend-unavailable", ());
+            self.synchronize_running_exit_failure().await;
+        }
+    }
+
+    async fn invalidate_unexpected_exit(&self, generation: u64) -> ExitDisposition {
+        self.inner.lock().await.record_process_exit(generation)
+    }
+
+    async fn synchronize_running_exit_failure(&self) {
+        let _wave = self.coordinator.wave.lock().await;
+        let failure = self.inner.lock().await.ordinary_failure.clone();
+        if let Some(failure) = failure {
+            self.coordinator.cache_failure(failure).await;
         }
     }
 
     pub async fn shutdown(&self) {
+        {
+            let mut inner = self.inner.lock().await;
+            inner.shutting_down = true;
+            inner.ordinary_failure = Some(BackendError::NotRunning);
+            stop_child(&mut inner);
+        }
         self.coordinator
             .cache_failure(BackendError::NotRunning)
             .await;
-        let mut inner = self.inner.lock().await;
-        inner.shutting_down = true;
-        stop_child(&mut inner);
     }
 
     async fn persist_shortcut(&self, shortcut: &str) -> Result<(), BackendError> {
@@ -1022,6 +1041,130 @@ mod tests {
             retry_failure
         );
         assert_eq!(starts.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn monitor_invalidation_blocks_health_and_ordinary_restart_until_retry() {
+        let supervisor = Arc::new(BackendSupervisor::new(PathBuf::from("test.sqlite3")));
+        let startup_generation = 7;
+        let coordinator_wave = supervisor.coordinator.wave.lock().await;
+        let mut startup_inner = supervisor.inner.lock().await;
+        startup_inner.generation = startup_generation;
+        startup_inner.lifecycle.begin_restart();
+
+        let monitor = tokio::spawn({
+            let supervisor = supervisor.clone();
+            async move {
+                supervisor
+                    .invalidate_unexpected_exit(startup_generation)
+                    .await
+            }
+        });
+        tokio::task::yield_now().await;
+        let health = tokio::spawn({
+            let supervisor = supervisor.clone();
+            async move {
+                let mut inner = supervisor.inner.lock().await;
+                if inner.generation == startup_generation && !inner.shutting_down {
+                    inner.connection = Some(BackendConnection::loopback(
+                        43_123,
+                        "stale-health-token".to_owned(),
+                    ));
+                    inner.lifecycle.mark_running();
+                    true
+                } else {
+                    false
+                }
+            }
+        });
+        tokio::task::yield_now().await;
+        drop(startup_inner);
+
+        assert_eq!(
+            tokio::time::timeout(Duration::from_secs(1), monitor)
+                .await
+                .expect("startup monitor must not wait for the coordinator wave")
+                .unwrap(),
+            ExitDisposition::StartupFailed
+        );
+        assert!(!health.await.unwrap());
+        drop(coordinator_wave);
+
+        let running_generation = 20;
+        {
+            let mut inner = supervisor.inner.lock().await;
+            inner.generation = running_generation;
+            inner.lifecycle.mark_running();
+            inner.connection = Some(BackendConnection::loopback(
+                43_124,
+                "running-token".to_owned(),
+            ));
+        }
+
+        let coordinator_wave = supervisor.coordinator.wave.lock().await;
+        assert_eq!(
+            supervisor
+                .invalidate_unexpected_exit(running_generation)
+                .await,
+            ExitDisposition::EmitUnavailable
+        );
+
+        let starts = Arc::new(AtomicUsize::new(0));
+        let ordinary_ensure = tokio::spawn({
+            let supervisor = supervisor.clone();
+            let starts = starts.clone();
+            async move {
+                supervisor
+                    .ensure_with(|| async move {
+                        starts.fetch_add(1, Ordering::SeqCst);
+                        Ok(BackendConnection::loopback(
+                            43_125,
+                            "unexpected-restart".to_owned(),
+                        ))
+                    })
+                    .await
+            }
+        });
+        tokio::task::yield_now().await;
+        let cache_sync = tokio::spawn({
+            let supervisor = supervisor.clone();
+            async move { supervisor.synchronize_running_exit_failure().await }
+        });
+        tokio::task::yield_now().await;
+        drop(coordinator_wave);
+
+        assert_eq!(
+            ordinary_ensure.await.unwrap().unwrap_err(),
+            BackendError::SidecarExited
+        );
+        cache_sync.await.unwrap();
+        assert_eq!(starts.load(Ordering::SeqCst), 0);
+        assert_eq!(
+            supervisor
+                .ensure_with(|| async {
+                    panic!("ordinary ensure must not restart an unexpectedly exited backend")
+                })
+                .await
+                .unwrap_err(),
+            BackendError::SidecarExited
+        );
+
+        let retried_connection = BackendConnection::loopback(43_126, "retry-token".to_owned());
+        assert_eq!(
+            supervisor
+                .retry_with({
+                    let starts = starts.clone();
+                    let retried_connection = retried_connection.clone();
+                    || async move {
+                        starts.fetch_add(1, Ordering::SeqCst);
+                        Ok(retried_connection)
+                    }
+                })
+                .await
+                .unwrap(),
+            retried_connection
+        );
+        assert_eq!(starts.load(Ordering::SeqCst), 1);
     }
 
     #[test]
