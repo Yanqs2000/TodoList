@@ -1,6 +1,6 @@
 # TodoList
 
-TodoList 是一个中文桌面待办应用，使用 React + Tauri 提供任务管理、拖拽排序、提醒、主题、音效和成就反馈。应用数据由随桌面程序启动的 Python 后端写入本机 SQLite；不需要账号，也不会把数据同步到云端。
+TodoList 是一个中文桌面待办应用，使用 React + Tauri 提供任务管理、拖拽排序、提醒、主题、音效和成就反馈。应用数据由随桌面程序启动的 Python 后端写入本机 SQLite；不需要账号，也不会把数据同步到云端。当前稳定版本为 **v1.0.0**。
 
 ## 当前架构
 
@@ -22,6 +22,12 @@ Tauri 启动 Python sidecar，并通过仅监听 `127.0.0.1` 的带随机 Bearer
 - 成就、连续完成天数和今日统计
 - macOS 托盘、关闭到托盘、全局快捷键和开机自启动
 - 后端异常时阻断主界面，可显式重试并加载完整数据库快照
+
+## v1.0.0
+
+v1.0.0 将应用的数据层升级为随桌面程序分发的 Python/FastAPI + SQLite 后端，并由 Tauri 负责 sidecar 生命周期和安全连接。前端、后端、桌面端与文档已拆分为独立目录，任务、设置、成就和提醒状态统一由本机数据库持久化。
+
+从 v0.5.0 升级时，旧版 `localStorage` 数据不会自动导入，首次运行 v1.0.0 会创建新的 SQLite 数据库。完整变更见 [v1.0.0 发布日志](docs/development-logs/v1.0.0-python-sqlite-desktop.md)。
 
 ## 开发环境
 
@@ -74,4 +80,4 @@ npm --prefix desktop run sign:macos
 - [macOS 安装与构建](docs/architecture/installation.md)
 - [文档索引](docs/CLAUDE.md)
 
-历史版本记录保留在 [docs/development-logs](docs/development-logs/) 中；这些日志描述对应版本当时的实现，不代表当前架构。
+版本记录保留在 [docs/development-logs](docs/development-logs/) 中；旧日志描述对应版本当时的实现，不代表当前架构。

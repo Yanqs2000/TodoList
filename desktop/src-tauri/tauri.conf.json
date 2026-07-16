@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Todo List",
-  "version": "0.5.0",
+  "version": "1.0.0",
   "identifier": "com.todo-app.desktop",
   "build": {
     "frontendDist": "../../frontend/dist",
@@ -40,6 +40,7 @@
     ],
     "macOS": {
       "signingIdentity": "-",
+      "hardenedRuntime": false,
       "minimumSystemVersion": "11.0",
       "entitlements": null
     },

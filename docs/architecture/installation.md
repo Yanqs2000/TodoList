@@ -67,4 +67,4 @@ codesign --verify --deep --strict --verbose=2 \
   "desktop/src-tauri/target/release/bundle/macos/Todo List.app"
 ```
 
-ad-hoc 签名证明 bundle 结构完整，但不等同于 Developer ID 签名和 Apple 公证。
+ad-hoc 签名证明 bundle 结构完整，但不等同于 Developer ID 签名和 Apple 公证。当前构建显式关闭 hardened runtime，以允许 PyInstaller one-file sidecar 加载运行时解压的 Python 动态库；未来改用 Developer ID 与公证时，需要为 sidecar 重新设计签名和 entitlements。

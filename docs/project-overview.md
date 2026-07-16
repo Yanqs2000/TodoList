@@ -14,6 +14,8 @@ TodoList 是一个无需账号的本地桌面待办应用。React 负责交互�
 
 Python 环境由 `uv` 管理。后端通过 PyInstaller 打成 Tauri external binary，用户无需单独安装 Python。
 
+当前稳定版本为 **v1.0.0**。该版本首次把 Python/SQLite 后端作为正式桌面发行架构。
+
 ## 数据流
 
 1. Tauri 在应用数据目录选择 `todo.sqlite3`，生成随机端口和 256-bit token。
@@ -84,4 +86,4 @@ cargo test --manifest-path desktop/src-tauri/Cargo.toml
 
 ## 历史版本
 
-v0.1.0 至 v0.5.0 的开发事实保留在 [development-logs](development-logs/) 中。旧日志可能提到当时的单目录、浏览器运行或 `localStorage`，不应作为当前操作指南；当前说明以本页和分类文档为准。
+v0.1.0 至 v1.0.0 的开发事实保留在 [development-logs](development-logs/) 中。旧日志可能提到当时的单目录、浏览器运行或 `localStorage`，不应作为当前操作指南；当前说明以本页和分类文档为准。

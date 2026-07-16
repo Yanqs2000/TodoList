@@ -32,13 +32,11 @@ fi
 
 echo "🔐 先签名内嵌 Python sidecar..."
 codesign --force --sign - \
-  --options runtime \
   --timestamp=none \
   "${SIDECAR_PATH}"
 
 echo "🔐 再签名包含它的 .app..."
 codesign --force --sign - \
-  --options runtime \
   --timestamp=none \
   "${APP_PATH}"
 

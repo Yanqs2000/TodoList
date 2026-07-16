@@ -21,7 +21,8 @@
 
 ## 历史与归档
 
-- [development-logs](development-logs/) — v0.1.0 至 v0.5.0 的版本日志，保持历史原文
+- [v1.0.0 发布日志](development-logs/v1.0.0-python-sqlite-desktop.md) — Python/FastAPI + SQLite 桌面架构正式发布
+- [development-logs](development-logs/) — v0.1.0 至 v1.0.0 的版本日志，保持历史原文
 - [bug-fixes](bug-fixes/README.md) — 独立问题记录入口
 - [plans](plans/README.md) — 旧模块规划入口
 
