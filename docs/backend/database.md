@@ -18,7 +18,7 @@ TodoList 使用 Python 标准库 `sqlite3`。macOS 正常运行时数据库位�
 | `achievement_state` | 单行 streak、当天日期和完成数 |
 | `achievement_unlocks` | 已解锁成就 ID |
 | `task_reminders` | `(task_id, scheduled_start)` 唯一 claim |
-| `app_settings` | 单行 theme、muted、shortcut |
+| `app_settings` | 单行 theme、muted、shortcut、language |
 
 `task_reminders.task_id` 使用外键并在任务删除时级联清理。任务顺序由唯一的整数 `position` 表示。
 
@@ -29,6 +29,7 @@ TodoList 使用 Python 标准库 `sqlite3`。macOS 正常运行时数据库位�
 - 每个迁移与 `user_version` 更新在一个事务中执行。
 - 数据库版本高于程序支持的最新版本时拒绝启动并返回稳定 503。
 - 已发布迁移保持不变；schema 变化新增下一个编号文件。
+- `002_add_language_setting.sql` 增加 `language`，允许 `zh-CN | en`，现有数据库默认升级为 `zh-CN`。
 
 ## 事务
 

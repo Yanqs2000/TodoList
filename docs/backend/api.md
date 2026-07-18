@@ -16,7 +16,7 @@ Base URL 由 Tauri 动态生成，格式为 `http://127.0.0.1:<port>/api/v1`。�
 | PUT | `/tasks/order` | `{ taskIds }` | `{ tasks }` |
 | PUT | `/tasks/{id}/completion` | `{ completed, localDate }` | task、achievementState、newlyUnlocked |
 | POST | `/reminders/claim` | `{ taskId, scheduledStart }` | `{ claimed }` |
-| PATCH | `/settings` | theme、muted 或 shortcut | `{ settings }` |
+| PATCH | `/settings` | theme、muted、shortcut 或 language | `{ settings }` |
 
 ## 主要字段
 
@@ -39,6 +39,7 @@ Base URL 由 Tauri 动态生成，格式为 `http://127.0.0.1:<port>/api/v1`。�
 - `category`: `work | study | life | other`
 - 时间为本地分钟格式 `YYYY-MM-DDTHH:mm`；没有时区转换。
 - theme 为 `workspace | mint | paper` 与 `light | dark` 的六种组合。
+- language 为 `zh-CN | en`，默认 `zh-CN`。
 
 完成响应中的 `achievementState` 是权威完整状态，前端不自行重算。提醒 claim 只有在任务仍未完成且 `scheduledStart` 等于任务当前开始时间时才能返回 `true`。
 
