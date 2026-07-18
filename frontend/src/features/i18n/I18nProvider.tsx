@@ -8,7 +8,14 @@ interface I18nValue {
   errorText: (code: string) => string;
 }
 
-const I18nContext = createContext<I18nValue | null>(null);
+const defaultValue: I18nValue = {
+  language: 'zh-CN',
+  locale: localeFor('zh-CN'),
+  t: (key, params) => translate('zh-CN', key, params),
+  errorText: code => translationForError('zh-CN', code),
+};
+
+const I18nContext = createContext<I18nValue>(defaultValue);
 
 export function I18nProvider({ language, children }: { language: Language; children: ReactNode }) {
   useEffect(() => {
@@ -26,7 +33,5 @@ export function I18nProvider({ language, children }: { language: Language; child
 }
 
 export function useI18n(): I18nValue {
-  const value = useContext(I18nContext);
-  if (!value) throw new Error('useI18n must be used inside I18nProvider');
-  return value;
+  return useContext(I18nContext);
 }

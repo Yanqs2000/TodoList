@@ -49,7 +49,7 @@ function Header({
           aria-label={language === 'zh-CN' ? t('header.switchToEnglish') : t('header.switchToChinese')}
           title={language === 'zh-CN' ? t('header.switchToEnglish') : t('header.switchToChinese')}
         >
-          {language === 'zh-CN' ? 'EN' : '中文'}
+          {language === 'zh-CN' ? 'EN' : t('header.chineseLabel')}
         </button>
         <button
           className="icon-btn"

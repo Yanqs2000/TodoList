@@ -2,6 +2,8 @@ import type { Todo } from '@/shared/types';
 import { formatTimeField } from '../lib/formatTime';
 import { proximityOf, isToday, toTimelineX, type Proximity } from '../lib/timeProximity';
 import '../styles/DayTimeline.css';
+import { useI18n } from '@/features/i18n/I18nProvider';
+import type { TranslationKey } from '@/features/i18n/translations';
 
 const MIN_WIDTH_PCT = 3; // narrowest a point-task block can be (% of track)
 const TICK_HOURS = [6, 8, 10, 12, 14, 16, 18, 20, 22];
@@ -14,12 +16,9 @@ interface DayTimelineProps {
   now?: number;
 }
 
-const PROX_LABEL: Record<Proximity, string> = {
-  overdue: '已过期',
-  soon: '即将',
-  today: '今天',
-  future: '以后',
-  none: '无时间',
+const PROX_LABEL: Record<Proximity, TranslationKey> = {
+  overdue: 'timeline.overdue', soon: 'timeline.soon', today: 'timeline.today',
+  future: 'timeline.future', none: 'timeline.none',
 };
 
 function nowToX(now: number): number | null {
@@ -32,6 +31,7 @@ function nowToX(now: number): number | null {
 }
 
 function DayTimeline({ tasks, selectedTaskId, onSelectTask, now: nowProp }: DayTimelineProps) {
+  const { t, locale } = useI18n();
   const now = nowProp ?? Date.now();
 
   const todayTimed = tasks.filter(t => t.time?.start && isToday(t.time.start, now));
@@ -51,11 +51,11 @@ function DayTimeline({ tasks, selectedTaskId, onSelectTask, now: nowProp }: DayT
   const nowX = nowToX(now);
 
   return (
-    <section className="day-timeline" role="region" aria-label="今日时间轴">
+    <section className="day-timeline" role="region" aria-label={t('timeline.title')}>
       <div className="day-timeline__header">
-        <span className="day-timeline__title">今日时间轴</span>
+        <span className="day-timeline__title">{t('timeline.title')}</span>
         {unscheduledN > 0 && (
-          <span className="day-timeline__cluster" title="未设定时间的任务">待安排 ({unscheduledN})</span>
+          <span className="day-timeline__cluster" title={t('timeline.unscheduledTitle')}>{t('timeline.unscheduled', { count: unscheduledN })}</span>
         )}
       </div>
 
@@ -83,8 +83,8 @@ function DayTimeline({ tasks, selectedTaskId, onSelectTask, now: nowProp }: DayT
             type="button"
             className={`day-timeline__block day-timeline__block--${prox}${selectedTaskId === task.id ? ' is-selected' : ''}`}
             style={{ left: `${left}%`, width: `${width}%` }}
-            title={`${task.text} · ${formatTimeField(task.time!)}`}
-            aria-label={`${task.text}，${formatTimeField(task.time!)}，${PROX_LABEL[prox]}`}
+            title={`${task.text} · ${formatTimeField(task.time!, locale)}`}
+            aria-label={`${task.text}, ${formatTimeField(task.time!, locale)}, ${t(PROX_LABEL[prox])}`}
             aria-pressed={selectedTaskId === task.id}
             onClick={() => onSelectTask?.(selectedTaskId === task.id ? null : task.id)}
           >
@@ -93,7 +93,7 @@ function DayTimeline({ tasks, selectedTaskId, onSelectTask, now: nowProp }: DayT
         ))}
 
         {todayTimed.length === 0 && (
-          <div className="day-timeline__empty">今天还没有计划任务</div>
+          <div className="day-timeline__empty">{t('timeline.empty')}</div>
         )}
       </div>
     </section>

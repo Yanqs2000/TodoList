@@ -3,6 +3,7 @@ import { DAILY_GOAL } from '@/shared/constants';
 import { useConfirm } from '@/shared/components/ConfirmDialog';
 import ProgressRing from './ProgressRing';
 import '../styles/Footer.css';
+import { useI18n } from '@/features/i18n/I18nProvider';
 
 interface FooterProps {
   stats: {
@@ -20,13 +21,14 @@ function Footer({ stats, onClearCompleted, achievements, clearPending = false, c
   const todayCompleted = achievements?.todayCompleted ?? 0;
   const streakDays = achievements?.streakDays ?? 0;
   const confirm = useConfirm();
+  const { t } = useI18n();
 
   const handleClearCompleted = async () => {
     if (stats.completed === 0) return;
     const ok = await confirm({
-      title: '清除已完成任务',
-      message: `确定要清除 ${stats.completed} 个已完成的任务吗？此操作不可撤销。`,
-      confirmText: '清除',
+      title: t('footer.clearTitle'),
+      message: t('footer.clearMessage', { count: stats.completed }),
+      confirmText: t('time.clear'),
       danger: true,
     });
     if (ok) await onClearCompleted();
@@ -38,7 +40,7 @@ function Footer({ stats, onClearCompleted, achievements, clearPending = false, c
         <div className="footer-card">
           <ProgressRing current={todayCompleted} goal={DAILY_GOAL} size={56} strokeWidth={5} />
           <div className="footer-card__meta">
-            <span className="footer-card__label">今日目标</span>
+            <span className="footer-card__label">{t('footer.todayGoal')}</span>
             <span className="footer-card__sub">{todayCompleted} / {DAILY_GOAL}</span>
           </div>
         </div>
@@ -46,11 +48,11 @@ function Footer({ stats, onClearCompleted, achievements, clearPending = false, c
         <div className="footer-card">
           <div className="footer-card__big">
             <span className="footer-card__value">{streakDays}</span>
-            <span className="footer-card__unit">天</span>
+            <span className="footer-card__unit">{t('footer.days')}</span>
           </div>
           <div className="footer-card__meta">
-            <span className="footer-card__label">连续打卡</span>
-            <span className="footer-card__sub">不间断</span>
+            <span className="footer-card__label">{t('footer.streak')}</span>
+            <span className="footer-card__sub">{t('footer.uninterrupted')}</span>
           </div>
         </div>
 
@@ -59,8 +61,8 @@ function Footer({ stats, onClearCompleted, achievements, clearPending = false, c
             <span className="footer-card__value">{stats.completed}</span>
           </div>
           <div className="footer-card__meta">
-            <span className="footer-card__label">总完成</span>
-            <span className="footer-card__sub">共 {stats.total} 项 · 进行中 {stats.active}</span>
+            <span className="footer-card__label">{t('footer.totalCompleted')}</span>
+            <span className="footer-card__sub">{t('footer.summary', { total: stats.total, active: stats.active })}</span>
           </div>
         </div>
       </div>
@@ -72,7 +74,7 @@ function Footer({ stats, onClearCompleted, achievements, clearPending = false, c
           disabled={stats.completed === 0 || clearPending || clearDisabled}
           onClick={handleClearCompleted}
         >
-          清除已完成
+          {t('footer.clear')}
         </button>
       </div>
     </div>

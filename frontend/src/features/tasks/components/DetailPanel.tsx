@@ -6,6 +6,7 @@ import { useConfirm } from '@/shared/components/ConfirmDialog';
 import { formatTimeField } from '../lib/formatTime';
 import TimePicker from './TimePicker';
 import '../styles/DetailPanel.css';
+import { useI18n } from '@/features/i18n/I18nProvider';
 
 interface DetailPanelProps {
   selectedTask: Todo | null;
@@ -24,8 +25,6 @@ interface DetailPanelProps {
 const priorityOptions = PRIORITIES.map(p => ({ value: p, label: PRIORITY_LABELS[p] }));
 
 const categoryOptions: Category[] = ['work', 'study', 'life', 'other'];
-
-const formatTimeTag = formatTimeField;
 
 function DetailPanel({
   selectedTask,
@@ -49,6 +48,7 @@ function DetailPanel({
   const [notesDraft, setNotesDraft] = useState(selectedTask?.notes ?? '');
   const [showTimePicker, setShowTimePicker] = useState(false);
   const confirm = useConfirm();
+  const { t, locale } = useI18n();
   const titleInputRef = useRef<HTMLInputElement>(null);
   const notesRef = useRef<HTMLTextAreaElement>(null);
 
@@ -131,9 +131,9 @@ function DetailPanel({
   const handleDelete = async () => {
     if (!selectedTask) return;
     const ok = await confirm({
-      title: '删除任务',
-      message: `确定要删除任务「${selectedTask.text}」吗？`,
-      confirmText: '删除',
+      title: t('task.deleteTitle'),
+      message: t('task.deleteMessage', { task: selectedTask.text }),
+      confirmText: t('common.delete'),
       danger: true,
     });
     if (ok) {
@@ -158,13 +158,13 @@ function DetailPanel({
       <aside className="detail">
         <header className="detail__header">
           <div className="detail__heading">
-            <h2 className="detail__title">今日摘要</h2>
-            <p className="detail__subtitle">未选中任务</p>
+            <h2 className="detail__title">{t('detail.summary')}</h2>
+            <p className="detail__subtitle">{t('detail.noSelection')}</p>
           </div>
           <button
             className="detail__close"
             onClick={onClose}
-            aria-label="关闭详情面板"
+            aria-label={t('detail.close')}
           >
             {CloseIcon}
           </button>
@@ -172,22 +172,22 @@ function DetailPanel({
 
         <div className="detail__summary">
           <div className="detail__summary-card">
-            <div className="detail__summary-label">今日完成</div>
+            <div className="detail__summary-label">{t('detail.todayCompleted')}</div>
             <div className="detail__summary-value">{todayCompleted}</div>
-            <div className="detail__summary-sub">目标 {dailyGoal}</div>
+            <div className="detail__summary-sub">{t('detail.goal', { goal: dailyGoal })}</div>
           </div>
           <div className="detail__summary-card">
-            <div className="detail__summary-label">连续天数</div>
+            <div className="detail__summary-label">{t('detail.streak')}</div>
             <div className="detail__summary-value">{streakDays}</div>
           </div>
           <div className="detail__summary-card">
-            <div className="detail__summary-label">总任务</div>
+            <div className="detail__summary-label">{t('detail.total')}</div>
             <div className="detail__summary-value">{stats.total}</div>
-            <div className="detail__summary-sub">进行中 {stats.active}</div>
+            <div className="detail__summary-sub">{t('detail.active', { count: stats.active })}</div>
           </div>
         </div>
 
-        <p className="detail__hint">点击左侧任务查看详情，或按 ⌘N 创建新任务</p>
+        <p className="detail__hint">{t('detail.hint')}</p>
       </aside>
     );
   }
@@ -206,14 +206,14 @@ function DetailPanel({
               onChange={(e) => setEditTitle(e.target.value)}
               onBlur={submitTitle}
               onKeyDown={handleTitleKeyDown}
-              aria-label="编辑任务标题"
+              aria-label={t('detail.editTitle')}
               disabled={editPending}
             />
           ) : (
             <h2
               className="detail__title detail__title--editable"
               onClick={startEditTitle}
-              title="点击编辑标题"
+              title={t('detail.clickEdit')}
             >
               {selectedTask.text}
             </h2>
@@ -222,7 +222,7 @@ function DetailPanel({
         <button
           className="detail__close"
           onClick={onClose}
-          aria-label="关闭详情面板"
+          aria-label={t('detail.close')}
         >
           {CloseIcon}
         </button>
@@ -231,7 +231,7 @@ function DetailPanel({
       <button
         className={`detail__status${selectedTask.completed ? ' detail__status--done' : ''}`}
         onClick={handleStatusToggle}
-        aria-label={selectedTask.completed ? '标记为未完成' : '标记为已完成'}
+        aria-label={selectedTask.completed ? t('task.markActive') : t('task.markCompleted')}
         disabled={togglePending}
       >
         {selectedTask.completed && (
@@ -239,12 +239,12 @@ function DetailPanel({
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
           </svg>
         )}
-        {selectedTask.completed ? '已完成' : '未完成'}
+        {selectedTask.completed ? t('detail.completed') : t('detail.notCompleted')}
       </button>
 
       <div className="detail__body">
         <section className="detail__section">
-          <div className="detail__label">优先级</div>
+          <div className="detail__label">{t('detail.priority')}</div>
           <div className="detail__btn-group">
             {priorityOptions.map((opt) => (
               <button
@@ -254,14 +254,14 @@ function DetailPanel({
                 onClick={() => onEdit(selectedTask.id, { priority: opt.value })}
                 disabled={editPending}
               >
-                {opt.label}
+                {t(opt.label)}
               </button>
             ))}
           </div>
         </section>
 
         <section className="detail__section">
-          <div className="detail__label">分类</div>
+          <div className="detail__label">{t('detail.category')}</div>
           <div className="detail__btn-group">
             {categoryOptions.map((cat) => (
               <button
@@ -270,25 +270,25 @@ function DetailPanel({
                 onClick={() => onEdit(selectedTask.id, { category: cat })}
                 disabled={editPending}
               >
-                {CATEGORY_LABELS[cat]}
+                {t(CATEGORY_LABELS[cat])}
               </button>
             ))}
           </div>
         </section>
 
         <section className="detail__section">
-          <div className="detail__label">时间</div>
+          <div className="detail__label">{t('detail.time')}</div>
           <div className="detail__field">
             {selectedTask.time ? (
               <div className="detail__time-tag">
                 <svg className="detail__time-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
                 </svg>
-                <span>{formatTimeTag(selectedTask.time)}</span>
+                <span>{formatTimeField(selectedTask.time, locale)}</span>
                 <button
                   className="detail__time-clear"
                   onClick={handleClearTime}
-                  aria-label="清除时间"
+                  aria-label={t('create.clearTime')}
                   disabled={editPending}
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -297,7 +297,7 @@ function DetailPanel({
                 </button>
               </div>
             ) : (
-              <span className="detail__time-empty">未设置</span>
+              <span className="detail__time-empty">{t('detail.noTime')}</span>
             )}
             <button
               type="button"
@@ -306,7 +306,7 @@ function DetailPanel({
               aria-expanded={showTimePicker}
               disabled={editPending}
             >
-              {showTimePicker ? '收起' : selectedTask.time ? '修改时间' : '设置时间'}
+              {showTimePicker ? t('create.collapse') : selectedTask.time ? t('detail.changeTime') : t('create.setTime')}
             </button>
           </div>
           {showTimePicker && (
@@ -321,14 +321,14 @@ function DetailPanel({
         </section>
 
         <section className="detail__section">
-          <div className="detail__label">备注</div>
+          <div className="detail__label">{t('detail.notes')}</div>
           <textarea
             ref={notesRef}
             className="detail__notes"
             value={notesDraft}
             onChange={(e) => setNotesDraft(e.target.value)}
             onBlur={handleNotesBlur}
-            placeholder="添加备注…"
+            placeholder={t('detail.notesPlaceholder')}
             disabled={editPending}
           />
         </section>
@@ -343,7 +343,7 @@ function DetailPanel({
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
           </svg>
-          删除任务
+          {t('task.deleteTitle')}
         </button>
       </div>
     </aside>

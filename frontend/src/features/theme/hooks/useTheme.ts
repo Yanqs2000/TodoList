@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { TodoApi } from '@/shared/api/contracts';
+import type { TranslationKey } from '@/features/i18n/translations';
 
 export type ThemeStyle = 'workspace' | 'mint' | 'paper';
 export type ThemeMode = 'light' | 'dark';
@@ -16,46 +17,40 @@ export const THEME_IDS: ThemeId[] = [
 
 export interface ThemeMeta {
   id: ThemeId;
-  name: string;
-  description: string;
+  name: TranslationKey;
+  description: TranslationKey;
   swatch: { bg: string; card: string; accent: string };
 }
 
 export const THEMES: Record<ThemeId, ThemeMeta> = {
   'workspace-light': {
     id: 'workspace-light',
-    name: '工作台 · 浅',
-    description: '暖白底，适合日常办公',
+    name: 'theme.workspaceLight.name', description: 'theme.workspaceLight.desc',
     swatch: { bg: '#FAFAF7', card: '#FFFFFF', accent: '#0D9488' },
   },
   'mint-light': {
     id: 'mint-light',
-    name: '薄荷 · 浅',
-    description: '淡雅薄荷，柔和清新',
+    name: 'theme.mintLight.name', description: 'theme.mintLight.desc',
     swatch: { bg: '#F7FAF9', card: '#FFFFFF', accent: '#0D9488' },
   },
   'paper-light': {
     id: 'paper-light',
-    name: '纸笺 · 浅',
-    description: '米色纸感，Notion 风',
+    name: 'theme.paperLight.name', description: 'theme.paperLight.desc',
     swatch: { bg: '#F7F6F3', card: '#FFFDF8', accent: '#0D9488' },
   },
   'workspace-dark': {
     id: 'workspace-dark',
-    name: '工作台 · 深',
-    description: '深色，适合夜间办公',
+    name: 'theme.workspaceDark.name', description: 'theme.workspaceDark.desc',
     swatch: { bg: '#0E0E10', card: '#18181B', accent: '#2DD4BF' },
   },
   'mint-dark': {
     id: 'mint-dark',
-    name: '薄荷 · 深',
-    description: '中性深灰，沉稳护眼',
+    name: 'theme.mintDark.name', description: 'theme.mintDark.desc',
     swatch: { bg: '#1A1D1C', card: '#25292B', accent: '#2DD4BF' },
   },
   'paper-dark': {
     id: 'paper-dark',
-    name: '纸笺 · 深',
-    description: '深色，纸感延续',
+    name: 'theme.paperDark.name', description: 'theme.paperDark.desc',
     swatch: { bg: '#0E0E10', card: '#1A1814', accent: '#2DD4BF' },
   },
 };

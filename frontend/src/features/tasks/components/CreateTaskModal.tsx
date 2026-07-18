@@ -5,6 +5,8 @@ import { CATEGORY_LABELS, PRIORITY_LABELS, PRIORITIES } from '@/shared/constants
 import { formatTimeField } from '../lib/formatTime';
 import TimePicker from './TimePicker';
 import '../styles/CreateTaskModal.css';
+import { useI18n } from '@/features/i18n/I18nProvider';
+import type { TranslationKey } from '@/features/i18n/translations';
 
 interface CreateTaskModalProps {
   open: boolean;
@@ -16,11 +18,8 @@ interface CreateTaskModalProps {
 
 const priorityOptions = PRIORITIES.map(p => ({ value: p, label: PRIORITY_LABELS[p] }));
 
-function formatTimeDisplay(t: TimeField): string {
-  return formatTimeField(t);
-}
-
 function CreateTaskModal({ open, onClose, onAdd, defaultPriority, pending = false }: CreateTaskModalProps) {
+  const { t, locale } = useI18n();
   const [text, setText] = useState('');
   const [priority, setPriority] = useState<Priority>(defaultPriority);
   const [category, setCategory] = useState<Category>('other');
@@ -145,15 +144,15 @@ function CreateTaskModal({ open, onClose, onAdd, defaultPriority, pending = fals
         className="create-modal__card"
         role="dialog"
         aria-modal="true"
-        aria-label="新建任务"
+        aria-label={t('create.title')}
       >
         <header className="create-modal__header">
-          <h2 className="create-modal__title">新建任务</h2>
+          <h2 className="create-modal__title">{t('create.title')}</h2>
           <button
             type="button"
             className="create-modal__close"
             onClick={onClose}
-            aria-label="关闭"
+            aria-label={t('common.close')}
           >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -172,13 +171,13 @@ function CreateTaskModal({ open, onClose, onAdd, defaultPriority, pending = fals
               onKeyDown={handleInputKeyDown}
               onCompositionStart={handleCompositionStart}
               onCompositionEnd={handleCompositionEnd}
-              placeholder="今天要做什么？"
+              placeholder={t('create.placeholder')}
               autoComplete="off"
             />
           </div>
 
           <div className="create-modal__field">
-            <span className="create-modal__label">优先级</span>
+            <span className="create-modal__label">{t('create.priority')}</span>
             <div className="create-modal__btn-group">
               {priorityOptions.map((opt) => (
                 <button
@@ -188,16 +187,16 @@ function CreateTaskModal({ open, onClose, onAdd, defaultPriority, pending = fals
                   data-priority={opt.value}
                   onClick={() => setPriority(opt.value)}
                 >
-                  {opt.label}
+                  {t(opt.label)}
                 </button>
               ))}
             </div>
           </div>
 
           <div className="create-modal__field">
-            <span className="create-modal__label">分类</span>
+            <span className="create-modal__label">{t('create.category')}</span>
             <div className="create-modal__btn-group">
-              {(Object.entries(CATEGORY_LABELS) as [Category, string][]).map(([key, label]) => (
+              {(Object.entries(CATEGORY_LABELS) as [Category, TranslationKey][]).map(([key, label]) => (
                 <button
                   key={key}
                   type="button"
@@ -205,17 +204,17 @@ function CreateTaskModal({ open, onClose, onAdd, defaultPriority, pending = fals
                   data-category={key}
                   onClick={() => setCategory(key)}
                 >
-                  {label}
+                  {t(label)}
                 </button>
               ))}
             </div>
           </div>
 
           <div className="create-modal__field">
-            <span className="create-modal__label">时间</span>
+            <span className="create-modal__label">{t('create.time')}</span>
             <div className="create-modal__time-row">
               <span className="create-modal__time-preview">
-                {time ? formatTimeDisplay(time) : '未设置时间'}
+                {time ? formatTimeField(time, locale) : t('create.noTime')}
               </span>
               <div className="create-modal__btn-group">
                 <button
@@ -224,7 +223,7 @@ function CreateTaskModal({ open, onClose, onAdd, defaultPriority, pending = fals
                   onClick={() => setShowTimePicker((s) => !s)}
                   aria-expanded={showTimePicker}
                 >
-                  {showTimePicker ? '收起' : '设置时间'}
+                  {showTimePicker ? t('create.collapse') : t('create.setTime')}
                 </button>
                 <button
                   type="button"
@@ -232,7 +231,7 @@ function CreateTaskModal({ open, onClose, onAdd, defaultPriority, pending = fals
                   onClick={() => setTime(undefined)}
                   disabled={!time}
                 >
-                  清除时间
+                  {t('create.clearTime')}
                 </button>
               </div>
             </div>
@@ -248,21 +247,21 @@ function CreateTaskModal({ open, onClose, onAdd, defaultPriority, pending = fals
           </div>
 
           <div className="create-modal__field">
-            <span className="create-modal__label">备注</span>
+            <span className="create-modal__label">{t('create.notes')}</span>
             <textarea
               className="create-modal__textarea"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               onCompositionStart={handleCompositionStart}
               onCompositionEnd={handleCompositionEnd}
-              placeholder="添加备注（可选）"
+              placeholder={t('create.notesPlaceholder')}
             />
           </div>
         </div>
 
         <footer className="create-modal__footer">
           <button type="button" className="create-modal__cancel" onClick={onClose}>
-            取消
+            {t('common.cancel')}
           </button>
           <button
             type="button"
@@ -270,7 +269,7 @@ function CreateTaskModal({ open, onClose, onAdd, defaultPriority, pending = fals
             onClick={() => void submit()}
             disabled={!text.trim() || pending}
           >
-            创建任务
+            {t('create.submit')}
           </button>
         </footer>
       </div>

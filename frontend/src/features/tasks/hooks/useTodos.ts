@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { CATEGORIES, CATEGORY_LABELS } from '@/shared/constants';
+import type { TranslationKey } from '@/features/i18n/translations';
 import {
   ApiError,
   InfrastructureError,
@@ -51,7 +52,7 @@ export interface TodoState {
   setSearchQuery: (value: string) => void;
   setSortMode: (value: 'manual' | 'time') => void;
   categories: Category[];
-  categoryLabels: Record<Category, string>;
+  categoryLabels: Record<Category, TranslationKey>;
 }
 
 const EMPTY_PENDING: PendingMutations = {
@@ -141,7 +142,7 @@ export function useTodos(
       return;
     }
     if (error instanceof ApiError && error.kind === 'business') {
-      setBusinessError(error.message);
+      setBusinessError(error.code);
       return;
     }
     onInfrastructureError(new InfrastructureError(

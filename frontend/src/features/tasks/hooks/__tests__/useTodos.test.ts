@@ -147,7 +147,7 @@ describe('useTodos database-first mutations', () => {
     });
 
     expect(result.current.allTasks).toEqual([original]);
-    expect(result.current.businessError).toBe('任务内容无效');
+    expect(result.current.businessError).toBe('INVALID_TASK');
     expect(onInfrastructureError).not.toHaveBeenCalled();
   });
 
@@ -368,7 +368,7 @@ describe('useTodos database-first mutations', () => {
       await result.current.editTask(original.id, { text: 'Rejected' });
     });
 
-    expect(result.current.businessError).toBe('Strict failure');
+    expect(result.current.businessError).toBe('INVALID_TASK');
     expect(result.current.pending.taskMutations.has(original.id)).toBe(false);
     expect(result.current.allTasks).toEqual([original]);
   });
@@ -621,7 +621,7 @@ describe('useTodos database-first mutations', () => {
 
     expect(cleared).toBe(1);
     expect(result.current.allTasks.map(item => item.id)).toEqual(['active', 'done-2']);
-    expect(result.current.businessError).toBe('无法删除');
+    expect(result.current.businessError).toBe('DELETE_FAILED');
     expect(result.current.pending.clearCompleted).toBe(false);
     expect(result.current.pending.taskMutations.size).toBe(0);
   });

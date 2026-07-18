@@ -1,16 +1,17 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AchievementDef, AchievementState } from '@/shared/types';
-
-export const ACHIEVEMENTS: AchievementDef[] = [
-  { id: 'first-task', name: '初出茅庐', description: '完成你的第一个任务', icon: '🌱' },
-  { id: 'speed-demon', name: '效率达人', description: '一天内完成10个任务', icon: '⚡' },
-  { id: 'streak-7', name: '永不言弃', description: '连续7天完成任务', icon: '🔥' },
-];
+import { useI18n } from '@/features/i18n/I18nProvider';
 
 export function useAchievements(
   initialState: AchievementState,
   onUnlockSound?: () => void,
 ) {
+  const { t } = useI18n();
+  const achievements = useMemo<AchievementDef[]>(() => [
+    { id: 'first-task', name: t('achievement.first.name'), description: t('achievement.first.desc'), icon: '🌱' },
+    { id: 'speed-demon', name: t('achievement.speed.name'), description: t('achievement.speed.desc'), icon: '⚡' },
+    { id: 'streak-7', name: t('achievement.streak.name'), description: t('achievement.streak.desc'), icon: '🔥' },
+  ], [t]);
   const [state, setState] = useState(initialState);
   const [toast, setToast] = useState<AchievementDef | null>(null);
   const toastTimerRef = useRef<number | null>(null);
@@ -28,13 +29,19 @@ export function useAchievements(
     if (toastTimerRef.current !== null) clearTimeout(toastTimerRef.current);
   }, []);
 
+  useEffect(() => {
+    setToast(current => (
+      current ? achievements.find(item => item.id === current.id) ?? null : null
+    ));
+  }, [achievements]);
+
   const applyCompletion = useCallback((
     achievementState: AchievementState,
     newlyUnlocked: string[],
   ) => {
     setState(achievementState);
     const achievement = newlyUnlocked
-      .map(id => ACHIEVEMENTS.find(definition => definition.id === id))
+      .map(id => achievements.find(definition => definition.id === id))
       .find((definition): definition is AchievementDef => definition !== undefined);
     if (!achievement) return;
 
@@ -42,7 +49,7 @@ export function useAchievements(
     onUnlockSound?.();
     if (toastTimerRef.current !== null) clearTimeout(toastTimerRef.current);
     toastTimerRef.current = window.setTimeout(() => setToast(null), 3_000);
-  }, [onUnlockSound]);
+  }, [achievements, onUnlockSound]);
 
   const dismissToast = useCallback(() => {
     setToast(null);
@@ -57,6 +64,6 @@ export function useAchievements(
     toast,
     dismissToast,
     applyCompletion,
-    allAchievements: ACHIEVEMENTS,
+    allAchievements: achievements,
   };
 }

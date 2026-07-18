@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import type { TimeField } from '@/shared/types';
 import '../styles/TimePicker.css';
+import { useI18n } from '@/features/i18n/I18nProvider';
 
 interface TimePickerProps {
   time?: TimeField;
@@ -71,6 +72,7 @@ function TimeScroller({ value, onChange, options }: { value: string; onChange: (
 }
 
 function TimePicker({ time, onTimeChange, onClose }: TimePickerProps) {
+  const { t, locale } = useI18n();
   const [mode, setMode] = useState<'point' | 'range'>(time?.end ? 'range' : 'point');
   const startParsed = parseStart(time?.start || '');
   const endParsed = parseEnd(time?.end || '', startParsed);
@@ -144,19 +146,30 @@ function TimePicker({ time, onTimeChange, onClose }: TimePickerProps) {
       date.year === today.getFullYear() && date.month === today.getMonth() && day === today.getDate();
     const isSelected = (day: number) => day === date.day;
 
-    const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
-    const monthNames = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+    const weekDays = locale === 'zh-CN'
+      ? [
+          t('time.weekdaySun'), t('time.weekdayMon'), t('time.weekdayTue'),
+          t('time.weekdayWed'), t('time.weekdayThu'), t('time.weekdayFri'),
+          t('time.weekdaySat'),
+        ]
+      : Array.from({ length: 7 }, (_, day) => (
+          new Intl.DateTimeFormat(locale, { weekday: 'short' }).format(new Date(2026, 5, 7 + day))
+        ));
+    const monthName = locale === 'zh-CN'
+      ? t('time.monthTitle', { year: date.year, month: date.month + 1 })
+      : new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' })
+          .format(new Date(date.year, date.month, 1));
 
     return (
       <div className="calendar">
         <div className="calendar-header">
-          <button className="calendar-nav" onClick={() => onMonthChange(-1)} aria-label="上个月">
+          <button className="calendar-nav" onClick={() => onMonthChange(-1)} aria-label={t('time.previousMonth')}>
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
             </svg>
           </button>
-          <span className="calendar-title">{date.year}年 {monthNames[date.month]}</span>
-          <button className="calendar-nav" onClick={() => onMonthChange(1)} aria-label="下个月">
+          <span className="calendar-title">{monthName}</span>
+          <button className="calendar-nav" onClick={() => onMonthChange(1)} aria-label={t('time.nextMonth')}>
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
             </svg>
@@ -196,26 +209,26 @@ function TimePicker({ time, onTimeChange, onClose }: TimePickerProps) {
           className={`time-mode-btn${mode === 'point' ? ' active' : ''}`}
           onClick={() => setMode('point')}
         >
-          时间点
+          {t('time.point')}
         </button>
         <button
           className={`time-mode-btn${mode === 'range' ? ' active' : ''}`}
           onClick={() => setMode('range')}
         >
-          时间段
+          {t('time.range')}
         </button>
       </div>
 
       <div className="time-picker-body">
         <div className="time-section">
-          <label className="time-section-label">开始时间</label>
+          <label className="time-section-label">{t('time.start')}</label>
           {renderCalendar(startDate, (day) => handleDateSelect(day, false), (delta) => handleMonthChange(delta, false))}
           {renderTimeScroller(startHour, startMinute, setStartHour, setStartMinute)}
         </div>
 
         {mode === 'range' && (
           <div className="time-section">
-            <label className="time-section-label">结束时间</label>
+            <label className="time-section-label">{t('time.end')}</label>
             {renderCalendar(endDate, (day) => handleDateSelect(day, true), (delta) => handleMonthChange(delta, true))}
             {renderTimeScroller(endHour, endMinute, setEndHour, setEndMinute)}
           </div>
@@ -224,10 +237,10 @@ function TimePicker({ time, onTimeChange, onClose }: TimePickerProps) {
 
       <div className="time-picker-footer">
         <button className="time-btn-clear" onClick={handleClear}>
-          清除
+          {t('time.clear')}
         </button>
         <button className="time-btn-confirm" onClick={handleConfirm}>
-          确认
+          {t('common.confirm')}
         </button>
       </div>
     </div>

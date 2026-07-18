@@ -6,8 +6,7 @@ import { formatTimeField } from '../lib/formatTime';
 import type { Proximity } from '../lib/timeProximity';
 import '../styles/TaskItem.css';
 import '../styles/DragDrop.css';
-
-const formatTimeTag = formatTimeField;
+import { useI18n } from '@/features/i18n/I18nProvider';
 
 interface TaskItemProps {
   task: Todo;
@@ -28,8 +27,6 @@ interface TaskItemProps {
   onDrop?: (e: React.DragEvent, id: string) => void;
   onDragEnd?: () => void;
 }
-
-const priorityLabels = PRIORITY_LABELS;
 
 function TaskItem({
   task,
@@ -53,6 +50,7 @@ function TaskItem({
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(task.text);
   const confirm = useConfirm();
+  const { t, locale } = useI18n();
   const editInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -109,14 +107,14 @@ function TaskItem({
     e.stopPropagation();
     if (deletePending) return;
     const ok = await confirm({
-      title: '删除任务',
-      message: `确定要删除任务「${task.text}」吗？`,
-      confirmText: '删除',
+      title: t('task.deleteTitle'),
+      message: t('task.deleteMessage', { task: task.text }),
+      confirmText: t('common.delete'),
       danger: true,
     });
     if (!ok) return;
     await onDelete(task.id);
-  }, [confirm, deletePending, onDelete, task.id, task.text]);
+  }, [confirm, deletePending, onDelete, t, task.id, task.text]);
 
   const isDragging = draggingId === task.id;
   const isOver = overId === task.id && draggingId !== task.id;
@@ -148,7 +146,7 @@ function TaskItem({
           type="button"
           className="checkbox-wrap"
           onClick={handleToggle}
-          aria-label={task.completed ? '标记为未完成' : '标记为已完成'}
+          aria-label={task.completed ? t('task.markActive') : t('task.markCompleted')}
           aria-pressed={task.completed}
           disabled={togglePending}
         >
@@ -181,18 +179,18 @@ function TaskItem({
         )}
 
         {task.time && (
-          <span className="time-tag" title={formatTimeTag(task.time)}>
+          <span className="time-tag" title={formatTimeField(task.time, locale)}>
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
             </svg>
-            <span>{formatTimeTag(task.time)}</span>
+            <span>{formatTimeField(task.time, locale)}</span>
           </span>
         )}
 
         <button
           type="button"
           className="btn-edit"
-          aria-label="编辑任务"
+          aria-label={t('task.edit')}
           onClick={handleEditButtonClick}
           disabled={editPending}
         >
@@ -204,7 +202,7 @@ function TaskItem({
         <button
           type="button"
           className="btn-delete"
-          aria-label="删除任务"
+          aria-label={t('task.delete')}
           onClick={handleDelete}
           disabled={deletePending}
         >
@@ -221,11 +219,11 @@ function TaskItem({
       {hasSubRow && (
         <div className="task-item__sub">
           <span className={`priority-tag priority-${task.priority}`}>
-            {priorityLabels[task.priority]}
+            {t(PRIORITY_LABELS[task.priority])}
           </span>
           {task.category && (
             <span className={`category-tag category-${task.category}`}>
-              {CATEGORY_LABELS[task.category] || task.category}
+              {t(CATEGORY_LABELS[task.category])}
             </span>
           )}
           {task.notes && (

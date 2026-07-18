@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { BootstrapSnapshot, TodoApi } from '@/shared/api/contracts';
 import StartupGate from '../StartupGate';
+import { I18nProvider } from '@/features/i18n/I18nProvider';
 
 const READY_STATE = {
   status: 'ready' as const,
@@ -67,5 +68,16 @@ describe('StartupGate', () => {
     );
 
     expect(screen.getByText('application')).toBeInTheDocument();
+  });
+
+  it('renders startup copy in English when requested', () => {
+    render(
+      <I18nProvider language="en">
+        <StartupGate state={{ status: 'loading' }} onRetry={vi.fn()}>
+          <div>application</div>
+        </StartupGate>
+      </I18nProvider>,
+    );
+    expect(screen.getByRole('status')).toHaveTextContent('Starting local service');
   });
 });

@@ -1,18 +1,19 @@
 import type { Category, Priority } from './types';
+import type { TranslationKey } from '@/features/i18n/translations';
 
 export const CATEGORIES: Category[] = ['work', 'study', 'life', 'other'];
 
-export const CATEGORY_LABELS: Record<Category, string> = {
-  work: '工作',
-  study: '学习',
-  life: '生活',
-  other: '其他',
+export const CATEGORY_LABELS: Record<Category, TranslationKey> = {
+  work: 'category.work',
+  study: 'category.study',
+  life: 'category.life',
+  other: 'category.other',
 };
 
-export const PRIORITY_LABELS: Record<Priority, string> = {
-  low: '低',
-  medium: '中',
-  high: '高',
+export const PRIORITY_LABELS: Record<Priority, TranslationKey> = {
+  low: 'priority.low',
+  medium: 'priority.medium',
+  high: 'priority.high',
 };
 
 export const PRIORITIES: Priority[] = ['low', 'medium', 'high'];

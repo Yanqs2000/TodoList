@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { DEFAULT_SHORTCUT } from '../hooks/useDesktop';
 import { THEME_IDS, THEMES, type ThemeId } from '@/features/theme/hooks/useTheme';
 import '../styles/SettingsModal.css';
+import { useI18n } from '@/features/i18n/I18nProvider';
 
 interface SettingsModalProps {
   open: boolean;
@@ -105,6 +106,7 @@ function SettingsModal({
   currentTheme,
   onSelectTheme,
 }: SettingsModalProps) {
+  const { t, errorText } = useI18n();
   const modalRef = useRef<HTMLDivElement>(null);
   const [recording, setRecording] = useState(false);
   const [pendingShortcut, setPendingShortcut] = useState<string | null>(null);
@@ -159,9 +161,9 @@ function SettingsModal({
     if (result.ok) {
       setPendingShortcut(null);
     } else {
-      setError(result.error);
+      setError(errorText(result.error));
     }
-  }, [pendingShortcut, onSetShortcut]);
+  }, [errorText, pendingShortcut, onSetShortcut]);
 
   const handleReset = useCallback(async () => {
     setError(null);
@@ -169,15 +171,15 @@ function SettingsModal({
     if (result.ok) {
       setPendingShortcut(null);
     } else {
-      setError(result.error);
+      setError(errorText(result.error));
     }
-  }, [onSetShortcut]);
+  }, [errorText, onSetShortcut]);
 
   const handleToggleAutostart = useCallback(async () => {
     setError(null);
     const result = await onToggleAutostart();
-    if (!result.ok) setError(result.error);
-  }, [onToggleAutostart]);
+    if (!result.ok) setError(errorText(result.error));
+  }, [errorText, onToggleAutostart]);
 
   if (!open) return null;
 
@@ -191,15 +193,15 @@ function SettingsModal({
         ref={modalRef}
         role="dialog"
         aria-modal="true"
-        aria-label="设置"
+        aria-label={t('settings.title')}
       >
         <header className="settings-modal__header">
-          <h2 className="settings-modal__title">设置</h2>
+          <h2 className="settings-modal__title">{t('settings.title')}</h2>
           <button
             type="button"
             className="settings-modal__close"
             onClick={onClose}
-            aria-label="关闭"
+            aria-label={t('common.close')}
           >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -207,10 +209,9 @@ function SettingsModal({
           </button>
         </header>
 
-        {/* ---------- 主题 ---------- */}
         <section className="settings-modal__section">
-          <div className="settings-modal__section-title">外观主题</div>
-          <div className="settings-modal__section-desc">3 种风格 × 2 种明暗 = 6 套主题</div>
+          <div className="settings-modal__section-title">{t('settings.appearance')}</div>
+          <div className="settings-modal__section-desc">{t('settings.appearanceDesc')}</div>
           <div className="settings-modal__theme-grid">
             {THEME_IDS.map((id) => {
               const meta = THEMES[id];
@@ -236,8 +237,8 @@ function SettingsModal({
                       style={{ background: meta.swatch.accent, right: 8 }}
                     />
                   </div>
-                  <div className="settings-modal__theme-name">{meta.name}</div>
-                  <div className="settings-modal__theme-desc">{meta.description}</div>
+                  <div className="settings-modal__theme-name">{t(meta.name)}</div>
+                  <div className="settings-modal__theme-desc">{t(meta.description)}</div>
                   {active && (
                     <span className="settings-modal__theme-check">
                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
@@ -251,21 +252,20 @@ function SettingsModal({
           </div>
         </section>
 
-        {/* ---------- 桌面 ---------- */}
         <section className="settings-modal__section">
-          <div className="settings-modal__section-title">桌面</div>
+          <div className="settings-modal__section-title">{t('settings.desktop')}</div>
           {!isDesktop && (
             <p className="settings-modal__hint">
-              桌面专属设置仅在 Tauri 桌面版本中可用。当前为 Web 版，下方设置已禁用。
+              {t('settings.webOnly')}
             </p>
           )}
 
           <div className="settings-modal__row">
             <div>
-              <div className="settings-modal__label">全局快捷键</div>
+              <div className="settings-modal__label">{t('settings.shortcut')}</div>
               <div className="settings-modal__desc">
-                在任意应用按下此组合，可快速弹出新建任务
-                {IS_MAC && '（macOS 的 Option = ⌥）'}
+                {t('settings.shortcutDesc')}
+                {IS_MAC && t('settings.macOption')}
               </div>
             </div>
             <div className="settings-modal__shortcut">
@@ -275,11 +275,11 @@ function SettingsModal({
                 onClick={() => isDesktop && setRecording(true)}
                 disabled={!isDesktop}
               >
-                {recording ? '请按下组合键…' : formatShortcut(displayShortcut)}
+                {recording ? t('settings.recording') : formatShortcut(displayShortcut)}
               </button>
               {hasPending && (
                 <button type="button" className="settings-modal__btn" onClick={handleApply}>
-                  应用
+                  {t('settings.apply')}
                 </button>
               )}
               <button
@@ -288,7 +288,7 @@ function SettingsModal({
                 onClick={handleReset}
                 disabled={!isDesktop || (shortcut === DEFAULT_SHORTCUT && !pendingShortcut)}
               >
-                恢复默认
+                {t('settings.restore')}
               </button>
             </div>
           </div>
@@ -296,8 +296,8 @@ function SettingsModal({
 
           <div className="settings-modal__row">
             <div>
-              <div className="settings-modal__label">开机自动启动</div>
-              <div className="settings-modal__desc">登录系统时自动后台运行 Todo List</div>
+              <div className="settings-modal__label">{t('settings.autostart')}</div>
+              <div className="settings-modal__desc">{t('settings.autostartDesc')}</div>
             </div>
             <label className={`settings-modal__switch${autostartEnabled ? ' settings-modal__switch--on' : ''}${!isDesktop ? ' settings-modal__switch--disabled' : ''}`}>
               <input
@@ -305,7 +305,7 @@ function SettingsModal({
                 checked={autostartEnabled}
                 onChange={() => { void handleToggleAutostart(); }}
                 disabled={!isDesktop}
-                aria-label="开机自启动"
+                aria-label={t('settings.autostartLabel')}
               />
               <span className="settings-modal__switch-knob" />
             </label>

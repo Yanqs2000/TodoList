@@ -1,10 +1,12 @@
 import type { Category, FilterType } from '@/shared/types';
 import ProgressRing from '@/features/stats/components/ProgressRing';
+import { useI18n } from '@/features/i18n/I18nProvider';
+import type { TranslationKey } from '@/features/i18n/translations';
 import '../styles/Sidebar.css';
 
 interface SidebarProps {
   categories: Category[];
-  categoryLabels: Record<Category, string>;
+  categoryLabels: Record<Category, TranslationKey>;
   categoryFilter: Category | 'all';
   setCategoryFilter: (c: Category | 'all') => void;
   filter: FilterType;
@@ -16,10 +18,10 @@ interface SidebarProps {
   setSearchQuery: (q: string) => void;
 }
 
-const STATUS_TABS: { value: FilterType; label: string }[] = [
-  { value: 'all', label: '全部' },
-  { value: 'active', label: '进行中' },
-  { value: 'completed', label: '已完成' },
+const STATUS_TABS: { value: FilterType; label: TranslationKey }[] = [
+  { value: 'all', label: 'sidebar.all' },
+  { value: 'active', label: 'sidebar.active' },
+  { value: 'completed', label: 'sidebar.completed' },
 ];
 
 const ICON_PROPS = {
@@ -85,9 +87,10 @@ function Sidebar({
   searchQuery,
   setSearchQuery,
 }: SidebarProps) {
+  const { t } = useI18n();
   const navItems: { value: Category | 'all'; label: string; count?: number }[] = [
-    { value: 'all', label: '全部', count: stats.total },
-    ...categories.map((c) => ({ value: c, label: categoryLabels[c] })),
+    { value: 'all', label: t('sidebar.all'), count: stats.total },
+    ...categories.map((c) => ({ value: c, label: t(categoryLabels[c]) })),
   ];
 
   return (
@@ -106,15 +109,15 @@ function Sidebar({
         </svg>
         <input
           type="text"
-          placeholder="搜索任务..."
+          placeholder={t('sidebar.search')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          aria-label="搜索任务"
+          aria-label={t('sidebar.searchLabel')}
         />
       </div>
 
       <section className="sidebar__section">
-        <nav className="sidebar__nav" aria-label="分类导航">
+        <nav className="sidebar__nav" aria-label={t('sidebar.categoryNav')}>
           {navItems.map((item) => {
             const active = categoryFilter === item.value;
             return (
@@ -139,7 +142,7 @@ function Sidebar({
       </section>
 
       <section className="sidebar__section">
-        <div className="sidebar__filter" role="group" aria-label="状态过滤">
+        <div className="sidebar__filter" role="group" aria-label={t('sidebar.statusFilter')}>
           {STATUS_TABS.map((tab) => {
             const active = filter === tab.value;
             return (
@@ -150,7 +153,7 @@ function Sidebar({
                 onClick={() => setFilter(tab.value)}
                 aria-pressed={active}
               >
-                {tab.label}
+                {t(tab.label)}
               </button>
             );
           })}
@@ -160,7 +163,7 @@ function Sidebar({
       <div className="sidebar__progress">
         <ProgressRing current={todayCompleted} goal={dailyGoal} size={48} strokeWidth={4} />
         <span className="sidebar__progress-text">
-          今日 {todayCompleted} / {dailyGoal}
+          {t('sidebar.todayGoal', { completed: todayCompleted, goal: dailyGoal })}
         </span>
       </div>
     </aside>

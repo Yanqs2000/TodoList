@@ -21,7 +21,7 @@ interface BootstrapController {
 
 type BackendCommand = 'get_backend_connection' | 'retry_backend';
 
-const BACKEND_UNAVAILABLE_MESSAGE = '本地后端不可用，请重试。';
+const BACKEND_UNAVAILABLE_MESSAGE = 'BACKEND_UNAVAILABLE';
 const defaultFetch: typeof fetch = (...args) => fetch(...args);
 
 export function isTauriRuntime(): boolean {

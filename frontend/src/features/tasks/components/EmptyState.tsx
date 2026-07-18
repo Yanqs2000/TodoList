@@ -1,5 +1,6 @@
 import type { FilterType } from '@/shared/types';
 import '../styles/EmptyState.css';
+import { useI18n } from '@/features/i18n/I18nProvider';
 
 interface EmptyStateProps {
   filter: FilterType;
@@ -7,15 +8,16 @@ interface EmptyStateProps {
 }
 
 function EmptyState({ filter, hasAnyTasks = false }: EmptyStateProps) {
+  const { t } = useI18n();
   let message: string;
   if (!hasAnyTasks) {
-    message = '还没有任务，添加一个吧';
+    message = t('empty.none');
   } else if (filter === 'active') {
-    message = '所有任务都完成了！';
+    message = t('empty.active');
   } else if (filter === 'completed') {
-    message = '还没有已完成的任务';
+    message = t('empty.completed');
   } else {
-    message = '没有匹配的任务';
+    message = t('empty.search');
   }
 
   return (

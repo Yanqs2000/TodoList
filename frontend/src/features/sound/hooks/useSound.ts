@@ -79,7 +79,7 @@ export function useSound(
     setTimeout(() => playTone(1047, 0.2, 'sine', 0.12), 300);
   }, [playTone]);
 
-  // ~5s 柔和提醒：5 次双音钟声（C5+E5），每次 ~1s 间隔
+  // Gentle ~5s reminder: five C5+E5 chimes roughly one second apart.
   const playReminder = useCallback(() => {
     for (let i = 0; i < 5; i++) {
       const delay = i * 1000;

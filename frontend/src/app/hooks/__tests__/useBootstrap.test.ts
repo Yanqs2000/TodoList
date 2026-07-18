@@ -144,7 +144,7 @@ describe('useBootstrap', () => {
 
     expect(result.current.state).toEqual({
       status: 'blocked',
-      message: '本地后端不可用，请重试。',
+      message: 'BACKEND_UNAVAILABLE',
     });
   });
 
@@ -162,7 +162,7 @@ describe('useBootstrap', () => {
 
     expect(result.current.state).toEqual({
       status: 'blocked',
-      message: '本地后端不可用，请重试。',
+      message: 'BACKEND_UNAVAILABLE',
     });
   });
 
@@ -224,7 +224,7 @@ describe('useBootstrap', () => {
     act(() => recoveredListener?.());
     expect(result.current.state).toEqual({
       status: 'blocked',
-      message: '本地后端不可用，请重试。',
+      message: 'BACKEND_UNAVAILABLE',
     });
   });
 

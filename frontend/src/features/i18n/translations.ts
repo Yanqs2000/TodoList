@@ -6,6 +6,7 @@ const zhCN = {
   'header.soundOn': '开启音效', 'header.soundOff': '关闭音效', 'header.achievements': '成就',
   'header.settings': '设置', 'header.settingsTitle': '设置（外观、桌面、快捷键）',
   'header.switchToEnglish': '切换为英文', 'header.switchToChinese': '切换为中文',
+  'header.chineseLabel': '中文',
   'sidebar.all': '全部', 'sidebar.active': '进行中', 'sidebar.completed': '已完成',
   'sidebar.search': '搜索任务...', 'sidebar.searchLabel': '搜索任务', 'sidebar.categoryNav': '分类导航',
   'sidebar.statusFilter': '状态过滤', 'sidebar.todayGoal': '今日 {completed} / {goal}',
@@ -34,6 +35,9 @@ const zhCN = {
   'detail.notesPlaceholder': '添加备注…',
   'time.previousMonth': '上个月', 'time.nextMonth': '下个月', 'time.point': '时间点',
   'time.range': '时间段', 'time.start': '开始时间', 'time.end': '结束时间', 'time.clear': '清除',
+  'time.monthTitle': '{year}年 {month}月', 'time.weekdaySun': '日', 'time.weekdayMon': '一',
+  'time.weekdayTue': '二', 'time.weekdayWed': '三', 'time.weekdayThu': '四',
+  'time.weekdayFri': '五', 'time.weekdaySat': '六',
   'settings.title': '设置', 'settings.appearance': '外观主题',
   'settings.appearanceDesc': '3 种风格 × 2 种明暗 = 6 套主题', 'settings.desktop': '桌面',
   'settings.webOnly': '桌面专属设置仅在 Tauri 桌面版本中可用。当前为 Web 版，下方设置已禁用。',
@@ -64,6 +68,7 @@ const zhCN = {
   'startup.failed': '暂时无法打开应用', 'startup.retry': '重试',
   'errors.backendUnavailable': '本地后端不可用，请重试。', 'errors.invalidRequest': '请求无效。',
   'errors.notFound': '未找到目标内容。', 'errors.conflict': '操作冲突，请重试。',
+  'errors.taskNotFound': '未找到该任务。', 'errors.invalidTaskOrder': '任务排序无效。',
   'errors.generic': '操作失败，请重试。',
   'category.work': '工作', 'category.study': '学习', 'category.life': '生活', 'category.other': '其他',
   'priority.low': '低', 'priority.medium': '中', 'priority.high': '高',
@@ -77,6 +82,7 @@ const en: Record<TranslationKey, string> = {
   'header.soundOn': 'Turn sound on', 'header.soundOff': 'Turn sound off', 'header.achievements': 'Achievements',
   'header.settings': 'Settings', 'header.settingsTitle': 'Settings (appearance, desktop, shortcuts)',
   'header.switchToEnglish': 'Switch to English', 'header.switchToChinese': 'Switch to Chinese',
+  'header.chineseLabel': '中文',
   'sidebar.all': 'All', 'sidebar.active': 'Active', 'sidebar.completed': 'Completed',
   'sidebar.search': 'Search tasks...', 'sidebar.searchLabel': 'Search tasks', 'sidebar.categoryNav': 'Category navigation',
   'sidebar.statusFilter': 'Status filter', 'sidebar.todayGoal': 'Today {completed} / {goal}',
@@ -105,6 +111,9 @@ const en: Record<TranslationKey, string> = {
   'detail.notesPlaceholder': 'Add notes…',
   'time.previousMonth': 'Previous month', 'time.nextMonth': 'Next month', 'time.point': 'Single time',
   'time.range': 'Time range', 'time.start': 'Start time', 'time.end': 'End time', 'time.clear': 'Clear',
+  'time.monthTitle': '{month} {year}', 'time.weekdaySun': 'Sun', 'time.weekdayMon': 'Mon',
+  'time.weekdayTue': 'Tue', 'time.weekdayWed': 'Wed', 'time.weekdayThu': 'Thu',
+  'time.weekdayFri': 'Fri', 'time.weekdaySat': 'Sat',
   'settings.title': 'Settings', 'settings.appearance': 'Appearance',
   'settings.appearanceDesc': '3 styles × light and dark = 6 themes', 'settings.desktop': 'Desktop',
   'settings.webOnly': 'Desktop settings are available only in the Tauri app. They are disabled in the web version.',
@@ -135,6 +144,7 @@ const en: Record<TranslationKey, string> = {
   'startup.failed': 'Unable to open the app', 'startup.retry': 'Retry',
   'errors.backendUnavailable': 'The local backend is unavailable. Please try again.', 'errors.invalidRequest': 'Invalid request.',
   'errors.notFound': 'The requested item was not found.', 'errors.conflict': 'The operation conflicted. Please try again.',
+  'errors.taskNotFound': 'The task was not found.', 'errors.invalidTaskOrder': 'The task order is invalid.',
   'errors.generic': 'Something went wrong. Please try again.',
   'category.work': 'Work', 'category.study': 'Study', 'category.life': 'Life', 'category.other': 'Other',
   'priority.low': 'Low', 'priority.medium': 'Medium', 'priority.high': 'High',
@@ -157,7 +167,9 @@ export function localeFor(language: Language): string {
 }
 
 const errorKeys: Record<string, TranslationKey> = {
-  INVALID_REQUEST: 'errors.invalidRequest', NOT_FOUND: 'errors.notFound', CONFLICT: 'errors.conflict',
+  INVALID_REQUEST: 'errors.invalidRequest', INVALID_TASK: 'errors.invalidRequest',
+  TASK_NOT_FOUND: 'errors.taskNotFound', NOT_FOUND: 'errors.notFound',
+  INVALID_TASK_ORDER: 'errors.invalidTaskOrder', CONFLICT: 'errors.conflict',
 };
 
 export function translationForError(language: Language, code: string): string {

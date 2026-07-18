@@ -7,6 +7,8 @@ import '../styles/TaskList.css';
 import TaskItem from './TaskItem';
 import EmptyState from './EmptyState';
 import DayTimeline from './DayTimeline';
+import { useI18n } from '@/features/i18n/I18nProvider';
+import type { TranslationKey } from '@/features/i18n/translations';
 
 interface TaskListProps {
   tasks: Todo[];
@@ -29,7 +31,7 @@ interface TaskListProps {
 
 interface TaskGroup {
   key: string;
-  label: string;
+  label: TranslationKey;
   items: Todo[];
 }
 
@@ -43,15 +45,17 @@ function groupByProximity(tasks: Todo[], now: number): TaskGroup[] {
     else if (p === 'future') buckets.future.push(t);
     else buckets.unscheduled.push(t);
   }
-  return [
-    { key: 'overdue', label: '已过期', items: buckets.overdue },
-    { key: 'today', label: '今天', items: buckets.today },
-    { key: 'future', label: '以后', items: buckets.future },
-    { key: 'unscheduled', label: '待安排', items: buckets.unscheduled },
-  ].filter(g => g.items.length > 0);
+  const groups: TaskGroup[] = [
+    { key: 'overdue', label: 'group.overdue', items: buckets.overdue },
+    { key: 'today', label: 'group.today', items: buckets.today },
+    { key: 'future', label: 'group.future', items: buckets.future },
+    { key: 'unscheduled', label: 'group.unscheduled', items: buckets.unscheduled },
+  ];
+  return groups.filter(g => g.items.length > 0);
 }
 
 function TaskList({ tasks, filter, hasAnyTasks, sortMode, onToggleSortMode, onToggle, onDelete, onEdit, onReorder, pendingMutations = new Map(), reorderPending = false, reorderDisabled = false, selectedTaskId, onSelectTask, now: nowProp }: TaskListProps) {
+  const { t } = useI18n();
   const drag = useDragDrop(onReorder);
   const [nowState, setNowState] = useState(() => Date.now());
   useEffect(() => {
@@ -109,22 +113,22 @@ function TaskList({ tasks, filter, hasAnyTasks, sortMode, onToggleSortMode, onTo
           onClick={() => onToggleSortMode('manual')}
           aria-pressed={sortMode === 'manual'}
         >
-          手动排序
+          {t('sort.manual')}
         </button>
         <button
           className={`sort-btn${sortMode === 'time' ? ' active' : ''}`}
           onClick={() => onToggleSortMode('time')}
           aria-pressed={sortMode === 'time'}
         >
-          按时间排序
+          {t('sort.time')}
         </button>
       </div>
       {grouped ? (
         grouped.map(group => (
-          <div key={group.key} className="task-group" role="group" aria-label={group.label}>
+          <div key={group.key} className="task-group" role="group" aria-label={t(group.label)}>
             <div className="task-group__header">
               <span className={`task-group__dot task-group__dot--${group.key}`} aria-hidden="true" />
-              <span className="task-group__label">{group.label}</span>
+              <span className="task-group__label">{t(group.label)}</span>
               <span className="task-group__count">{group.items.length}</span>
             </div>
             {group.items.map(renderItem)}

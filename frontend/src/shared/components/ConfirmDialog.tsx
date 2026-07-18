@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import './ConfirmDialog.css';
+import { useI18n } from '@/features/i18n/I18nProvider';
 
 export interface ConfirmOptions {
   title: string;
@@ -32,6 +33,7 @@ interface PendingState extends ConfirmOptions {
 }
 
 export function ConfirmProvider({ children }: { children: ReactNode }) {
+  const { t } = useI18n();
   const [pending, setPending] = useState<PendingState | null>(null);
   const resolverRef = useRef<((v: boolean) => void) | null>(null);
 
@@ -84,7 +86,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                 className="confirm__btn confirm__btn--cancel"
                 onClick={() => close(false)}
               >
-                {pending.cancelText ?? '取消'}
+                {pending.cancelText ?? t('common.cancel')}
               </button>
               <button
                 type="button"
@@ -93,7 +95,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                 // Autofocus so Enter confirms; Esc cancels (handled above).
                 ref={(el) => el?.focus()}
               >
-                {pending.confirmText ?? '确定'}
+                {pending.confirmText ?? t('common.confirm')}
               </button>
             </div>
           </div>

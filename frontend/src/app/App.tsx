@@ -26,8 +26,10 @@ import { useDesktop } from '@/features/desktop/hooks/useDesktop';
 import SettingsModal from '@/features/desktop/components/SettingsModal';
 import StartupGate from './components/StartupGate';
 import { useBootstrap } from './hooks/useBootstrap';
-import { I18nProvider } from '@/features/i18n/I18nProvider';
+import { I18nProvider, useI18n } from '@/features/i18n/I18nProvider';
 import { useLanguage } from '@/features/i18n/hooks/useLanguage';
+import type { Language } from '@/features/i18n/translations';
+import { ConfirmProvider } from '@/shared/components/ConfirmDialog';
 import './styles/App.css';
 
 interface InfoToastState {
@@ -41,7 +43,14 @@ interface TodoApplicationProps {
   onInfrastructureError: (error: InfrastructureError) => void;
 }
 
-function TodoApplication({ snapshot, api, onInfrastructureError }: TodoApplicationProps) {
+interface TodoApplicationContentProps extends TodoApplicationProps {
+  language: Language;
+  setLanguage: (language: Language) => Promise<boolean>;
+  languagePending: boolean;
+}
+
+function TodoApplicationContent({ snapshot, api, onInfrastructureError, language, setLanguage, languagePending }: TodoApplicationContentProps) {
+  const { t, errorText } = useI18n();
   const todoState = useTodos(snapshot.tasks, api, onInfrastructureError);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -62,7 +71,7 @@ function TodoApplication({ snapshot, api, onInfrastructureError }: TodoApplicati
       return;
     }
     if (error instanceof ApiError && error.kind === 'business') {
-      showInfo(error.message, 'error');
+      showInfo(errorText(error.code), 'error');
       return;
     }
     onInfrastructureError(new InfrastructureError(
@@ -70,9 +79,7 @@ function TodoApplication({ snapshot, api, onInfrastructureError }: TodoApplicati
       'UNEXPECTED_CLIENT_ERROR',
       'Unexpected backend error',
     ));
-  }, [onInfrastructureError, showInfo]);
-
-  const language = useLanguage(snapshot.settings.language, api, handleApplicationError);
+  }, [errorText, onInfrastructureError, showInfo]);
 
   const { theme, setTheme } = useTheme(
     snapshot.settings.theme,
@@ -88,9 +95,9 @@ function TodoApplication({ snapshot, api, onInfrastructureError }: TodoApplicati
 
   useEffect(() => {
     if (!todoState.businessError) return;
-    showInfo(todoState.businessError, 'error');
+    showInfo(errorText(todoState.businessError), 'error');
     todoState.clearBusinessError();
-  }, [showInfo, todoState]);
+  }, [errorText, showInfo, todoState]);
 
   // Cmd+N shortcut for opening create task modal
   useEffect(() => {
@@ -118,10 +125,10 @@ function TodoApplication({ snapshot, api, onInfrastructureError }: TodoApplicati
 
   const handleReminder = useCallback((event: ReminderEvent) => {
     sound.playReminder();
-    showInfo(`⏰ 任务到时间了：${event.text}`, 'success');
+    showInfo(t('feedback.reminder', { task: event.text }), 'success');
     if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
       try {
-        new Notification('Todo List 提醒', {
+        new Notification(t('feedback.notificationTitle'), {
           body: event.text,
           tag: `todo-reminder-${event.taskId}`,
         });
@@ -129,7 +136,7 @@ function TodoApplication({ snapshot, api, onInfrastructureError }: TodoApplicati
         // ignore notification failures (some browsers reject from non-secure contexts)
       }
     }
-  }, [sound]);
+  }, [showInfo, sound, t]);
 
   useReminders(todoState.allTasks, api, handleReminder, handleApplicationError);
 
@@ -174,8 +181,8 @@ function TodoApplication({ snapshot, api, onInfrastructureError }: TodoApplicati
 
   const handleClearCompleted = useCallback(async () => {
     const cleared = await todoState.clearCompleted();
-    if (cleared > 0) showInfo(`已清除 ${cleared} 个已完成任务`, 'success');
-  }, [showInfo, todoState]);
+    if (cleared > 0) showInfo(t('feedback.cleared', { count: cleared }), 'success');
+  }, [showInfo, t, todoState]);
 
   const selectedTask = selectedTaskId
     ? todoState.allTasks.find(t => t.id === selectedTaskId) ?? null
@@ -185,7 +192,6 @@ function TodoApplication({ snapshot, api, onInfrastructureError }: TodoApplicati
   ));
 
   return (
-    <I18nProvider language={language.language}>
     <div className="app-shell">
       <AchievementDrawer
         open={drawerOpen}
@@ -215,7 +221,7 @@ function TodoApplication({ snapshot, api, onInfrastructureError }: TodoApplicati
       />
 
       <div className="sr-only" role="status" aria-live="polite">
-        {achievements.toast ? `成就解锁：${achievements.toast.name} — ${achievements.toast.description}` : ''}
+        {achievements.toast ? t('achievement.unlocked', { name: achievements.toast.name, description: achievements.toast.description }) : ''}
         {infoToast ? infoToast.message : ''}
       </div>
       {achievements.toast && (
@@ -243,8 +249,8 @@ function TodoApplication({ snapshot, api, onInfrastructureError }: TodoApplicati
           onOpenSettings={() => setSettingsOpen(true)}
           muted={sound.muted}
           onToggleMuted={sound.toggleMuted}
-          onToggleLanguage={() => void language.setLanguage(language.language === 'zh-CN' ? 'en' : 'zh-CN')}
-          languagePending={language.pending}
+          onToggleLanguage={() => void setLanguage(language === 'zh-CN' ? 'en' : 'zh-CN')}
+          languagePending={languagePending}
         />
       </div>
 
@@ -306,6 +312,28 @@ function TodoApplication({ snapshot, api, onInfrastructureError }: TodoApplicati
         />
       </aside>
     </div>
+  );
+}
+
+function TodoApplication(props: TodoApplicationProps) {
+  const language = useLanguage(
+    props.snapshot.settings.language,
+    props.api,
+    error => {
+      if (error instanceof InfrastructureError) props.onInfrastructureError(error);
+    },
+  );
+
+  return (
+    <I18nProvider language={language.language}>
+      <ConfirmProvider>
+        <TodoApplicationContent
+          {...props}
+          language={language.language}
+          setLanguage={language.setLanguage}
+          languagePending={language.pending}
+        />
+      </ConfirmProvider>
     </I18nProvider>
   );
 }
