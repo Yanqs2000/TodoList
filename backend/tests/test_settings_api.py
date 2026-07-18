@@ -46,6 +46,7 @@ def test_settings_patch_persists_only_supplied_fields(client: TestClient) -> Non
             "theme": "workspace-light",
             "muted": True,
             "shortcut": "Cmd+Alt+KeyT",
+            "language": "zh-CN",
         }
     }
     assert shortcut.status_code == 200
@@ -53,6 +54,7 @@ def test_settings_patch_persists_only_supplied_fields(client: TestClient) -> Non
         "theme": "mint-dark",
         "muted": True,
         "shortcut": "Cmd+Shift+KeyN",
+        "language": "zh-CN",
     }
     assert restarted.json()["settings"] == shortcut.json()["settings"]
 
@@ -68,6 +70,7 @@ def test_settings_patch_persists_only_supplied_fields(client: TestClient) -> Non
         {"shortcut": "not a shortcut"},
         {"shortcut": "Cmd+"},
         {"shortcut": None},
+        {"language": "fr"},
         {"unknown": True},
     ],
 )
@@ -88,3 +91,28 @@ def test_settings_patch_rejects_invalid_payloads(
     assert response.json() == {
         "error": {"code": "INVALID_REQUEST", "message": "Invalid request"}
     }
+
+
+def test_language_setting_defaults_and_persists(client: TestClient) -> None:
+    headers = {"Authorization": "Bearer test-token"}
+    initialized = client.post(
+        "/api/v1/bootstrap",
+        headers=headers,
+        json={"preferredTheme": "workspace-light"},
+    )
+
+    changed = client.patch(
+        "/api/v1/settings",
+        headers=headers,
+        json={"language": "en"},
+    )
+    restarted = client.post(
+        "/api/v1/bootstrap",
+        headers=headers,
+        json={"preferredTheme": "workspace-dark"},
+    )
+
+    assert initialized.json()["settings"]["language"] == "zh-CN"
+    assert changed.status_code == 200
+    assert changed.json()["settings"]["language"] == "en"
+    assert restarted.json()["settings"]["language"] == "en"

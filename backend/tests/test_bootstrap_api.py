@@ -42,6 +42,7 @@ def test_first_bootstrap_initializes_singletons_and_returns_full_snapshot(
             "theme": "workspace-dark",
             "muted": False,
             "shortcut": "Cmd+Alt+KeyT",
+            "language": "zh-CN",
         },
         "achievementState": {
             "unlocked": [],

@@ -17,6 +17,7 @@ ThemeId = Literal[
     "mint-dark",
     "paper-dark",
 ]
+Language = Literal["zh-CN", "en"]
 LocalDate = Annotated[str, Field(strict=True, pattern=r"^\d{4}-\d{2}-\d{2}$")]
 
 
@@ -104,12 +105,14 @@ class AppSettings(WireModel):
     theme: ThemeId
     muted: bool
     shortcut: Annotated[str, Field(strict=True, min_length=1, max_length=200)]
+    language: Language
 
 
 class SettingsPatchCommand(WireModel):
     theme: ThemeId | None = None
     muted: bool | None = None
     shortcut: Annotated[str, Field(strict=True, min_length=1, max_length=200)] | None = None
+    language: Language | None = None
 
     @field_validator("shortcut")
     @classmethod

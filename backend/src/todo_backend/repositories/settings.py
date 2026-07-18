@@ -16,7 +16,7 @@ class SettingsRepository:
 
     def get(self, connection: sqlite3.Connection) -> AppSettings:
         row = connection.execute(
-            "SELECT theme, muted, shortcut FROM app_settings WHERE id = 1"
+            "SELECT theme, muted, shortcut, language FROM app_settings WHERE id = 1"
         ).fetchone()
         if row is None:
             raise RuntimeError("Application settings are not initialized")
@@ -24,6 +24,7 @@ class SettingsRepository:
             theme=row["theme"],
             muted=bool(row["muted"]),
             shortcut=row["shortcut"],
+            language=row["language"],
         )
 
     def patch(
