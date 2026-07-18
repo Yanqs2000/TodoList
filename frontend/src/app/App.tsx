@@ -26,6 +26,8 @@ import { useDesktop } from '@/features/desktop/hooks/useDesktop';
 import SettingsModal from '@/features/desktop/components/SettingsModal';
 import StartupGate from './components/StartupGate';
 import { useBootstrap } from './hooks/useBootstrap';
+import { I18nProvider } from '@/features/i18n/I18nProvider';
+import { useLanguage } from '@/features/i18n/hooks/useLanguage';
 import './styles/App.css';
 
 interface InfoToastState {
@@ -69,6 +71,8 @@ function TodoApplication({ snapshot, api, onInfrastructureError }: TodoApplicati
       'Unexpected backend error',
     ));
   }, [onInfrastructureError, showInfo]);
+
+  const language = useLanguage(snapshot.settings.language, api, handleApplicationError);
 
   const { theme, setTheme } = useTheme(
     snapshot.settings.theme,
@@ -181,6 +185,7 @@ function TodoApplication({ snapshot, api, onInfrastructureError }: TodoApplicati
   ));
 
   return (
+    <I18nProvider language={language.language}>
     <div className="app-shell">
       <AchievementDrawer
         open={drawerOpen}
@@ -238,6 +243,8 @@ function TodoApplication({ snapshot, api, onInfrastructureError }: TodoApplicati
           onOpenSettings={() => setSettingsOpen(true)}
           muted={sound.muted}
           onToggleMuted={sound.toggleMuted}
+          onToggleLanguage={() => void language.setLanguage(language.language === 'zh-CN' ? 'en' : 'zh-CN')}
+          languagePending={language.pending}
         />
       </div>
 
@@ -299,6 +306,7 @@ function TodoApplication({ snapshot, api, onInfrastructureError }: TodoApplicati
         />
       </aside>
     </div>
+    </I18nProvider>
   );
 }
 
@@ -313,9 +321,11 @@ function App() {
   ) : null;
 
   return (
-    <StartupGate state={bootstrap.state} onRetry={bootstrap.retry}>
-      {application}
-    </StartupGate>
+    <I18nProvider language="zh-CN">
+      <StartupGate state={bootstrap.state} onRetry={bootstrap.retry}>
+        {application}
+      </StartupGate>
+    </I18nProvider>
   );
 }
 

@@ -12,6 +12,7 @@ const READY_STATE = {
       theme: 'workspace-light' as const,
       muted: false,
       shortcut: 'Cmd+Alt+KeyT',
+      language: 'zh-CN',
     },
     achievementState: {
       unlocked: [],

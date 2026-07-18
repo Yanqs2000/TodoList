@@ -7,6 +7,7 @@ const SETTINGS: AppSettings = {
   theme: 'workspace-light',
   muted: true,
   shortcut: 'Cmd+Alt+KeyT',
+  language: 'zh-CN',
 };
 
 function deferred<T>() {

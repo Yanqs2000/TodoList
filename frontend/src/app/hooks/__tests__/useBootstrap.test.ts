@@ -24,6 +24,7 @@ const FIRST_SNAPSHOT: BootstrapSnapshot = {
     theme: 'workspace-dark',
     muted: false,
     shortcut: 'Cmd+Alt+KeyT',
+    language: 'zh-CN',
   },
   achievementState: {
     unlocked: [],

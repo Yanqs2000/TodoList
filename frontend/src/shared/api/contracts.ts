@@ -5,6 +5,7 @@ import type {
   TimeField,
   Todo,
 } from '@/shared/types';
+import type { Language } from '@/features/i18n/translations';
 
 export type ThemeId =
   | 'workspace-light'
@@ -25,6 +26,7 @@ export interface AppSettings {
   theme: ThemeId;
   muted: boolean;
   shortcut: string;
+  language: Language;
 }
 
 export interface BootstrapSnapshot {
@@ -69,6 +71,7 @@ export interface SettingsPatch {
   theme?: ThemeId;
   muted?: boolean;
   shortcut?: string;
+  language?: Language;
 }
 
 export interface TodoApi {
