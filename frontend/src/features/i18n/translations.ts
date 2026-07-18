@@ -1,0 +1,165 @@
+export type Language = 'zh-CN' | 'en';
+
+const zhCN = {
+  'common.cancel': '取消', 'common.confirm': '确定', 'common.close': '关闭', 'common.delete': '删除',
+  'header.newTask': '新建任务', 'header.newTaskTitle': '新建任务 (Cmd+N)',
+  'header.soundOn': '开启音效', 'header.soundOff': '关闭音效', 'header.achievements': '成就',
+  'header.settings': '设置', 'header.settingsTitle': '设置（外观、桌面、快捷键）',
+  'header.switchToEnglish': '切换为英文', 'header.switchToChinese': '切换为中文',
+  'sidebar.all': '全部', 'sidebar.active': '进行中', 'sidebar.completed': '已完成',
+  'sidebar.search': '搜索任务...', 'sidebar.searchLabel': '搜索任务', 'sidebar.categoryNav': '分类导航',
+  'sidebar.statusFilter': '状态过滤', 'sidebar.todayGoal': '今日 {completed} / {goal}',
+  'sort.manual': '手动排序', 'sort.time': '按时间排序',
+  'group.overdue': '已过期', 'group.today': '今天', 'group.future': '以后', 'group.unscheduled': '待安排',
+  'timeline.overdue': '已过期', 'timeline.soon': '即将', 'timeline.today': '今天',
+  'timeline.future': '以后', 'timeline.none': '无时间', 'timeline.title': '今日时间轴',
+  'timeline.unscheduledTitle': '未设定时间的任务', 'timeline.unscheduled': '待安排 ({count})',
+  'timeline.empty': '今天还没有计划任务',
+  'empty.none': '还没有任务，添加一个吧', 'empty.active': '所有任务都完成了！',
+  'empty.completed': '还没有已完成的任务', 'empty.search': '没有匹配的任务',
+  'task.deleteTitle': '删除任务', 'task.deleteMessage': '确定要删除任务「{task}」吗？',
+  'task.markActive': '标记为未完成', 'task.markCompleted': '标记为已完成',
+  'task.edit': '编辑任务', 'task.delete': '删除任务',
+  'create.title': '新建任务', 'create.placeholder': '今天要做什么？', 'create.priority': '优先级',
+  'create.category': '分类', 'create.time': '时间', 'create.noTime': '未设置时间',
+  'create.collapse': '收起', 'create.setTime': '设置时间', 'create.clearTime': '清除时间',
+  'create.notes': '备注', 'create.notesPlaceholder': '添加备注（可选）', 'create.submit': '创建任务',
+  'detail.summary': '今日摘要', 'detail.noSelection': '未选中任务', 'detail.close': '关闭详情面板',
+  'detail.todayCompleted': '今日完成', 'detail.goal': '目标 {goal}', 'detail.streak': '连续天数',
+  'detail.total': '总任务', 'detail.active': '进行中 {count}',
+  'detail.hint': '点击左侧任务查看详情，或按 ⌘N 创建新任务', 'detail.editTitle': '编辑任务标题',
+  'detail.clickEdit': '点击编辑标题', 'detail.completed': '已完成', 'detail.notCompleted': '未完成',
+  'detail.priority': '优先级', 'detail.category': '分类', 'detail.time': '时间',
+  'detail.noTime': '未设置', 'detail.changeTime': '修改时间', 'detail.notes': '备注',
+  'detail.notesPlaceholder': '添加备注…',
+  'time.previousMonth': '上个月', 'time.nextMonth': '下个月', 'time.point': '时间点',
+  'time.range': '时间段', 'time.start': '开始时间', 'time.end': '结束时间', 'time.clear': '清除',
+  'settings.title': '设置', 'settings.appearance': '外观主题',
+  'settings.appearanceDesc': '3 种风格 × 2 种明暗 = 6 套主题', 'settings.desktop': '桌面',
+  'settings.webOnly': '桌面专属设置仅在 Tauri 桌面版本中可用。当前为 Web 版，下方设置已禁用。',
+  'settings.shortcut': '全局快捷键', 'settings.shortcutDesc': '在任意应用按下此组合，可快速弹出新建任务',
+  'settings.macOption': '（macOS 的 Option = ⌥）', 'settings.recording': '请按下组合键…',
+  'settings.apply': '应用', 'settings.restore': '恢复默认', 'settings.autostart': '开机自动启动',
+  'settings.autostartDesc': '登录系统时自动后台运行 Todo List', 'settings.autostartLabel': '开机自启动',
+  'theme.workspaceLight.name': '工作台 · 浅', 'theme.workspaceLight.desc': '暖白底，适合日常办公',
+  'theme.mintLight.name': '薄荷 · 浅', 'theme.mintLight.desc': '淡雅薄荷，柔和清新',
+  'theme.paperLight.name': '纸笺 · 浅', 'theme.paperLight.desc': '米色纸感，Notion 风',
+  'theme.workspaceDark.name': '工作台 · 深', 'theme.workspaceDark.desc': '深色，适合夜间办公',
+  'theme.mintDark.name': '薄荷 · 深', 'theme.mintDark.desc': '中性深灰，沉稳护眼',
+  'theme.paperDark.name': '纸笺 · 深', 'theme.paperDark.desc': '深色，纸感延续',
+  'achievement.first.name': '初出茅庐', 'achievement.first.desc': '完成你的第一个任务',
+  'achievement.speed.name': '效率达人', 'achievement.speed.desc': '一天内完成10个任务',
+  'achievement.streak.name': '永不言弃', 'achievement.streak.desc': '连续7天完成任务',
+  'achievement.streakDays': '连续天数', 'achievement.today': '今日完成',
+  'achievement.unlocked': '成就解锁：{name} — {description}',
+  'footer.todayGoal': '今日目标', 'footer.days': '天', 'footer.streak': '连续打卡',
+  'footer.uninterrupted': '不间断', 'footer.totalCompleted': '总完成',
+  'footer.summary': '共 {total} 项 · 进行中 {active}', 'footer.clear': '清除已完成',
+  'footer.clearTitle': '清除已完成任务',
+  'footer.clearMessage': '确定要清除 {count} 个已完成的任务吗？此操作不可撤销。',
+  'feedback.reminder': '⏰ 任务到时间了：{task}', 'feedback.notificationTitle': 'Todo List 提醒',
+  'feedback.cleared': '已清除 {count} 个已完成任务',
+  'startup.loading': '正在启动本地服务…', 'startup.desktopOnly': '请通过桌面应用运行',
+  'startup.desktopOnlyDesc': '此应用的数据由桌面版内置的本地数据库保存，普通浏览器模式不可用。',
+  'startup.failed': '暂时无法打开应用', 'startup.retry': '重试',
+  'errors.backendUnavailable': '本地后端不可用，请重试。', 'errors.invalidRequest': '请求无效。',
+  'errors.notFound': '未找到目标内容。', 'errors.conflict': '操作冲突，请重试。',
+  'errors.generic': '操作失败，请重试。',
+  'category.work': '工作', 'category.study': '学习', 'category.life': '生活', 'category.other': '其他',
+  'priority.low': '低', 'priority.medium': '中', 'priority.high': '高',
+} as const;
+
+export type TranslationKey = keyof typeof zhCN;
+
+const en: Record<TranslationKey, string> = {
+  'common.cancel': 'Cancel', 'common.confirm': 'Confirm', 'common.close': 'Close', 'common.delete': 'Delete',
+  'header.newTask': 'New Task', 'header.newTaskTitle': 'New Task (Cmd+N)',
+  'header.soundOn': 'Turn sound on', 'header.soundOff': 'Turn sound off', 'header.achievements': 'Achievements',
+  'header.settings': 'Settings', 'header.settingsTitle': 'Settings (appearance, desktop, shortcuts)',
+  'header.switchToEnglish': 'Switch to English', 'header.switchToChinese': 'Switch to Chinese',
+  'sidebar.all': 'All', 'sidebar.active': 'Active', 'sidebar.completed': 'Completed',
+  'sidebar.search': 'Search tasks...', 'sidebar.searchLabel': 'Search tasks', 'sidebar.categoryNav': 'Category navigation',
+  'sidebar.statusFilter': 'Status filter', 'sidebar.todayGoal': 'Today {completed} / {goal}',
+  'sort.manual': 'Manual', 'sort.time': 'By Time',
+  'group.overdue': 'Overdue', 'group.today': 'Today', 'group.future': 'Later', 'group.unscheduled': 'Unscheduled',
+  'timeline.overdue': 'Overdue', 'timeline.soon': 'Soon', 'timeline.today': 'Today',
+  'timeline.future': 'Later', 'timeline.none': 'No time', 'timeline.title': "Today's Timeline",
+  'timeline.unscheduledTitle': 'Tasks without a time', 'timeline.unscheduled': 'Unscheduled ({count})',
+  'timeline.empty': 'No tasks planned for today',
+  'empty.none': 'No tasks yet. Add one!', 'empty.active': 'All tasks are complete!',
+  'empty.completed': 'No completed tasks yet', 'empty.search': 'No matching tasks',
+  'task.deleteTitle': 'Delete Task', 'task.deleteMessage': 'Delete “{task}”?',
+  'task.markActive': 'Mark as active', 'task.markCompleted': 'Mark as completed',
+  'task.edit': 'Edit task', 'task.delete': 'Delete task',
+  'create.title': 'New Task', 'create.placeholder': 'What needs to be done today?', 'create.priority': 'Priority',
+  'create.category': 'Category', 'create.time': 'Time', 'create.noTime': 'No time set',
+  'create.collapse': 'Collapse', 'create.setTime': 'Set time', 'create.clearTime': 'Clear time',
+  'create.notes': 'Notes', 'create.notesPlaceholder': 'Add notes (optional)', 'create.submit': 'Create Task',
+  'detail.summary': "Today's Summary", 'detail.noSelection': 'No task selected', 'detail.close': 'Close details panel',
+  'detail.todayCompleted': 'Completed Today', 'detail.goal': 'Goal {goal}', 'detail.streak': 'Day Streak',
+  'detail.total': 'Total Tasks', 'detail.active': '{count} active',
+  'detail.hint': 'Select a task on the left, or press ⌘N to create one', 'detail.editTitle': 'Edit task title',
+  'detail.clickEdit': 'Click to edit title', 'detail.completed': 'Completed', 'detail.notCompleted': 'Active',
+  'detail.priority': 'Priority', 'detail.category': 'Category', 'detail.time': 'Time',
+  'detail.noTime': 'Not set', 'detail.changeTime': 'Change time', 'detail.notes': 'Notes',
+  'detail.notesPlaceholder': 'Add notes…',
+  'time.previousMonth': 'Previous month', 'time.nextMonth': 'Next month', 'time.point': 'Single time',
+  'time.range': 'Time range', 'time.start': 'Start time', 'time.end': 'End time', 'time.clear': 'Clear',
+  'settings.title': 'Settings', 'settings.appearance': 'Appearance',
+  'settings.appearanceDesc': '3 styles × light and dark = 6 themes', 'settings.desktop': 'Desktop',
+  'settings.webOnly': 'Desktop settings are available only in the Tauri app. They are disabled in the web version.',
+  'settings.shortcut': 'Global Shortcut', 'settings.shortcutDesc': 'Use this shortcut in any app to open New Task',
+  'settings.macOption': '(Option on macOS = ⌥)', 'settings.recording': 'Press a key combination…',
+  'settings.apply': 'Apply', 'settings.restore': 'Restore Default', 'settings.autostart': 'Launch at Login',
+  'settings.autostartDesc': 'Run Todo List in the background when you sign in', 'settings.autostartLabel': 'Launch at login',
+  'theme.workspaceLight.name': 'Workspace · Light', 'theme.workspaceLight.desc': 'Warm white for everyday work',
+  'theme.mintLight.name': 'Mint · Light', 'theme.mintLight.desc': 'Soft, fresh mint tones',
+  'theme.paperLight.name': 'Paper · Light', 'theme.paperLight.desc': 'Warm paper inspired by Notion',
+  'theme.workspaceDark.name': 'Workspace · Dark', 'theme.workspaceDark.desc': 'Dark workspace for evening use',
+  'theme.mintDark.name': 'Mint · Dark', 'theme.mintDark.desc': 'Calm, eye-friendly charcoal',
+  'theme.paperDark.name': 'Paper · Dark', 'theme.paperDark.desc': 'Paper character in dark mode',
+  'achievement.first.name': 'First Steps', 'achievement.first.desc': 'Complete your first task',
+  'achievement.speed.name': 'Productivity Pro', 'achievement.speed.desc': 'Complete 10 tasks in one day',
+  'achievement.streak.name': 'Unstoppable', 'achievement.streak.desc': 'Complete tasks 7 days in a row',
+  'achievement.streakDays': 'Day Streak', 'achievement.today': 'Completed Today',
+  'achievement.unlocked': 'Achievement unlocked: {name} — {description}',
+  'footer.todayGoal': "Today's Goal", 'footer.days': 'days', 'footer.streak': 'Current Streak',
+  'footer.uninterrupted': 'Uninterrupted', 'footer.totalCompleted': 'Total Completed',
+  'footer.summary': '{total} total · {active} active', 'footer.clear': 'Clear Completed',
+  'footer.clearTitle': 'Clear Completed Tasks',
+  'footer.clearMessage': 'Clear {count} completed tasks? This cannot be undone.',
+  'feedback.reminder': '⏰ Time for: {task}', 'feedback.notificationTitle': 'Todo List Reminder',
+  'feedback.cleared': 'Cleared {count} completed tasks',
+  'startup.loading': 'Starting local service…', 'startup.desktopOnly': 'Open this app from the desktop application',
+  'startup.desktopOnlyDesc': 'Your data is stored in the desktop app’s local database. Browser mode is unavailable.',
+  'startup.failed': 'Unable to open the app', 'startup.retry': 'Retry',
+  'errors.backendUnavailable': 'The local backend is unavailable. Please try again.', 'errors.invalidRequest': 'Invalid request.',
+  'errors.notFound': 'The requested item was not found.', 'errors.conflict': 'The operation conflicted. Please try again.',
+  'errors.generic': 'Something went wrong. Please try again.',
+  'category.work': 'Work', 'category.study': 'Study', 'category.life': 'Life', 'category.other': 'Other',
+  'priority.low': 'Low', 'priority.medium': 'Medium', 'priority.high': 'High',
+};
+
+const dictionaries: Record<Language, Record<TranslationKey, string>> = { 'zh-CN': zhCN, en };
+
+export function translationKeys(language: Language): TranslationKey[] {
+  return Object.keys(dictionaries[language]).sort() as TranslationKey[];
+}
+
+export function translate(language: Language, key: TranslationKey, params: Record<string, string | number> = {}): string {
+  return dictionaries[language][key].replace(/\{(\w+)\}/g, (token, name: string) => (
+    Object.prototype.hasOwnProperty.call(params, name) ? String(params[name]) : token
+  ));
+}
+
+export function localeFor(language: Language): string {
+  return language === 'en' ? 'en-US' : 'zh-CN';
+}
+
+const errorKeys: Record<string, TranslationKey> = {
+  INVALID_REQUEST: 'errors.invalidRequest', NOT_FOUND: 'errors.notFound', CONFLICT: 'errors.conflict',
+};
+
+export function translationForError(language: Language, code: string): string {
+  return translate(language, errorKeys[code] ?? 'errors.generic');
+}
