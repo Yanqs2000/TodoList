@@ -128,6 +128,18 @@ class ConversationsRepository:
             (content, status, tool_trace, message_id),
         )
 
+    def update_message_attachments(
+        self,
+        connection: sqlite3.Connection,
+        message_id: str,
+        attachments: list[AssistantAttachment],
+    ) -> None:
+        serialized = [a.model_dump(mode="json", by_alias=True) for a in attachments]
+        connection.execute(
+            "UPDATE assistant_messages SET attachments = ? WHERE id = ?",
+            (json.dumps(serialized), message_id),
+        )
+
     def insert_proposal(
         self,
         connection: sqlite3.Connection,

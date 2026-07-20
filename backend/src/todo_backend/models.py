@@ -267,3 +267,53 @@ class AssistantConversationSummary(WireModel):
     title: str
     created_at: int = Field(alias="createdAt")
     updated_at: int = Field(alias="updatedAt")
+
+
+class SendAssistantMessageCommand(WireModel):
+    content: Annotated[str, Field(strict=True, max_length=10_000)] = ""
+    attachments: list[AssistantAttachment] = Field(
+        default_factory=list[AssistantAttachment], max_length=5
+    )
+
+    @model_validator(mode="after")
+    def require_content_or_attachment(self) -> "SendAssistantMessageCommand":
+        if not self.content.strip() and not self.attachments:
+            raise ValueError("message requires content or attachments")
+        return self
+
+
+class TranscribeCommand(WireModel):
+    file_id: Annotated[str, Field(strict=True, min_length=1, max_length=200)] = Field(
+        alias="fileId"
+    )
+
+
+class AssistantTurnResponse(WireModel):
+    message: AssistantMessage
+    proposals: list[AssistantProposal]
+
+
+class AssistantConversationDetail(WireModel):
+    conversation: AssistantConversationSummary
+    messages: list[AssistantMessage]
+    proposals: list[AssistantProposal]
+
+
+class AssistantConversationListResponse(WireModel):
+    conversations: list[AssistantConversationSummary]
+
+
+class AssistantProposalResolveResponse(WireModel):
+    proposal: AssistantProposal
+    task: Task | None = None
+
+
+class UploadResponse(WireModel):
+    file_id: str = Field(alias="fileId")
+    kind: AttachmentKind
+    name: str
+    mime: str
+
+
+class TranscribeResponse(WireModel):
+    text: str
