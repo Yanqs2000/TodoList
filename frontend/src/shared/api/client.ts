@@ -2,9 +2,16 @@ import {
   ApiError,
   InfrastructureError,
   type AppSettings,
+  type AssistantAttachment,
+  type AssistantConversationDetail,
+  type AssistantConversationSummary,
+  type AssistantProposal,
+  type AssistantSettingsView,
+  type AssistantTurn,
   type BackendConnection,
   type BootstrapSnapshot,
   type CompletionResult,
+  type ResolveProposalResult,
   type TodoApi,
 } from './contracts';
 import type { Todo } from '@/shared/types';
@@ -164,5 +171,50 @@ export function createTodoApi(
     updateSettings: async input => (
       await request<SettingsEnvelope>('/api/v1/settings', 'PATCH', input)
     ).settings,
+    listAssistantConversations: async () => (
+      await request<{ conversations: AssistantConversationSummary[] }>(
+        '/api/v1/assistant/conversations', 'GET',
+      )
+    ).conversations,
+    createAssistantConversation: () => request<AssistantConversationSummary>(
+      '/api/v1/assistant/conversations', 'POST', {},
+    ),
+    getAssistantConversation: id => request<AssistantConversationDetail>(
+      `/api/v1/assistant/conversations/${encodeURIComponent(id)}`, 'GET',
+    ),
+    deleteAssistantConversation: id => request<void>(
+      `/api/v1/assistant/conversations/${encodeURIComponent(id)}`, 'DELETE',
+    ),
+    sendAssistantMessage: (id, input) => request<AssistantTurn>(
+      `/api/v1/assistant/conversations/${encodeURIComponent(id)}/messages`, 'POST', input,
+    ),
+    uploadAssistantFile: async file => {
+      const form = new FormData();
+      form.append('file', file, file.name);
+      const response = await fetcher(`${baseUrl}/api/v1/assistant/uploads`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${connection.token}` },
+        body: form,
+      });
+      if (!response.ok) throw await responseError(response);
+      return (await response.json()) as AssistantAttachment;
+    },
+    transcribeAssistantAudio: async fileId => (
+      await request<{ text: string }>('/api/v1/assistant/transcribe', 'POST', { fileId })
+    ).text,
+    acceptAssistantProposal: id => request<ResolveProposalResult>(
+      `/api/v1/assistant/proposals/${encodeURIComponent(id)}/accept`, 'POST', {},
+    ),
+    rejectAssistantProposal: async id => (
+      await request<{ proposal: AssistantProposal }>(
+        `/api/v1/assistant/proposals/${encodeURIComponent(id)}/reject`, 'POST', {},
+      )
+    ).proposal,
+    getAssistantSettings: () => request<AssistantSettingsView>(
+      '/api/v1/assistant/settings', 'GET',
+    ),
+    updateAssistantSettings: input => request<AssistantSettingsView>(
+      '/api/v1/assistant/settings', 'PUT', input,
+    ),
   };
 }

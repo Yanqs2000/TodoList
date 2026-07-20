@@ -74,6 +74,84 @@ export interface SettingsPatch {
   language?: Language;
 }
 
+export type AssistantAttachmentKind = 'image' | 'document' | 'audio';
+
+export interface AssistantAttachment {
+  fileId: string;
+  kind: AssistantAttachmentKind;
+  name: string;
+  mime: string;
+  extractedText?: string | null;
+}
+
+export interface AssistantConversationSummary {
+  id: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface AssistantMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  attachments: AssistantAttachment[];
+  status: 'pending' | 'done' | 'failed';
+  createdAt: number;
+}
+
+export interface ProposalFields {
+  text?: string;
+  priority?: 'low' | 'medium' | 'high';
+  category?: 'work' | 'study' | 'life' | 'other';
+  time_start?: string | null;
+  time_end?: string | null;
+  notes?: string | null;
+}
+
+export interface AssistantProposal {
+  id: string;
+  messageId: string;
+  action: 'create' | 'update' | 'delete';
+  taskId: string | null;
+  payload: ProposalFields;
+  status: 'pending' | 'accepted' | 'rejected';
+  createdAt: number;
+}
+
+export interface AssistantTurn {
+  message: AssistantMessage;
+  proposals: AssistantProposal[];
+}
+
+export interface AssistantConversationDetail {
+  conversation: AssistantConversationSummary;
+  messages: AssistantMessage[];
+  proposals: AssistantProposal[];
+}
+
+export interface AssistantSettingsView {
+  hasApiKey: boolean;
+  chatModel: string;
+  audioModel: string;
+}
+
+export interface AssistantSettingsPatch {
+  apiKey?: string;
+  chatModel?: string;
+  audioModel?: string;
+}
+
+export interface ResolveProposalResult {
+  proposal: AssistantProposal;
+  task: import('@/shared/types').Todo | null;
+}
+
+export interface SendAssistantMessageInput {
+  content: string;
+  attachments: AssistantAttachment[];
+}
+
 export interface TodoApi {
   bootstrap(preferredTheme: SystemTheme): Promise<BootstrapSnapshot>;
   createTask(input: CreateTaskInput): Promise<Todo>;
@@ -83,6 +161,17 @@ export interface TodoApi {
   setTaskCompletion(taskId: string, input: CompletionInput): Promise<CompletionResult>;
   claimReminder(input: ReminderClaimInput): Promise<boolean>;
   updateSettings(input: SettingsPatch): Promise<AppSettings>;
+  listAssistantConversations(): Promise<AssistantConversationSummary[]>;
+  createAssistantConversation(): Promise<AssistantConversationSummary>;
+  getAssistantConversation(id: string): Promise<AssistantConversationDetail>;
+  deleteAssistantConversation(id: string): Promise<void>;
+  sendAssistantMessage(id: string, input: SendAssistantMessageInput): Promise<AssistantTurn>;
+  uploadAssistantFile(file: File): Promise<AssistantAttachment>;
+  transcribeAssistantAudio(fileId: string): Promise<string>;
+  acceptAssistantProposal(id: string): Promise<ResolveProposalResult>;
+  rejectAssistantProposal(id: string): Promise<AssistantProposal>;
+  getAssistantSettings(): Promise<AssistantSettingsView>;
+  updateAssistantSettings(input: AssistantSettingsPatch): Promise<AssistantSettingsView>;
 }
 
 export type ApiErrorKind = 'business' | 'infrastructure' | 'timeout' | 'network';
