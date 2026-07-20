@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException
 from starlette.middleware.cors import CORSMiddleware
 
+from todo_backend.assistant_api import build_assistant_router
 from todo_backend.auth import require_token
 from todo_backend.config import Settings
 from todo_backend.database import Database
@@ -30,8 +31,22 @@ from todo_backend.models import (
     TaskResponse,
     UpdateTaskCommand,
 )
+from todo_backend.repositories.conversations import (
+    ConversationNotFoundError,
+    ProposalNotFoundError,
+)
 from todo_backend.repositories.tasks import InvalidTaskOrderError, TaskNotFoundError
+from todo_backend.services.assistant import (
+    AssistantNotConfiguredError,
+    AssistantService,
+    AssistantUnavailableError,
+    ProposalAlreadyResolvedError,
+    UnsupportedFileTypeError,
+    UploadNotFoundError,
+    UploadTooLargeError,
+)
 from todo_backend.services.bootstrap import BootstrapService
+from todo_backend.services.documents import DocumentExtractionError
 from todo_backend.services.reminders import ReminderService
 from todo_backend.services.settings import SettingsService
 from todo_backend.services.tasks import TaskService
@@ -40,6 +55,7 @@ from todo_backend.services.tasks import TaskService
 def create_app(
     settings: Settings | None = None,
     database: Database | None = None,
+    assistant_service: AssistantService | None = None,
 ) -> FastAPI:
     resolved_settings = settings or Settings.from_env()
     resolved_database = database or Database(
@@ -55,6 +71,9 @@ def create_app(
     bootstrap_service = BootstrapService(resolved_database)
     reminder_service = ReminderService(resolved_database)
     settings_service = SettingsService(resolved_database)
+    resolved_assistant_service = assistant_service or AssistantService(
+        resolved_database, resolved_settings
+    )
 
     app = FastAPI()
     allowed_origins = ["tauri://localhost", "http://tauri.localhost"]
@@ -73,6 +92,15 @@ def create_app(
     app.add_exception_handler(HTTPException, _http_error_handler)
     app.add_exception_handler(sqlite3.Error, _database_error_handler)
     app.add_exception_handler(DatabaseVersionError, _database_error_handler)
+    app.add_exception_handler(AssistantNotConfiguredError, _assistant_not_configured_handler)
+    app.add_exception_handler(AssistantUnavailableError, _assistant_unavailable_handler)
+    app.add_exception_handler(UnsupportedFileTypeError, _unsupported_file_type_handler)
+    app.add_exception_handler(UploadTooLargeError, _upload_too_large_handler)
+    app.add_exception_handler(UploadNotFoundError, _upload_not_found_handler)
+    app.add_exception_handler(ConversationNotFoundError, _conversation_not_found_handler)
+    app.add_exception_handler(ProposalNotFoundError, _proposal_not_found_handler)
+    app.add_exception_handler(ProposalAlreadyResolvedError, _proposal_resolved_handler)
+    app.add_exception_handler(DocumentExtractionError, _document_not_readable_handler)
     app.add_exception_handler(Exception, _internal_error_handler)
 
     def _require_database() -> None:
@@ -147,6 +175,7 @@ def create_app(
     def _patch_settings(command: SettingsPatchCommand) -> SettingsResponse:
         return SettingsResponse(settings=settings_service.patch(command))
 
+    router.include_router(build_assistant_router(resolved_assistant_service))
     app.include_router(router)
     return app
 
@@ -227,3 +256,39 @@ def _error_response(
         content={"error": {"code": code, "message": message}},
         headers=headers,
     )
+
+
+def _assistant_not_configured_handler(_request: Request, _error: Exception) -> JSONResponse:
+    return _error_response(409, "ASSISTANT_NOT_CONFIGURED", "Assistant is not configured")
+
+
+def _assistant_unavailable_handler(_request: Request, _error: Exception) -> JSONResponse:
+    return _error_response(503, "ASSISTANT_UNAVAILABLE", "Assistant service unavailable")
+
+
+def _unsupported_file_type_handler(_request: Request, _error: Exception) -> JSONResponse:
+    return _error_response(415, "UNSUPPORTED_FILE_TYPE", "Unsupported file type")
+
+
+def _upload_too_large_handler(_request: Request, _error: Exception) -> JSONResponse:
+    return _error_response(413, "UPLOAD_TOO_LARGE", "Upload too large")
+
+
+def _upload_not_found_handler(_request: Request, _error: Exception) -> JSONResponse:
+    return _error_response(404, "UPLOAD_NOT_FOUND", "Upload not found")
+
+
+def _conversation_not_found_handler(_request: Request, _error: Exception) -> JSONResponse:
+    return _error_response(404, "CONVERSATION_NOT_FOUND", "Conversation not found")
+
+
+def _proposal_not_found_handler(_request: Request, _error: Exception) -> JSONResponse:
+    return _error_response(404, "PROPOSAL_NOT_FOUND", "Proposal not found")
+
+
+def _proposal_resolved_handler(_request: Request, _error: Exception) -> JSONResponse:
+    return _error_response(409, "PROPOSAL_ALREADY_RESOLVED", "Proposal already resolved")
+
+
+def _document_not_readable_handler(_request: Request, _error: Exception) -> JSONResponse:
+    return _error_response(422, "DOCUMENT_NOT_READABLE", "Document has no readable text")
