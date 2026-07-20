@@ -8,6 +8,7 @@ from todo_backend.agent.ark_client import ArkChatResult, ArkToolCall, ArkUnavail
 from todo_backend.config import Settings
 from todo_backend.database import Database
 from todo_backend.models import (
+    AssistantAttachment,
     AssistantSettingsPatchCommand,
     SendAssistantMessageCommand,
     TranscribeCommand,
@@ -18,6 +19,7 @@ from todo_backend.services.assistant import (
     AssistantService,
     ProposalAlreadyResolvedError,
     UnsupportedFileTypeError,
+    UploadNotFoundError,
     UploadTooLargeError,
 )
 
@@ -175,3 +177,22 @@ def test_settings_view_masks_api_key(service: AssistantService) -> None:
 
     assert view.has_api_key is True
     assert not hasattr(view, "api_key")
+
+
+def test_path_traversal_file_id_rejected(service: AssistantService) -> None:
+    _configure(service)
+    global _FAKE_ARK
+    _FAKE_ARK = _FakeArk([ArkChatResult(content="ok", tool_calls=[])])
+    conversation = service.create_conversation()
+
+    evil_attachment = AssistantAttachment(
+        fileId="../evil.txt", kind="document", name="evil.txt", mime="text/plain",
+    )
+    with pytest.raises(UploadNotFoundError):
+        service.send_message(
+            conversation.id,
+            SendAssistantMessageCommand(content="", attachments=[evil_attachment]),
+        )
+
+    with pytest.raises(UploadNotFoundError):
+        service.transcribe(TranscribeCommand(fileId="../evil.mp3"))

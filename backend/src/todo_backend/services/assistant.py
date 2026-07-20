@@ -104,6 +104,15 @@ class AssistantService:
     def _uploads_dir(self) -> Path:
         return self._settings.database_path.parent / "assistant_uploads"
 
+    def _upload_path(self, file_id: str) -> Path:
+        if "/" in file_id or "\\" in file_id or ".." in file_id:
+            raise UploadNotFoundError
+        uploads_dir = self._uploads_dir.resolve()
+        path = (uploads_dir / file_id).resolve()
+        if not path.is_relative_to(uploads_dir):
+            raise UploadNotFoundError
+        return path
+
     # ---- settings ----
 
     def get_settings_view(self) -> AssistantSettingsView:
@@ -190,7 +199,7 @@ class AssistantService:
             raise AssistantUnavailableError from error
 
     def _audio_path(self, file_id: str) -> tuple[Path, str]:
-        path = self._uploads_dir / file_id
+        path = self._upload_path(file_id)
         audio_format = _AUDIO_FORMAT_BY_EXT.get(path.suffix.lower())
         if audio_format is None:
             raise UnsupportedFileTypeError
@@ -262,7 +271,7 @@ class AssistantService:
         return AssistantTurnResponse(message=done, proposals=proposals)
 
     def _verified_attachment(self, attachment: AssistantAttachment) -> AssistantAttachment:
-        path = self._uploads_dir / attachment.file_id
+        path = self._upload_path(attachment.file_id)
         if not path.is_file():
             raise UploadNotFoundError
         suffix = path.suffix.lower()
@@ -276,7 +285,7 @@ class AssistantService:
     def _enrich_document(self, attachment: AssistantAttachment) -> AssistantAttachment:
         if attachment.kind != "document":
             return attachment
-        text = extract_document_text(self._uploads_dir / attachment.file_id)
+        text = extract_document_text(self._upload_path(attachment.file_id))
         return attachment.model_copy(update={"extracted_text": text})
 
     def _enrich_audio(self, ark: Any, attachment: AssistantAttachment) -> AssistantAttachment:
@@ -328,7 +337,7 @@ class AssistantService:
             text = message.content
             for attachment in message.attachments:
                 if attachment.kind == "image":
-                    path = self._uploads_dir / attachment.file_id
+                    path = self._upload_path(attachment.file_id)
                     encoded = base64.b64encode(path.read_bytes()).decode()
                     parts.append({
                         "type": "image_url",
