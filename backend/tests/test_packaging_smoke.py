@@ -84,5 +84,5 @@ def test_packaged_sidecar_starts_and_stops(tmp_path: Path) -> None:
             )
         }
 
-    assert user_version == 2
+    assert user_version == 3
     assert "tasks" in tables

@@ -49,7 +49,7 @@ def test_initialize_creates_schema(database: Database) -> None:
             for row in connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
         }
 
-    assert version == 2
+    assert version == 3
     assert language == "zh-CN"
     assert {
         "tasks",
@@ -65,7 +65,7 @@ def test_initialize_is_idempotent(database: Database) -> None:
     database.initialize()
 
     with database.connect() as connection:
-        assert connection.execute("PRAGMA user_version").fetchone()[0] == 2
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 3
 
 
 def test_initial_schema_enforces_checks_index_and_cascade(database: Database) -> None:
@@ -155,7 +155,7 @@ def test_initialize_rejects_database_version_above_latest(
     database: Database,
 ) -> None:
     with database.connect() as connection:
-        connection.execute("PRAGMA user_version = 3")
+        connection.execute("PRAGMA user_version = 4")
 
     with pytest.raises(DatabaseVersionError, match="newer"):
         database.initialize()

@@ -179,3 +179,39 @@ class CompletionResponse(WireModel):
     task: Task
     achievement_state: AchievementState = Field(alias="achievementState")
     newly_unlocked: list[str] = Field(alias="newlyUnlocked")
+
+
+DEFAULT_CHAT_MODEL = "doubao-seed-2-1-pro-260628"
+DEFAULT_AUDIO_MODEL = "doubao-seed-2-0-lite-260428"
+
+
+class AssistantSettings(WireModel):
+    api_key: str
+    chat_model: str
+    audio_model: str
+
+
+class AssistantSettingsView(WireModel):
+    has_api_key: bool = Field(alias="hasApiKey")
+    chat_model: str = Field(alias="chatModel")
+    audio_model: str = Field(alias="audioModel")
+
+
+class AssistantSettingsPatchCommand(WireModel):
+    api_key: Annotated[str, Field(strict=True, max_length=200)] | None = Field(
+        default=None, alias="apiKey"
+    )
+    chat_model: Annotated[str, Field(strict=True, min_length=1, max_length=100)] | None = Field(
+        default=None, alias="chatModel"
+    )
+    audio_model: Annotated[str, Field(strict=True, min_length=1, max_length=100)] | None = Field(
+        default=None, alias="audioModel"
+    )
+
+    @model_validator(mode="after")
+    def reject_empty_or_null_patch(self) -> "AssistantSettingsPatchCommand":
+        if not self.model_fields_set:
+            raise ValueError("settings patch cannot be empty")
+        if any(getattr(self, name) is None for name in self.model_fields_set):
+            raise ValueError("settings fields cannot be null")
+        return self
