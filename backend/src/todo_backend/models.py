@@ -215,3 +215,55 @@ class AssistantSettingsPatchCommand(WireModel):
         if any(getattr(self, name) is None for name in self.model_fields_set):
             raise ValueError("settings fields cannot be null")
         return self
+
+
+AssistantRole = Literal["user", "assistant"]
+AssistantMessageStatus = Literal["pending", "done", "failed"]
+AttachmentKind = Literal["image", "document", "audio"]
+ProposalAction = Literal["create", "update", "delete"]
+ProposalStatus = Literal["pending", "accepted", "rejected"]
+
+
+class AssistantAttachment(WireModel):
+    file_id: Annotated[str, Field(strict=True, min_length=1, max_length=200)] = Field(
+        alias="fileId"
+    )
+    kind: AttachmentKind
+    name: Annotated[str, Field(strict=True, min_length=1, max_length=255)]
+    mime: Annotated[str, Field(strict=True, min_length=1, max_length=100)]
+    extracted_text: str | None = Field(default=None, alias="extractedText")
+
+
+class ProposalFields(WireModel):
+    text: StrictText | None = None
+    priority: Priority | None = None
+    category: Category | None = None
+    time_start: LocalDateTime | None = None
+    time_end: LocalDateTime | None = None
+    notes: StrictNotes | None = None
+
+
+class AssistantMessage(WireModel):
+    id: str
+    role: AssistantRole
+    content: str
+    attachments: list[AssistantAttachment] = []
+    status: AssistantMessageStatus = "done"
+    created_at: int = Field(alias="createdAt")
+
+
+class AssistantProposal(WireModel):
+    id: str
+    message_id: str = Field(alias="messageId")
+    action: ProposalAction
+    task_id: str | None = Field(default=None, alias="taskId")
+    payload: ProposalFields
+    status: ProposalStatus
+    created_at: int = Field(alias="createdAt")
+
+
+class AssistantConversationSummary(WireModel):
+    id: str
+    title: str
+    created_at: int = Field(alias="createdAt")
+    updated_at: int = Field(alias="updatedAt")
