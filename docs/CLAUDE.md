@@ -19,6 +19,11 @@
 - [Python SQLite 后端设计](architecture/2026-07-12-python-sqlite-backend-design.md)
 - [Python SQLite 后端实施计划](architecture/2026-07-12-python-sqlite-backend-implementation-plan.md)
 
+## AI 助手
+
+- [AI 助手设计](superpowers/specs/2026-07-20-ai-assistant-design.md) — 多模态 agent 架构、Ark 接入、提议确认流、安全约束
+- [AI 助手实施计划](superpowers/plans/2026-07-20-ai-assistant.md) — 15 个任务的 TDD 实施步骤
+
 ## 历史与归档
 
 - [v1.0.0 发布日志](development-logs/v1.0.0-python-sqlite-desktop.md) — Python/FastAPI + SQLite 桌面架构正式发布

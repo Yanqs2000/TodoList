@@ -23,7 +23,20 @@ Tauri 启动 Python sidecar，并通过仅监听 `127.0.0.1` 的带随机 Bearer
 - 首页 `EN` / `中文` 按钮切换完整中英文界面，并在 SQLite 中保存选择
 - macOS 托盘、关闭到托盘、全局快捷键和开机自启动
 - 后端异常时阻断主界面，可显式重试并加载完整数据库快照
-- AI 助手：接入火山引擎方舟多模态模型，支持文字、语音（转写或直发）、图片和文档分析；agent 提议任务变更，确认后写入列表
+- AI 助手：接入火山引擎方舟多模态模型，支持文字、语音（转写或直发）、图片和文档分析；agent 提议任务变更，确认后写入列表；推挤动画布局，主题自适应
+
+## AI 助手配置
+
+AI 助手需要火山引擎方舟的 API Key。支持两种套餐：
+
+| 套餐 | Base URL | API Key |
+|---|---|---|
+| **Agent Plan**（推荐） | `https://ark.cn-beijing.volces.com/api/plan/v3` | Agent Plan 专属 Key |
+| Token Plan / 按量计费 | `https://ark.cn-beijing.volces.com/api/v3` | 普通方舟 Key |
+
+配置步骤：打开应用 → 点击 header 右侧 ✦ 按钮 → 点击 ⚙ 设置 → 填入 API Key、Base URL、对话模型和音频模型 → 保存。
+
+默认模型：对话 `doubao-seed-2-1-pro-260628`，音频 `doubao-seed-2-0-lite-260428`。API Key 仅保存在本机 SQLite，不回传、不写日志。
 
 ## v1.0.0
 

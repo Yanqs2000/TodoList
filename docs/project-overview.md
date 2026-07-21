@@ -11,8 +11,9 @@ TodoList 是一个无需账号的本地桌面待办应用。React 负责交互�
 | 桌面 | Tauri 2、Rust | sidecar 监督、托盘、快捷键、自启动、打包 |
 | 数据 | SQLite WAL | 本机单文件持久化和迁移 |
 | 测试 | Vitest、Testing Library、pytest、Rust tests | 前端、API、数据库和进程监督验证 |
+| AI | 火山引擎方舟（OpenAI 兼容）、openai SDK | 多模态 agent 循环、工具调用、提议确认 |
 
-Python 环境由 `uv` 管理。后端通过 PyInstaller 打成 Tauri external binary，用户无需单独安装 Python。
+Python 环境由 `uv` 管理。后端通过 PyInstaller 打成 Tauri external binary，用户无需单独安装 Python。AI 助手通过 `openai` Python SDK 调用火山方舟 chat completions API（支持 Agent Plan 和 Token Plan 两种 Base URL），后端 agent 循环执行工具调用并将写操作转为提议行，用户确认后才写入真实任务。
 
 当前稳定版本为 **v1.0.0**。该版本首次把 Python/SQLite 后端作为正式桌面发行架构，并提供可持久化的中英文界面切换。
 
@@ -34,8 +35,9 @@ SQLite 保存：
 - 界面语言、主题、静音和全局快捷键
 - 成就状态与已解锁徽章
 - 已 claim 的提醒时间
+- AI 助手会话、消息、提议和模型配置（API Key 打码存储）
 
-React 只保留当前筛选、搜索、弹窗、pending 控件和动画计时等临时 UI 状态。生产代码没有 `localStorage` 持久化，也没有账号或云同步。
+React 只保留当前筛选、搜索、弹窗、pending 控件和动画计时等临时 UI 状态。生产代码没有 `localStorage` 持久化，也没有账号或云同步。AI 助手的 API Key 仅存于本机 SQLite，不回传、不写日志。
 
 ## 目录
 
