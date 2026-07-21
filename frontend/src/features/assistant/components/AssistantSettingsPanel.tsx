@@ -10,11 +10,13 @@ interface AssistantSettingsPanelProps {
 function AssistantSettingsPanel({ view, onSave }: AssistantSettingsPanelProps) {
   const { t } = useI18n();
   const [apiKey, setApiKey] = useState('');
+  const [baseUrl, setBaseUrl] = useState(view?.baseUrl ?? '');
   const [chatModel, setChatModel] = useState(view?.chatModel ?? '');
   const [audioModel, setAudioModel] = useState(view?.audioModel ?? '');
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
+    setBaseUrl(view?.baseUrl ?? '');
     setChatModel(view?.chatModel ?? '');
     setAudioModel(view?.audioModel ?? '');
   }, [view]);
@@ -33,6 +35,10 @@ function AssistantSettingsPanel({ view, onSave }: AssistantSettingsPanelProps) {
         />
       </label>
       <label>
+        {t('assistant.baseUrl')}
+        <input value={baseUrl} onChange={event => setBaseUrl(event.target.value)} />
+      </label>
+      <label>
         {t('assistant.chatModel')}
         <input value={chatModel} onChange={event => setChatModel(event.target.value)} />
       </label>
@@ -42,7 +48,7 @@ function AssistantSettingsPanel({ view, onSave }: AssistantSettingsPanelProps) {
       </label>
       <button
         onClick={() => {
-          const patch: AssistantSettingsPatch = { chatModel, audioModel };
+          const patch: AssistantSettingsPatch = { baseUrl, chatModel, audioModel };
           if (apiKey) patch.apiKey = apiKey;
           void onSave(patch).then(() => {
             setSaved(true);

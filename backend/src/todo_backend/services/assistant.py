@@ -81,7 +81,7 @@ def _now_ms() -> int:
 
 
 def _default_ark_factory(config: AssistantSettings) -> ArkClient:
-    return ArkClient(config.api_key, config.chat_model, config.audio_model)
+    return ArkClient(config.api_key, config.chat_model, config.audio_model, config.base_url)
 
 
 class AssistantService:
@@ -132,6 +132,7 @@ class AssistantService:
             hasApiKey=bool(config.api_key),
             chatModel=config.chat_model,
             audioModel=config.audio_model,
+            baseUrl=config.base_url,
         )
 
     def _require_ark(self) -> Any:

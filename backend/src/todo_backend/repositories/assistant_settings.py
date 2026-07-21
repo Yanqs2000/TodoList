@@ -1,20 +1,26 @@
 import sqlite3
 
 from todo_backend.models import (
+    DEFAULT_ARK_BASE_URL,
     DEFAULT_AUDIO_MODEL,
     DEFAULT_CHAT_MODEL,
     AssistantSettings,
     AssistantSettingsPatchCommand,
 )
 
-__all__ = ["DEFAULT_AUDIO_MODEL", "DEFAULT_CHAT_MODEL", "AssistantSettingsRepository"]
+__all__ = [
+    "DEFAULT_ARK_BASE_URL",
+    "DEFAULT_AUDIO_MODEL",
+    "DEFAULT_CHAT_MODEL",
+    "AssistantSettingsRepository",
+]
 
 
 class AssistantSettingsRepository:
     def get(self, connection: sqlite3.Connection) -> AssistantSettings:
         row = connection.execute(
-            "SELECT assistant_api_key, assistant_chat_model, assistant_audio_model"
-            " FROM app_settings WHERE id = 1"
+            "SELECT assistant_api_key, assistant_chat_model, assistant_audio_model,"
+            " assistant_base_url FROM app_settings WHERE id = 1"
         ).fetchone()
         if row is None:
             raise RuntimeError("Application settings are not initialized")
@@ -22,6 +28,7 @@ class AssistantSettingsRepository:
             api_key=row["assistant_api_key"],
             chat_model=row["assistant_chat_model"],
             audio_model=row["assistant_audio_model"],
+            base_url=row["assistant_base_url"],
         )
 
     def patch(
@@ -33,6 +40,7 @@ class AssistantSettingsRepository:
             "api_key": "assistant_api_key",
             "chat_model": "assistant_chat_model",
             "audio_model": "assistant_audio_model",
+            "base_url": "assistant_base_url",
         }
         assignments: list[str] = []
         values: list[object] = []

@@ -183,18 +183,21 @@ class CompletionResponse(WireModel):
 
 DEFAULT_CHAT_MODEL = "doubao-seed-2-1-pro-260628"
 DEFAULT_AUDIO_MODEL = "doubao-seed-2-0-lite-260428"
+DEFAULT_ARK_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3"
 
 
 class AssistantSettings(WireModel):
     api_key: str
     chat_model: str
     audio_model: str
+    base_url: str
 
 
 class AssistantSettingsView(WireModel):
     has_api_key: bool = Field(alias="hasApiKey")
     chat_model: str = Field(alias="chatModel")
     audio_model: str = Field(alias="audioModel")
+    base_url: str = Field(alias="baseUrl")
 
 
 class AssistantSettingsPatchCommand(WireModel):
@@ -206,6 +209,9 @@ class AssistantSettingsPatchCommand(WireModel):
     )
     audio_model: Annotated[str, Field(strict=True, min_length=1, max_length=100)] | None = Field(
         default=None, alias="audioModel"
+    )
+    base_url: Annotated[str, Field(strict=True, min_length=1, max_length=200)] | None = Field(
+        default=None, alias="baseUrl"
     )
 
     @model_validator(mode="after")

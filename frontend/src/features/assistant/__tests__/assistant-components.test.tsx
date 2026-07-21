@@ -17,7 +17,7 @@ function state(overrides: Partial<AssistantState> = {}): AssistantState {
         payload: { text: '买菜', priority: 'medium', time_start: '2026-07-21T09:00' },
         status: 'pending', createdAt: 3 },
     ],
-    settingsView: { hasApiKey: true, chatModel: 'chat', audioModel: 'audio' },
+    settingsView: { hasApiKey: true, chatModel: 'chat', audioModel: 'audio', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3' },
     selectConversation: vi.fn(), startNewConversation: vi.fn(),
     deleteConversation: vi.fn(), send: vi.fn(), retry: vi.fn(),
     resolveProposal: vi.fn().mockResolvedValue(undefined), saveSettings: vi.fn(),
@@ -81,7 +81,7 @@ describe('AssistantDrawer', () => {
   });
 
   it('shows the setup panel when the key is missing', () => {
-    renderDrawer(state({ settingsView: { hasApiKey: false, chatModel: 'c', audioModel: 'a' } }));
+    renderDrawer(state({ settingsView: { hasApiKey: false, chatModel: 'c', audioModel: 'a', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3' } }));
 
     expect(screen.getByText('还没有配置模型服务')).toBeTruthy();
   });

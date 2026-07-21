@@ -36,12 +36,13 @@ class ArkClient:
         api_key: str,
         chat_model: str,
         audio_model: str,
+        base_url: str = ARK_BASE_URL,
         *,
         timeout: float = 60.0,
         client: OpenAI | None = None,
     ) -> None:
         self._client = client or OpenAI(
-            base_url=ARK_BASE_URL,
+            base_url=base_url,
             api_key=api_key,
             timeout=timeout,
             max_retries=0,

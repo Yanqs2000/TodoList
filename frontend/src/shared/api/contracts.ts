@@ -134,12 +134,14 @@ export interface AssistantSettingsView {
   hasApiKey: boolean;
   chatModel: string;
   audioModel: string;
+  baseUrl: string;
 }
 
 export interface AssistantSettingsPatch {
   apiKey?: string;
   chatModel?: string;
   audioModel?: string;
+  baseUrl?: string;
 }
 
 export interface ResolveProposalResult {

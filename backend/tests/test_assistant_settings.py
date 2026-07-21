@@ -7,6 +7,7 @@ import pytest
 from todo_backend.database import Database
 from todo_backend.models import AssistantSettingsPatchCommand
 from todo_backend.repositories.assistant_settings import (
+    DEFAULT_ARK_BASE_URL,
     DEFAULT_AUDIO_MODEL,
     DEFAULT_CHAT_MODEL,
     AssistantSettingsRepository,
@@ -36,7 +37,7 @@ def test_migration_003_creates_assistant_tables(database: Database) -> None:
         }
     finally:
         connection.close()
-    assert version == 3
+    assert version == 4
     assert {
         "assistant_conversations",
         "assistant_messages",
@@ -46,6 +47,7 @@ def test_migration_003_creates_assistant_tables(database: Database) -> None:
         "assistant_api_key",
         "assistant_chat_model",
         "assistant_audio_model",
+        "assistant_base_url",
     } <= columns
 
 
@@ -60,6 +62,7 @@ def test_assistant_settings_defaults_and_patch(database: Database) -> None:
         assert defaults.api_key == ""
         assert defaults.chat_model == DEFAULT_CHAT_MODEL
         assert defaults.audio_model == DEFAULT_AUDIO_MODEL
+        assert defaults.base_url == DEFAULT_ARK_BASE_URL
 
         updated = repository.patch(
             connection,
