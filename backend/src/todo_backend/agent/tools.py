@@ -104,12 +104,12 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
                         "properties": {
                             "text": {"type": ["string", "null"]},
                             "priority": {
-                                "type": ["string", "null"],
-                                "enum": ["low", "medium", "high", None],
+                                "type": "string",
+                                "enum": ["low", "medium", "high"],
                             },
                             "category": {
-                                "type": ["string", "null"],
-                                "enum": ["work", "study", "life", "other", None],
+                                "type": "string",
+                                "enum": ["work", "study", "life", "other"],
                             },
                             "time_start": {"type": ["string", "null"]},
                             "time_end": {"type": ["string", "null"]},
