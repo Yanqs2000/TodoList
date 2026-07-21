@@ -19,6 +19,7 @@
   --radius-sm: 8px;
   --radius-lg: 16px;
   --transition: 200ms ease;
+  --layout-transition: 300ms ease-out;
   --category-work: #2563EB;
   /* Today Focus timeline proximity (light) */
   --time-now: #10B981;      /* 进行中/正常 · 绿 */
@@ -201,13 +202,18 @@ body {
 
 .app-shell {
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr) 320px;
+  grid-template-columns: 240px minmax(0, 1fr) 320px 0px;
   grid-template-rows: 56px minmax(0, 1fr);
   grid-template-areas:
-    "header header header"
-    "sidebar list detail";
+    "header header header header"
+    "sidebar list detail assistant";
   height: 100vh;
   overflow: hidden;
+  transition: grid-template-columns var(--layout-transition);
+}
+
+.app-shell--assistant-open {
+  grid-template-columns: 240px minmax(0, 1fr) 320px 380px;
 }
 
 .app-shell__header {
@@ -234,6 +240,12 @@ body {
   background: var(--bg-elevated);
 }
 
+.app-shell__assistant {
+  grid-area: assistant;
+  min-width: 0;
+  overflow: hidden;
+}
+
 @media (max-width: 1024px) {
   .app-shell {
     grid-template-columns: 200px minmax(0, 1fr);
@@ -243,6 +255,25 @@ body {
   }
   .app-shell__detail {
     display: none;
+  }
+  /* 窄窗口下助手面板不再挤占布局，改为覆盖层 */
+  .app-shell__assistant {
+    display: none;
+  }
+  .app-shell--assistant-open {
+    grid-template-columns: 200px minmax(0, 1fr);
+  }
+  .app-shell--assistant-open .app-shell__assistant {
+    display: block;
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    width: 380px;
+    max-width: 90vw;
+    overflow: visible;
+    box-shadow: -4px 0 16px rgb(0 0 0 / 8%);
   }
 }
 

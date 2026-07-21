@@ -206,21 +206,12 @@ function TodoApplicationContent({ snapshot, api, onInfrastructureError, language
   ));
 
   return (
-    <div className="app-shell">
+    <div className={assistantOpen ? 'app-shell app-shell--assistant-open' : 'app-shell'}>
       <AchievementDrawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         achievements={achievements.achievements}
         allAchievements={achievements.allAchievements}
-      />
-
-      <AssistantDrawer
-        open={assistantOpen}
-        onClose={() => setAssistantOpen(false)}
-        assistant={assistant}
-        api={api}
-        onApplyProposal={handleApplyProposal}
-        onError={handleApplicationError}
       />
 
       <CreateTaskModal
@@ -335,6 +326,17 @@ function TodoApplicationContent({ snapshot, api, onInfrastructureError, language
           streakDays={achievements.achievements.streakDays}
         />
       </aside>
+
+      <div className="app-shell__assistant">
+        <AssistantDrawer
+          open={assistantOpen}
+          onClose={() => setAssistantOpen(false)}
+          assistant={assistant}
+          api={api}
+          onApplyProposal={handleApplyProposal}
+          onError={handleApplicationError}
+        />
+      </div>
     </div>
   );
 }

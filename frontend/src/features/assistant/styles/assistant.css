@@ -1,16 +1,27 @@
 .assistant-drawer {
-  position: fixed;
-  top: 0;
-  right: 0;
-  bottom: 0;
   width: 380px;
-  max-width: 90vw;
+  height: 100%;
+  margin-left: auto;
   display: flex;
   flex-direction: column;
   background: var(--panel-bg, #fff);
   border-left: 1px solid var(--border-color, #ddd);
-  box-shadow: -4px 0 16px rgb(0 0 0 / 8%);
-  z-index: 40;
+  animation: assistant-drawer-pop var(--layout-transition, 300ms ease-out);
+}
+
+@keyframes assistant-drawer-pop {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+}
+
+@media (max-width: 1024px) {
+  /* 覆盖层模式下填满固定宽度的容器 */
+  .assistant-drawer {
+    width: 100%;
+    margin-left: 0;
+  }
 }
 
 .assistant-drawer__header {
