@@ -42,3 +42,13 @@ TodoList 使用 Python 标准库 `sqlite3`。macOS 正常运行时数据库位�
 恢复前先退出应用，再替换数据库文件。若恢复文件的 `user_version` 高于当前应用支持版本，应用会进入阻断错误页而不会降级或覆盖数据。
 
 删除数据库会丢失全部任务、设置、成就和提醒 claim；下次启动会创建空库。
+
+### assistant_conversations / assistant_messages / assistant_proposals
+
+- `assistant_conversations`：`id` 主键，`title`，`created_at` / `updated_at`（毫秒时间戳）。
+- `assistant_messages`：`id` 主键，`conversation_id` 外键（级联删除），`role`（user/assistant），`content`，`attachments`（JSON），`tool_trace`（JSON，仅审计），`status`（pending/done/failed），`created_at`。
+- `assistant_proposals`：`id` 主键，`conversation_id`、`message_id` 外键，`action`（create/update/delete），`task_id`（update/delete 的目标），`payload`（JSON，任务字段），`status`（pending/accepted/rejected），`created_at`，`resolved_at`。
+
+迁移 `003_add_assistant.sql` 新建以上三张表，并向 `app_settings` 增加 `assistant_api_key`、`assistant_chat_model`、`assistant_audio_model` 三列。API key 只存于该列，任何接口不回传。
+
+上传的文件保存在数据库同级的 `assistant_uploads/` 目录，删除会话时同步清理。

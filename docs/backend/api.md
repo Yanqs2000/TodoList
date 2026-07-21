@@ -68,3 +68,25 @@ Base URL 由 Tauri 动态生成，格式为 `http://127.0.0.1:<port>/api/v1`。�
 | 500 | `INTERNAL_ERROR` | 其他内部错误 |
 
 错误正文不会包含 token、路径、SQL、任务内容或 traceback。
+
+## AI 助手
+
+所有路由同样需要 Bearer token；统一挂载在 `/api/v1/assistant/` 下。
+
+| 方法与路径 | 说明 |
+| --- | --- |
+| `POST /assistant/conversations` | 创建会话，返回 `{id, title, createdAt, updatedAt}` |
+| `GET /assistant/conversations` | 返回 `{conversations: [...]}`（按 `updatedAt` 倒序） |
+| `GET /assistant/conversations/{id}` | 返回 `{conversation, messages, proposals}` |
+| `DELETE /assistant/conversations/{id}` | 删除会话并清理其上传附件，204 |
+| `POST /assistant/conversations/{id}/messages` | 发送消息并运行 agent 循环，返回 `{message, proposals}` |
+| `POST /assistant/uploads` | multipart 上传（字段名 `file`），返回 `{fileId, kind, name, mime}` |
+| `POST /assistant/transcribe` | `{fileId}` -> `{text}`（音频模型转写） |
+| `POST /assistant/proposals/{id}/accept` | 按 action 创建/修改/删除真实任务，返回 `{proposal, task?}` |
+| `POST /assistant/proposals/{id}/reject` | 标记拒绝，返回 `{proposal}` |
+| `GET /assistant/settings` | 返回 `{hasApiKey, chatModel, audioModel}`（key 不回传） |
+| `PUT /assistant/settings` | 保存 `{apiKey?, chatModel?, audioModel?}` |
+
+上传限制：图片 jpg/jpeg/png/webp ≤10MB；文档 pdf/docx/txt/md ≤10MB；音频 mp3/wav/m4a ≤25MB。
+
+稳定错误码：`ASSISTANT_NOT_CONFIGURED`（409）、`ASSISTANT_UNAVAILABLE`（503）、`UNSUPPORTED_FILE_TYPE`（415）、`UPLOAD_TOO_LARGE`（413）、`UPLOAD_NOT_FOUND`（404）、`CONVERSATION_NOT_FOUND`（404）、`PROPOSAL_NOT_FOUND`（404）、`PROPOSAL_ALREADY_RESOLVED`（409）、`DOCUMENT_NOT_READABLE`（422）。
