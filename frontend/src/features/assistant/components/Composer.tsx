@@ -129,15 +129,17 @@ function Composer({ sending, onSend, onError, uploadFile, transcribe }: Composer
               event.target.value = '';
             }}
           />
-          <button onClick={() => fileInputRef.current?.click()} disabled={sending}
+          <button className="assistant-composer__tool" onClick={() => fileInputRef.current?.click()} disabled={sending}
             title={t('assistant.attach')} aria-label={t('assistant.attach')}>📎</button>
           <button
+            className={recording ? 'assistant-composer__tool assistant-composer__tool--recording' : 'assistant-composer__tool'}
             onClick={() => void (recording ? stopRecording() : startRecording())}
             disabled={sending}
             title={recording ? t('assistant.stopRecording') : t('assistant.record')}
             aria-label={recording ? t('assistant.stopRecording') : t('assistant.record')}
           >{recording ? '⏹' : '🎙'}</button>
           <button
+            className="assistant-composer__send"
             onClick={() => void handleSend()}
             disabled={sending || (!text.trim() && attachments.length === 0 && !pendingAudio)}
           >{t('assistant.send')}</button>
