@@ -100,6 +100,7 @@ const zhCN = {
   'errors.conversationNotFound': '会话不存在。',
   'errors.proposalNotFound': '提议不存在。',
   'errors.proposalAlreadyResolved': '该提议已处理过。',
+  'errors.micDenied': '无法访问麦克风，请检查系统权限。',
 } as const;
 
 export type TranslationKey = keyof typeof zhCN;
@@ -204,6 +205,7 @@ const en: Record<TranslationKey, string> = {
   'errors.conversationNotFound': 'The chat was not found.',
   'errors.proposalNotFound': 'The proposal was not found.',
   'errors.proposalAlreadyResolved': 'This proposal was already handled.',
+  'errors.micDenied': 'Microphone is unavailable. Check system permissions.',
 };
 
 const dictionaries: Record<Language, Record<TranslationKey, string>> = { 'zh-CN': zhCN, en };
@@ -235,6 +237,7 @@ const errorKeys: Record<string, TranslationKey> = {
   PROPOSAL_NOT_FOUND: 'errors.proposalNotFound',
   PROPOSAL_ALREADY_RESOLVED: 'errors.proposalAlreadyResolved',
   UPLOAD_NOT_FOUND: 'errors.notFound',
+  MIC_DENIED: 'errors.micDenied',
 };
 
 export function translationForError(language: Language, code: string): string {
