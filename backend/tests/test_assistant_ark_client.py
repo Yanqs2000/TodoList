@@ -88,3 +88,18 @@ def test_api_errors_become_ark_unavailable() -> None:
 
     with pytest.raises(ArkUnavailableError):
         client.chat([{"role": "user", "content": "hi"}])
+
+
+def test_malformed_tool_call_arguments_become_ark_unavailable() -> None:
+    function = MagicMock()
+    function.name = "list_tasks"
+    function.arguments = "{not json"
+    tool_call = MagicMock()
+    tool_call.id = "call_1"
+    tool_call.function = function
+    sdk = MagicMock()
+    sdk.chat.completions.create.return_value = _completion(None, [tool_call])
+    client = ArkClient("sk-x", "chat-model", "audio-model", client=sdk)
+
+    with pytest.raises(ArkUnavailableError, match="malformed tool call arguments"):
+        client.chat([{"role": "user", "content": "hi"}])

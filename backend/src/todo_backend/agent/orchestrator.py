@@ -68,7 +68,10 @@ class AgentOrchestrator:
 
     def system_prompt(self) -> str:
         template = _SYSTEM_PROMPTS.get(self._language, _SYSTEM_PROMPTS["en"])
-        return template.format(now=self._now_local, pending=self._pending_summary or "无")
+        empty_pending = "无" if self._language == "zh-CN" else "None"
+        return template.format(
+            now=self._now_local, pending=self._pending_summary or empty_pending
+        )
 
     def run(self, messages: list[dict[str, Any]]) -> AgentTurn:
         trace: list[dict[str, Any]] = []

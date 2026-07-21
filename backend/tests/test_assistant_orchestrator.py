@@ -86,3 +86,16 @@ def test_system_prompt_contains_time_and_pending_summary() -> None:
 
     assert "2026-07-20T09:30" in prompt
     assert "[p1] create: 买菜" in prompt
+
+
+def test_system_prompt_uses_none_for_empty_pending_in_english() -> None:
+    tools = MagicMock()
+    orchestrator = AgentOrchestrator(
+        _ScriptedArk([]), tools, language="en",
+        now_local="2026-07-20T09:30", pending_summary="",
+    )
+
+    prompt = orchestrator.system_prompt()
+
+    assert "None" in prompt
+    assert "无" not in prompt

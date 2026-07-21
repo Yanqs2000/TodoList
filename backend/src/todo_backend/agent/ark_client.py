@@ -66,14 +66,19 @@ class ArkClient:
         except Exception as error:  # openai raises a broad exception tree
             raise ArkUnavailableError("chat completion failed") from error
         message = completion.choices[0].message  # type: ignore[reportUnknownMemberType, reportUnknownVariableType]
-        tool_calls = [
-            ArkToolCall(
-                id=call.id,  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType]
-                name=call.function.name,  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType]
-                arguments=json.loads(call.function.arguments or "{}"),  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType]
+        tool_calls: list[ArkToolCall] = []
+        for call in message.tool_calls or []:  # type: ignore[reportUnknownVariableType, reportUnknownMemberType]
+            try:
+                arguments = json.loads(call.function.arguments or "{}")  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType]
+            except json.JSONDecodeError as error:
+                raise ArkUnavailableError("malformed tool call arguments") from error
+            tool_calls.append(
+                ArkToolCall(
+                    id=call.id,  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType]
+                    name=call.function.name,  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType]
+                    arguments=arguments,
+                )
             )
-            for call in message.tool_calls or []  # type: ignore[reportUnknownVariableType, reportUnknownMemberType]
-        ]
         return ArkChatResult(
             content=message.content or "",  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType]
             tool_calls=tool_calls,

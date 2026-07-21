@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from 'vitest';
-import { createTodoApi } from '../client';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createTodoApi, REQUEST_TIMEOUT_MS } from '../client';
+import { InfrastructureError } from '../contracts';
 
 const connection = { baseUrl: 'http://localhost:8000', token: 'test-token' };
 
@@ -11,6 +12,10 @@ function jsonResponse(payload: unknown, status = 200): Response {
 }
 
 describe('assistant api client', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('sends a message and unwraps the turn', async () => {
     const turn = {
       message: { id: 'm2', role: 'assistant', content: '好', attachments: [], status: 'done', createdAt: 2 },
@@ -72,5 +77,48 @@ describe('assistant api client', () => {
     const api = createTodoApi(connection, fetcher);
 
     await expect(api.transcribeAssistantAudio('f1.wav')).resolves.toBe('识别结果');
+  });
+
+  it('uses an extended timeout for sendAssistantMessage', async () => {
+    vi.useFakeTimers();
+    let signal: AbortSignal | null | undefined;
+    const fetcher = vi.fn<typeof fetch>().mockImplementation((_input, init) => {
+      signal = init?.signal;
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => {
+          reject(new DOMException('aborted', 'AbortError'));
+        });
+      });
+    });
+    const api = createTodoApi(connection, fetcher);
+
+    const request = api.sendAssistantMessage('c1', { content: '你好', attachments: [] });
+    const assertion = expect(request).rejects.toMatchObject({
+      name: 'InfrastructureError',
+      kind: 'timeout',
+      code: 'REQUEST_TIMEOUT',
+    });
+
+    await vi.advanceTimersByTimeAsync(REQUEST_TIMEOUT_MS + 1);
+    expect(signal?.aborted).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(120_000);
+    await assertion;
+  });
+
+  it('classifies fetch rejection as a network failure for uploads', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockRejectedValue(
+      new TypeError('private network adapter detail'),
+    );
+    const api = createTodoApi(connection, fetcher);
+    const file = new File([new Uint8Array([1, 2])], 'a.png', { type: 'image/png' });
+
+    await expect(api.uploadAssistantFile(file)).rejects.toMatchObject({
+      name: 'InfrastructureError',
+      kind: 'network',
+      code: 'NETWORK_ERROR',
+      message: 'Network request failed',
+    });
+    await expect(api.uploadAssistantFile(file)).rejects.toBeInstanceOf(InfrastructureError);
   });
 });

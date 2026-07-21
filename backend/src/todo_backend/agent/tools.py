@@ -94,7 +94,7 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "propose_update_task",
-            "description": "提议修改现有任务字段。只生成待用户确认的提议。把字段设为 null 表示清除该字段",
+            "description": "提议修改现有任务字段。只生成待用户确认的提议。notes 和 time_start/time_end 设为 null 表示清除该字段；text/priority/category 必须提供值",
             "parameters": {
                 "type": "object",
                 "properties": {

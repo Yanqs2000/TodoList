@@ -305,9 +305,12 @@ class AssistantService:
         with self.database.transaction() as connection:
             messages = self._conversations.list_messages(connection, conversation_id)
             pending = self._conversations.list_pending_proposals(connection, conversation_id)
-            language = connection.execute(
+            row = connection.execute(
                 "SELECT language FROM app_settings WHERE id = 1"
-            ).fetchone()["language"]
+            ).fetchone()
+            if row is None:
+                raise RuntimeError("Application settings are not initialized")
+            language = row["language"]
         tools = AgentTools(
             self.database,
             conversation_id=conversation_id,
@@ -321,12 +324,13 @@ class AssistantService:
             pending_summary=self._pending_summary(pending),
         )
         history = [{"role": "system", "content": orchestrator.system_prompt()}]
-        history.extend(self._build_ark_messages(messages))
+        history.extend(self._build_ark_messages(messages, language))
         return orchestrator.run(history)
 
     def _build_ark_messages(
-        self, messages: list[AssistantMessage]
+        self, messages: list[AssistantMessage], language: str
     ) -> list[dict[str, Any]]:
+        attachment_fallback = "（附件消息）" if language == "zh-CN" else "(attachment message)"
         ark_messages: list[dict[str, Any]] = []
         for message in messages[-HISTORY_LIMIT:]:
             if message.role == "assistant":
@@ -345,7 +349,7 @@ class AssistantService:
                     })
                 elif attachment.extracted_text:
                     text += f"\n\n〈{attachment.name}〉\n{attachment.extracted_text}"
-            parts.append({"type": "text", "text": text or "（附件消息）"})
+            parts.append({"type": "text", "text": text or attachment_fallback})
             ark_messages.append({"role": "user", "content": parts})
         return ark_messages
 

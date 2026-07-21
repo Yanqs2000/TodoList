@@ -95,19 +95,30 @@ export function createTodoApi(
     path: string,
     method: string,
     body?: unknown,
+    timeoutMs: number = REQUEST_TIMEOUT_MS,
+    rawBody?: BodyInit,
+    headers?: Record<string, string>,
   ): Promise<T> {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
+      const requestHeaders: Record<string, string> = {
+        Authorization: `Bearer ${connection.token}`,
+        ...(headers ?? {}),
+      };
+      if (rawBody === undefined) {
+        requestHeaders['Content-Type'] = 'application/json';
+      }
       let response: Response;
       try {
         response = await fetcher(`${baseUrl}${path}`, {
           method,
-          headers: {
-            Authorization: `Bearer ${connection.token}`,
-            'Content-Type': 'application/json',
-          },
-          body: body === undefined ? undefined : JSON.stringify(body),
+          headers: requestHeaders,
+          body: rawBody !== undefined
+            ? rawBody
+            : body === undefined
+              ? undefined
+              : JSON.stringify(body),
           signal: controller.signal,
         });
       } catch {
@@ -186,18 +197,14 @@ export function createTodoApi(
       `/api/v1/assistant/conversations/${encodeURIComponent(id)}`, 'DELETE',
     ),
     sendAssistantMessage: (id, input) => request<AssistantTurn>(
-      `/api/v1/assistant/conversations/${encodeURIComponent(id)}/messages`, 'POST', input,
+      `/api/v1/assistant/conversations/${encodeURIComponent(id)}/messages`, 'POST', input, 120_000,
     ),
     uploadAssistantFile: async file => {
       const form = new FormData();
       form.append('file', file, file.name);
-      const response = await fetcher(`${baseUrl}/api/v1/assistant/uploads`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${connection.token}` },
-        body: form,
-      });
-      if (!response.ok) throw await responseError(response);
-      return (await response.json()) as AssistantAttachment;
+      return request<AssistantAttachment>(
+        '/api/v1/assistant/uploads', 'POST', undefined, 60_000, form,
+      );
     },
     transcribeAssistantAudio: async fileId => (
       await request<{ text: string }>('/api/v1/assistant/transcribe', 'POST', { fileId })
