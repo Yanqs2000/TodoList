@@ -46,6 +46,8 @@ export interface TodoState {
   ) => Promise<boolean>;
   clearCompleted: () => Promise<number>;
   reorderTasks: (fromId: string, toId: string) => Promise<boolean>;
+  upsertExternalTask: (task: Todo) => void;
+  removeExternalTask: (id: string) => void;
   setFilter: (value: FilterType) => void;
   setPriority: (value: Priority) => void;
   setCategoryFilter: (value: Category | 'all') => void;
@@ -327,6 +329,18 @@ export function useTodos(
     }
   }, [api, handleError]);
 
+  const upsertExternalTask = useCallback((task: Todo) => {
+    setTasks(prev => (
+      prev.some(existing => existing.id === task.id)
+        ? prev.map(existing => (existing.id === task.id ? task : existing))
+        : [...prev, task]
+    ));
+  }, []);
+
+  const removeExternalTask = useCallback((id: string) => {
+    setTasks(prev => prev.filter(existing => existing.id !== id));
+  }, []);
+
   const clearCompleted = useCallback(async (): Promise<number> => {
     const completed = tasksRef.current.filter(item => item.completed);
     if (
@@ -423,6 +437,8 @@ export function useTodos(
     editTask,
     clearCompleted,
     reorderTasks,
+    upsertExternalTask,
+    removeExternalTask,
     setFilter,
     setPriority,
     setCategoryFilter,

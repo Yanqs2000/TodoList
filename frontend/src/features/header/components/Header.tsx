@@ -6,6 +6,7 @@ interface HeaderProps {
   onOpenAchievements: () => void;
   onOpenCreateModal: () => void;
   onOpenSettings: () => void;
+  onOpenAssistant: () => void;
   muted: boolean;
   onToggleMuted: () => void;
   onToggleLanguage: () => void;
@@ -16,6 +17,7 @@ function Header({
   onOpenAchievements,
   onOpenCreateModal,
   onOpenSettings,
+  onOpenAssistant,
   muted,
   onToggleMuted,
   onToggleLanguage,
@@ -42,6 +44,16 @@ function Header({
       </button>
 
       <div className="app-header__actions">
+        <button
+          className="icon-btn"
+          onClick={onOpenAssistant}
+          aria-label={t('assistant.openAssistant')}
+          title={t('assistant.openAssistant')}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" width="20" height="20">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 3l1.9 4.6L18.5 9l-4.6 1.4L12 15l-1.9-4.6L5.5 9l4.6-1.4L12 3zM18 15l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9.9-2.1z" />
+          </svg>
+        </button>
         <button
           className="app-header__language-btn"
           onClick={onToggleLanguage}

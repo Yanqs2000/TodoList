@@ -636,4 +636,19 @@ describe('useTodos database-first mutations', () => {
     expect(result.current.pending.clearCompleted).toBe(false);
     expect(result.current.pending.taskMutations.size).toBe(0);
   });
+
+  it('upserts and removes externally changed tasks', () => {
+    const initial = task();
+    const { result } = renderHook(() => useTodos([initial], fakeApi(), vi.fn()));
+
+    act(() => result.current.upsertExternalTask(task({ id: 'new-id', text: '助手创建' })));
+    expect(result.current.allTasks.map(t => t.id)).toEqual([initial.id, 'new-id']);
+
+    act(() => result.current.upsertExternalTask(task({ text: '改后' })));
+    expect(result.current.allTasks[0].text).toBe('改后');
+    expect(result.current.allTasks).toHaveLength(2);
+
+    act(() => result.current.removeExternalTask(initial.id));
+    expect(result.current.allTasks.map(t => t.id)).toEqual(['new-id']);
+  });
 });

@@ -4,10 +4,13 @@ import {
   ApiError,
   InfrastructureError,
   type BootstrapSnapshot,
+  type ResolveProposalResult,
   type TodoApi,
 } from '@/shared/api/contracts';
 import { DAILY_GOAL } from '@/shared/constants';
 import { useTodos } from '@/features/tasks/hooks/useTodos';
+import { useAssistant } from '@/features/assistant/hooks/useAssistant';
+import AssistantDrawer from '@/features/assistant/components/AssistantDrawer';
 import { useTheme } from '@/features/theme/hooks/useTheme';
 import { useSound } from '@/features/sound/hooks/useSound';
 import { useAchievements } from '@/features/achievements/hooks/useAchievements';
@@ -80,6 +83,17 @@ function TodoApplicationContent({ snapshot, api, onInfrastructureError, language
       'Unexpected backend error',
     ));
   }, [errorText, onInfrastructureError, showInfo]);
+
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const assistant = useAssistant(api, handleApplicationError);
+
+  const handleApplyProposal = useCallback((result: ResolveProposalResult) => {
+    if (result.proposal.action === 'delete') {
+      if (result.proposal.taskId) todoState.removeExternalTask(result.proposal.taskId);
+      return;
+    }
+    if (result.task) todoState.upsertExternalTask(result.task);
+  }, [todoState]);
 
   const { theme, setTheme } = useTheme(
     snapshot.settings.theme,
@@ -200,6 +214,15 @@ function TodoApplicationContent({ snapshot, api, onInfrastructureError, language
         allAchievements={achievements.allAchievements}
       />
 
+      <AssistantDrawer
+        open={assistantOpen}
+        onClose={() => setAssistantOpen(false)}
+        assistant={assistant}
+        api={api}
+        onApplyProposal={handleApplyProposal}
+        onError={handleApplicationError}
+      />
+
       <CreateTaskModal
         open={createModalOpen}
         onClose={() => setCreateModalOpen(false)}
@@ -247,6 +270,7 @@ function TodoApplicationContent({ snapshot, api, onInfrastructureError, language
           onOpenAchievements={() => setDrawerOpen(true)}
           onOpenCreateModal={() => setCreateModalOpen(true)}
           onOpenSettings={() => setSettingsOpen(true)}
+          onOpenAssistant={() => setAssistantOpen(true)}
           muted={sound.muted}
           onToggleMuted={sound.toggleMuted}
           onToggleLanguage={() => void setLanguage(language === 'zh-CN' ? 'en' : 'zh-CN')}
