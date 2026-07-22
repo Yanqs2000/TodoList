@@ -1,16 +1,34 @@
 import { useI18n } from '@/features/i18n/I18nProvider';
-import type { AssistantMessage, AssistantProposal } from '@/shared/api/contracts';
-import ProposalCard from './ProposalCard';
+import type {
+  AssistantMessage,
+  AssistantProposalBatch,
+  ConfirmProposalItemInput,
+} from '@/shared/api/contracts';
+import DeleteProposalCard from './DeleteProposalCard';
+import ProposalBatchCard from './ProposalBatchCard';
 
 interface MessageListProps {
   messages: AssistantMessage[];
-  proposals: AssistantProposal[];
+  proposalBatches: AssistantProposalBatch[];
+  submittingBatchIds: ReadonlySet<string>;
   sending: boolean;
-  onRetry: () => void;
-  onResolve: (id: string, action: 'accept' | 'reject') => Promise<void>;
+  onRetry: (turnId: string) => void | Promise<void>;
+  onConfirmBatch: (
+    id: string,
+    items: ConfirmProposalItemInput[],
+  ) => void | Promise<unknown>;
+  onRejectBatch: (id: string) => void | Promise<unknown>;
 }
 
-function MessageList({ messages, proposals, sending, onRetry, onResolve }: MessageListProps) {
+function MessageList({
+  messages,
+  proposalBatches,
+  submittingBatchIds,
+  sending,
+  onRetry,
+  onConfirmBatch,
+  onRejectBatch,
+}: MessageListProps) {
   const { t } = useI18n();
   if (messages.length === 0 && !sending) {
     return <div className="assistant-messages assistant-messages--empty">
@@ -31,15 +49,27 @@ function MessageList({ messages, proposals, sending, onRetry, onResolve }: Messa
             {message.status === 'failed' && (
               <p className="assistant-bubble__failed">
                 {t('assistant.failed')}
-                <button onClick={onRetry}>{t('assistant.retry')}</button>
+                {message.turnId !== null && (
+                  <button onClick={() => void onRetry(message.turnId!)}>
+                    {t('assistant.retry')}
+                  </button>
+                )}
               </p>
             )}
           </div>
-          {proposals
-            .filter(proposal => proposal.messageId === message.id)
-            .map(proposal => (
-              <ProposalCard key={proposal.id} proposal={proposal} onResolve={onResolve} />
-            ))}
+          {proposalBatches
+            .filter(batch => batch.messageId === message.id)
+            .map(batch => {
+              const props = {
+                batch,
+                submitting: submittingBatchIds.has(batch.id),
+                onConfirm: onConfirmBatch,
+                onReject: onRejectBatch,
+              };
+              return batch.proposals.length === 1 && batch.proposals[0]?.action === 'delete'
+                ? <DeleteProposalCard key={batch.id} {...props} />
+                : <ProposalBatchCard key={batch.id} {...props} />;
+            })}
         </div>
       ))}
       {sending && <div className="assistant-bubble assistant-bubble--assistant">

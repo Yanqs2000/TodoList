@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createTodoApi, REQUEST_TIMEOUT_MS } from '../client';
-import { InfrastructureError } from '../contracts';
+import {
+  InfrastructureError,
+  type ProposalBatchResolveResult,
+} from '../contracts';
 
 const connection = { baseUrl: 'http://localhost:8000', token: 'test-token' };
 
@@ -11,26 +14,68 @@ function jsonResponse(payload: unknown, status = 200): Response {
   });
 }
 
+function batchResolveResult(
+  status: 'accepted' | 'rejected',
+): ProposalBatchResolveResult {
+  const proposal = {
+    id: 'p1',
+    messageId: 'm2',
+    batchId: 'b1',
+    action: 'create' as const,
+    targetTaskId: null,
+    beforeSnapshot: null,
+    payload: {
+      text: '买菜',
+      priority: 'medium' as const,
+      category: 'life' as const,
+      time_start: null,
+      time_end: null,
+      notes: null,
+    },
+    resultTaskId: status === 'accepted' ? 't1' : null,
+    status,
+    lastError: null,
+    createdAt: 3,
+  };
+  return {
+    batch: {
+      id: 'b1',
+      messageId: 'm2',
+      status,
+      supersedesBatchId: null,
+      proposals: [proposal],
+      createdAt: 3,
+      resolvedAt: 4,
+    },
+    items: [{ proposal, task: null, error: null }],
+  };
+}
+
 describe('assistant api client', () => {
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  it('sends a message and unwraps the turn', async () => {
+  it('sends the stable turn id with the message', async () => {
     const turn = {
-      message: { id: 'm2', role: 'assistant', content: '好', attachments: [], status: 'done', createdAt: 2 },
-      proposals: [],
+      message: {
+        id: 'm2', turnId: 'turn-1', role: 'assistant', content: '好',
+        attachments: [], status: 'done', createdAt: 2,
+      },
+      proposalBatches: [],
     };
     const fetcher = vi.fn().mockResolvedValue(jsonResponse(turn));
     const api = createTodoApi(connection, fetcher);
 
-    const result = await api.sendAssistantMessage('c1', { content: '你好', attachments: [] });
+    const result = await api.sendAssistantMessage('c1', {
+      turnId: 'turn-1', content: '你好', attachments: [],
+    });
 
     expect(result.message.content).toBe('好');
-    expect(fetcher).toHaveBeenCalledWith(
-      'http://localhost:8000/api/v1/assistant/conversations/c1/messages',
-      expect.objectContaining({ method: 'POST' }),
-    );
+    const [, init] = fetcher.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toEqual({
+      turnId: 'turn-1', content: '你好', attachments: [],
+    });
   });
 
   it('uploads a file as multipart without a JSON content type', async () => {
@@ -50,25 +95,45 @@ describe('assistant api client', () => {
     expect(headers['Content-Type']).toBeUndefined();
   });
 
-  it('resolves proposals and reads settings', async () => {
-    const resolved = {
-      proposal: { id: 'p1', messageId: 'm1', action: 'create', taskId: null,
-        payload: { text: '买菜' }, status: 'accepted', createdAt: 1 },
-      task: { id: 't1', text: '买菜', completed: false, priority: 'medium',
-        createdAt: 1, category: 'life' },
-    };
-    const fetcher = vi.fn()
-      .mockResolvedValueOnce(jsonResponse(resolved))
-      .mockResolvedValueOnce(jsonResponse({
-        hasApiKey: true, chatModel: 'chat', audioModel: 'audio',
-      }));
+  it('confirms an edited proposal batch in one request', async () => {
+    const result = batchResolveResult('accepted');
+    const fetcher = vi.fn().mockResolvedValue(jsonResponse(result));
+    const api = createTodoApi(connection, fetcher);
+    const input = { items: [{
+      proposalId: 'p1',
+      payload: {
+        text: '卡片编辑后', priority: 'high' as const, category: 'work' as const,
+        time_start: null, time_end: null, notes: null,
+      },
+    }] };
+
+    await expect(api.confirmAssistantProposalBatch('b1', input)).resolves.toEqual(result);
+    expect(fetcher).toHaveBeenCalledWith(
+      'http://localhost:8000/api/v1/assistant/proposal-batches/b1/confirm',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify(input) }),
+    );
+  });
+
+  it('rejects a whole batch through the batch route', async () => {
+    const result = batchResolveResult('rejected');
+    const fetcher = vi.fn().mockResolvedValue(jsonResponse(result));
     const api = createTodoApi(connection, fetcher);
 
-    const accepted = await api.acceptAssistantProposal('p1');
+    await api.rejectAssistantProposalBatch('b1');
+    expect(fetcher).toHaveBeenCalledWith(
+      'http://localhost:8000/api/v1/assistant/proposal-batches/b1/reject',
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
+  it('reads assistant settings', async () => {
+    const fetcher = vi.fn().mockResolvedValue(jsonResponse({
+      hasApiKey: true, chatModel: 'chat', audioModel: 'audio',
+    }));
+    const api = createTodoApi(connection, fetcher);
+
     const settings = await api.getAssistantSettings();
 
-    expect(accepted.proposal.status).toBe('accepted');
-    expect(accepted.task?.id).toBe('t1');
     expect(settings.hasApiKey).toBe(true);
   });
 
@@ -92,7 +157,9 @@ describe('assistant api client', () => {
     });
     const api = createTodoApi(connection, fetcher);
 
-    const request = api.sendAssistantMessage('c1', { content: '你好', attachments: [] });
+    const request = api.sendAssistantMessage('c1', {
+      turnId: 'turn-timeout', content: '你好', attachments: [],
+    });
     const assertion = expect(request).rejects.toMatchObject({
       name: 'InfrastructureError',
       kind: 'timeout',

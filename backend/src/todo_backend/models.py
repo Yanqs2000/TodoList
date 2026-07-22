@@ -227,7 +227,11 @@ AssistantRole = Literal["user", "assistant"]
 AssistantMessageStatus = Literal["pending", "done", "failed"]
 AttachmentKind = Literal["image", "document", "audio"]
 ProposalAction = Literal["create", "update", "delete"]
-ProposalStatus = Literal["pending", "accepted", "rejected"]
+ProposalStatus = Literal["pending", "accepted", "rejected", "superseded"]
+ProposalBatchStatus = Literal[
+    "pending", "partially_applied", "accepted", "rejected", "superseded"
+]
+AssistantTurnStatus = Literal["active", "done", "failed"]
 
 
 class AssistantAttachment(WireModel):
@@ -240,13 +244,26 @@ class AssistantAttachment(WireModel):
     extracted_text: str | None = Field(default=None, alias="extractedText")
 
 
-class ProposalFields(WireModel):
+class PlannedFields(WireModel):
     text: StrictText | None = None
     priority: Priority | None = None
     category: Category | None = None
     time_start: LocalDateTime | None = None
     time_end: LocalDateTime | None = None
     notes: StrictNotes | None = None
+
+
+class ProposalCardFields(WireModel):
+    text: StrictText
+    priority: Priority
+    category: Category
+    time_start: LocalDateTime | None
+    time_end: LocalDateTime | None
+    notes: StrictNotes | None
+
+
+# Temporary source-compatibility alias for the old AgentTools removed in Task 11.
+ProposalFields = PlannedFields
 
 
 class AssistantMessage(WireModel):
@@ -256,16 +273,41 @@ class AssistantMessage(WireModel):
     attachments: list[AssistantAttachment] = []
     status: AssistantMessageStatus = "done"
     created_at: int = Field(alias="createdAt")
+    turn_id: str | None = Field(default=None, alias="turnId")
+
+
+class AssistantTurnRecord(WireModel):
+    id: str
+    conversation_id: str = Field(alias="conversationId")
+    user_message_id: str = Field(alias="userMessageId")
+    assistant_message_id: str = Field(alias="assistantMessageId")
+    request_fingerprint: str = Field(alias="requestFingerprint")
+    status: AssistantTurnStatus
+    last_error: str | None = Field(default=None, alias="lastError")
 
 
 class AssistantProposal(WireModel):
     id: str
     message_id: str = Field(alias="messageId")
+    batch_id: str = Field(alias="batchId")
     action: ProposalAction
-    task_id: str | None = Field(default=None, alias="taskId")
-    payload: ProposalFields
+    target_task_id: str | None = Field(default=None, alias="targetTaskId")
+    before_snapshot: Task | None = Field(default=None, alias="beforeSnapshot")
+    payload: ProposalCardFields | None
+    result_task_id: str | None = Field(default=None, alias="resultTaskId")
     status: ProposalStatus
+    last_error: str | None = Field(default=None, alias="lastError")
     created_at: int = Field(alias="createdAt")
+
+
+class AssistantProposalBatch(WireModel):
+    id: str
+    message_id: str = Field(alias="messageId")
+    status: ProposalBatchStatus
+    supersedes_batch_id: str | None = Field(default=None, alias="supersedesBatchId")
+    proposals: list[AssistantProposal]
+    created_at: int = Field(alias="createdAt")
+    resolved_at: int | None = Field(default=None, alias="resolvedAt")
 
 
 class AssistantConversationSummary(WireModel):
@@ -276,6 +318,9 @@ class AssistantConversationSummary(WireModel):
 
 
 class SendAssistantMessageCommand(WireModel):
+    turn_id: Annotated[str, Field(strict=True, min_length=8, max_length=100)] = Field(
+        alias="turnId"
+    )
     content: Annotated[str, Field(strict=True, max_length=10_000)] = ""
     attachments: list[AssistantAttachment] = Field(
         default_factory=list[AssistantAttachment], max_length=5
@@ -288,6 +333,31 @@ class SendAssistantMessageCommand(WireModel):
         return self
 
 
+class ConfirmProposalItem(WireModel):
+    proposal_id: str = Field(alias="proposalId")
+    payload: ProposalCardFields | None = None
+
+
+class ConfirmProposalBatchCommand(WireModel):
+    items: Annotated[list[ConfirmProposalItem], Field(min_length=1)]
+
+
+class ProposalReviewDecision(WireModel):
+    decision: Literal["confirm", "reject"]
+    items: list[ConfirmProposalItem] = Field(default_factory=list[ConfirmProposalItem])
+
+
+class ProposalApplyItemResult(WireModel):
+    proposal: AssistantProposal
+    task: Task | None = None
+    error: str | None = None
+
+
+class ProposalBatchResolveResponse(WireModel):
+    batch: AssistantProposalBatch
+    items: list[ProposalApplyItemResult]
+
+
 class TranscribeCommand(WireModel):
     file_id: Annotated[str, Field(strict=True, min_length=1, max_length=200)] = Field(
         alias="fileId"
@@ -296,13 +366,13 @@ class TranscribeCommand(WireModel):
 
 class AssistantTurnResponse(WireModel):
     message: AssistantMessage
-    proposals: list[AssistantProposal]
+    proposal_batches: list[AssistantProposalBatch] = Field(alias="proposalBatches")
 
 
 class AssistantConversationDetail(WireModel):
     conversation: AssistantConversationSummary
     messages: list[AssistantMessage]
-    proposals: list[AssistantProposal]
+    proposal_batches: list[AssistantProposalBatch] = Field(alias="proposalBatches")
 
 
 class AssistantConversationListResponse(WireModel):

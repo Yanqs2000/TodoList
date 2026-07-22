@@ -1,7 +1,8 @@
 # pyright: reportUnusedFunction=false
 
 import sqlite3
-from collections.abc import Mapping
+from collections.abc import AsyncIterator, Mapping
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import cast
 
@@ -33,20 +34,29 @@ from todo_backend.models import (
 )
 from todo_backend.repositories.conversations import (
     ConversationNotFoundError,
+)
+from todo_backend.repositories.proposal_batches import (
+    ProposalBatchNotFoundError,
     ProposalNotFoundError,
 )
 from todo_backend.repositories.tasks import InvalidTaskOrderError, TaskNotFoundError
 from todo_backend.services.assistant import (
     AssistantNotConfiguredError,
     AssistantService,
+    AssistantTurnActiveError,
+    AssistantTurnPayloadMismatchError,
     AssistantUnavailableError,
-    ProposalAlreadyResolvedError,
+    ProposalBatchRequiredError,
     UnsupportedFileTypeError,
     UploadNotFoundError,
     UploadTooLargeError,
 )
 from todo_backend.services.bootstrap import BootstrapService
 from todo_backend.services.documents import DocumentExtractionError
+from todo_backend.services.proposal_batches import (
+    InvalidProposalBatchCommandError,
+    ProposalBatchNotConfirmableError,
+)
 from todo_backend.services.reminders import ReminderService
 from todo_backend.services.settings import SettingsService
 from todo_backend.services.tasks import TaskService
@@ -75,7 +85,14 @@ def create_app(
         resolved_database, resolved_settings
     )
 
-    app = FastAPI()
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        try:
+            yield
+        finally:
+            resolved_assistant_service.close()
+
+    app = FastAPI(lifespan=lifespan)
     allowed_origins = ["tauri://localhost", "http://tauri.localhost"]
     if resolved_settings.allow_vite_dev_origin:
         allowed_origins.append("http://localhost:5173")
@@ -99,7 +116,18 @@ def create_app(
     app.add_exception_handler(UploadNotFoundError, _upload_not_found_handler)
     app.add_exception_handler(ConversationNotFoundError, _conversation_not_found_handler)
     app.add_exception_handler(ProposalNotFoundError, _proposal_not_found_handler)
-    app.add_exception_handler(ProposalAlreadyResolvedError, _proposal_resolved_handler)
+    app.add_exception_handler(ProposalBatchNotFoundError, _proposal_batch_not_found_handler)
+    app.add_exception_handler(
+        InvalidProposalBatchCommandError, _invalid_confirmation_payload_handler
+    )
+    app.add_exception_handler(
+        ProposalBatchNotConfirmableError, _proposal_batch_not_confirmable_handler
+    )
+    app.add_exception_handler(AssistantTurnActiveError, _assistant_turn_active_handler)
+    app.add_exception_handler(
+        AssistantTurnPayloadMismatchError, _assistant_turn_payload_mismatch_handler
+    )
+    app.add_exception_handler(ProposalBatchRequiredError, _proposal_batch_required_handler)
     app.add_exception_handler(DocumentExtractionError, _document_not_readable_handler)
     app.add_exception_handler(Exception, _internal_error_handler)
 
@@ -286,8 +314,52 @@ def _proposal_not_found_handler(_request: Request, _error: Exception) -> JSONRes
     return _error_response(404, "PROPOSAL_NOT_FOUND", "Proposal not found")
 
 
-def _proposal_resolved_handler(_request: Request, _error: Exception) -> JSONResponse:
-    return _error_response(409, "PROPOSAL_ALREADY_RESOLVED", "Proposal already resolved")
+def _proposal_batch_not_found_handler(
+    _request: Request, _error: Exception
+) -> JSONResponse:
+    return _error_response(
+        404, "PROPOSAL_BATCH_NOT_FOUND", "Proposal batch not found"
+    )
+
+
+def _invalid_confirmation_payload_handler(
+    _request: Request, _error: Exception
+) -> JSONResponse:
+    return _error_response(
+        422, "INVALID_CONFIRMATION_PAYLOAD", "Invalid confirmation payload"
+    )
+
+
+def _proposal_batch_not_confirmable_handler(
+    _request: Request, _error: Exception
+) -> JSONResponse:
+    return _error_response(
+        409, "PROPOSAL_BATCH_NOT_CONFIRMABLE", "Proposal batch is not confirmable"
+    )
+
+
+def _assistant_turn_active_handler(
+    _request: Request, _error: Exception
+) -> JSONResponse:
+    return _error_response(409, "ASSISTANT_TURN_ACTIVE", "Assistant turn is active")
+
+
+def _assistant_turn_payload_mismatch_handler(
+    _request: Request, _error: Exception
+) -> JSONResponse:
+    return _error_response(
+        409,
+        "ASSISTANT_TURN_PAYLOAD_MISMATCH",
+        "Assistant turn payload does not match",
+    )
+
+
+def _proposal_batch_required_handler(
+    _request: Request, _error: Exception
+) -> JSONResponse:
+    return _error_response(
+        409, "PROPOSAL_BATCH_REQUIRED", "Use the proposal batch endpoint"
+    )
 
 
 def _document_not_readable_handler(_request: Request, _error: Exception) -> JSONResponse:

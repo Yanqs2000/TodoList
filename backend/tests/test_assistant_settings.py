@@ -3,8 +3,10 @@
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from todo_backend.database import Database
+from todo_backend import models
 from todo_backend.models import AssistantSettingsPatchCommand
 from todo_backend.repositories.assistant_settings import (
     DEFAULT_ARK_BASE_URL,
@@ -37,7 +39,7 @@ def test_migration_003_creates_assistant_tables(database: Database) -> None:
         }
     finally:
         connection.close()
-    assert version == 4
+    assert version == 5
     assert {
         "assistant_conversations",
         "assistant_messages",
@@ -84,3 +86,39 @@ def test_assistant_settings_patch_rejects_null_and_unknown() -> None:
         AssistantSettingsPatchCommand(apiKey=None)
     with pytest.raises(Exception):
         AssistantSettingsPatchCommand(unknown="x")
+
+
+def test_proposal_card_fields_require_all_six_wire_keys() -> None:
+    assert set(models.ProposalCardFields.model_json_schema()["required"]) == {
+        "text",
+        "priority",
+        "category",
+        "time_start",
+        "time_end",
+        "notes",
+    }
+
+    card = models.ProposalCardFields(
+        text="买菜",
+        priority="medium",
+        category="life",
+        time_start=None,
+        time_end=None,
+        notes=None,
+    )
+    assert card.text == "买菜"
+
+    with pytest.raises(ValidationError):
+        models.ProposalCardFields(
+            text="买菜",
+            priority="medium",
+            category="life",
+            time_start=None,
+            time_end=None,
+        )
+
+
+def test_planned_fields_remain_partial() -> None:
+    planned = models.PlannedFields(time_end="2026-07-22T17:00")
+
+    assert planned.time_end == "2026-07-22T17:00"

@@ -242,12 +242,10 @@
   background: rgba(255, 255, 255, 0.2);
 }
 
-/* ---------- 提案卡片 ---------- */
-.assistant-proposal {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-width: 100%;
+/* ---------- 提案批次卡片 ---------- */
+.assistant-proposal-batch {
+  width: calc(100% - 12px);
+  box-sizing: border-box;
   margin-left: 12px;
   padding: 12px;
   background: var(--card-bg);
@@ -255,73 +253,228 @@
   border-left: 3px solid var(--cta);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
-  transition: opacity var(--transition);
+  color: var(--text);
 }
 
-.assistant-proposal--accepted {
+.assistant-proposal-batch--accepted {
   border-left-color: var(--priority-low);
-  opacity: 0.85;
 }
 
-.assistant-proposal--rejected {
+.assistant-proposal-batch--rejected,
+.assistant-proposal-batch--superseded {
   border-left-color: var(--border-strong);
-  opacity: 0.6;
 }
 
-.assistant-proposal__header {
+.assistant-proposal-batch--superseded {
+  opacity: 0.72;
+}
+
+.assistant-proposal-batch--superseded > summary {
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.assistant-proposal-batch--superseded[open] > summary {
+  margin-bottom: 10px;
+}
+
+.assistant-proposal-batch__status {
+  margin-bottom: 8px;
+  color: var(--cta);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.assistant-proposal-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.assistant-proposal-item + .assistant-proposal-item {
+  margin-top: 10px;
+}
+
+.assistant-proposal-item--pending {
+  border-color: color-mix(in srgb, var(--cta) 42%, var(--border));
+}
+
+.assistant-proposal-item--accepted {
+  border-color: color-mix(in srgb, var(--priority-low) 42%, var(--border));
+}
+
+.assistant-proposal-item--rejected,
+.assistant-proposal-item--superseded {
+  opacity: 0.7;
+}
+
+.assistant-proposal-item--error {
+  border-color: color-mix(in srgb, var(--danger) 48%, var(--border));
+}
+
+.assistant-proposal-item__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
   font-size: 0.8125rem;
-  font-weight: 600;
-  color: var(--text);
 }
 
-.assistant-proposal__status {
+.assistant-proposal-item__header > span {
   padding: 1px 8px;
   border-radius: 999px;
+  background: var(--card-bg);
+  color: var(--text-muted);
   font-size: 0.6875rem;
   font-weight: 600;
-  flex-shrink: 0;
 }
 
-.assistant-proposal--accepted .assistant-proposal__status {
+.assistant-proposal-item--accepted .assistant-proposal-item__header > span {
   background: color-mix(in srgb, var(--priority-low) 14%, transparent);
   color: var(--priority-low);
 }
 
-.assistant-proposal--rejected .assistant-proposal__status {
-  background: var(--bg-elevated);
-  color: var(--text-light);
-}
-
-.assistant-proposal__text {
-  font-size: 0.875rem;
-  color: var(--text);
+.assistant-proposal-item__target,
+.assistant-proposal-item__unavailable {
+  color: var(--text-muted);
+  font-size: 0.8125rem;
   line-height: 1.5;
 }
 
-.assistant-proposal__fields {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  font-size: 0.75rem;
-  color: var(--text-muted);
+.assistant-proposal-diff {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
 
-.assistant-proposal__fields span {
-  padding: 2px 8px;
-  background: var(--bg-elevated);
+.assistant-proposal-diff > div {
+  min-width: 0;
+  padding: 8px;
+  background: var(--card-bg);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.assistant-proposal-diff__values {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
+.assistant-proposal-fields {
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.assistant-proposal-fields label {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.assistant-proposal-fields label:first-child,
+.assistant-proposal-fields label:last-child {
+  grid-column: 1 / -1;
+}
+
+.assistant-proposal-fields input,
+.assistant-proposal-fields select,
+.assistant-proposal-fields textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card-bg);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.8125rem;
+  outline: none;
+  transition: border-color var(--transition), opacity var(--transition);
+}
+
+.assistant-proposal-fields textarea {
+  min-height: 58px;
+  resize: vertical;
+}
+
+.assistant-proposal-fields input:focus,
+.assistant-proposal-fields select:focus,
+.assistant-proposal-fields textarea:focus {
+  border-color: var(--primary);
+}
+
+.assistant-proposal-fields input:focus-visible,
+.assistant-proposal-fields select:focus-visible,
+.assistant-proposal-fields textarea:focus-visible,
+.assistant-proposal-batch--superseded > summary:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.assistant-proposal-fields:disabled input,
+.assistant-proposal-fields:disabled select,
+.assistant-proposal-fields:disabled textarea {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.assistant-proposal-item__validation,
+.assistant-proposal-item__error {
+  color: var(--danger);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.assistant-delete-target {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  font-size: 0.75rem;
+}
+
+.assistant-delete-target > div {
+  display: grid;
+  grid-template-columns: minmax(72px, auto) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.assistant-delete-target dt {
+  color: var(--text-light);
+}
+
+.assistant-delete-target dd {
+  margin: 0;
+  color: var(--text);
+  overflow-wrap: anywhere;
   font-variant-numeric: tabular-nums;
 }
 
 .assistant-proposal__actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
-  margin-top: 2px;
+  margin-top: 10px;
 }
 
 .assistant-proposal__actions button {
@@ -337,7 +490,7 @@
   transition: all var(--transition);
 }
 
-.assistant-proposal__actions button:hover {
+.assistant-proposal__actions button:hover:not(:disabled) {
   border-color: var(--border-strong);
   color: var(--text);
 }
@@ -348,10 +501,27 @@
   color: #fff;
 }
 
-.assistant-proposal__actions .assistant-proposal__accept:hover {
+.assistant-proposal__actions .assistant-proposal__accept:hover:not(:disabled) {
   background: var(--primary-light);
   border-color: var(--primary-light);
   color: #fff;
+}
+
+.assistant-proposal__actions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (max-width: 340px) {
+  .assistant-proposal-fields,
+  .assistant-proposal-diff {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .assistant-proposal-fields label:first-child,
+  .assistant-proposal-fields label:last-child {
+    grid-column: auto;
+  }
 }
 
 /* ---------- 输入区 ---------- */

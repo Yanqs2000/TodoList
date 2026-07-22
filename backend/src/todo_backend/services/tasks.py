@@ -1,3 +1,5 @@
+import sqlite3
+
 from todo_backend.database import Database
 from todo_backend.models import (
     CompletionCommand,
@@ -33,22 +35,38 @@ class TaskService:
 
     def create(self, command: CreateTaskCommand) -> Task:
         with self.database.transaction() as connection:
-            return self.repository.create(connection, command)
+            return self.create_in_transaction(connection, command)
+
+    def create_in_transaction(
+        self, connection: sqlite3.Connection, command: CreateTaskCommand
+    ) -> Task:
+        return self.repository.create(connection, command)
 
     def update(self, task_id: str, command: UpdateTaskCommand) -> Task:
         with self.database.transaction() as connection:
-            task = self.repository.update(connection, task_id, command)
-            if "time" in command.model_fields_set:
-                self.reminder_repository.prune_stale(
-                    connection,
-                    task_id,
-                    task.time.start if task.time else None,
-                )
-            return task
+            return self.update_in_transaction(connection, task_id, command)
+
+    def update_in_transaction(
+        self,
+        connection: sqlite3.Connection,
+        task_id: str,
+        command: UpdateTaskCommand,
+    ) -> Task:
+        task = self.repository.update(connection, task_id, command)
+        if "time" in command.model_fields_set:
+            self.reminder_repository.prune_stale(
+                connection, task_id, task.time.start if task.time else None
+            )
+        return task
 
     def delete(self, task_id: str) -> None:
         with self.database.transaction() as connection:
-            self.repository.delete(connection, task_id)
+            self.delete_in_transaction(connection, task_id)
+
+    def delete_in_transaction(
+        self, connection: sqlite3.Connection, task_id: str
+    ) -> None:
+        self.repository.delete(connection, task_id)
 
     def set_completion(
         self,

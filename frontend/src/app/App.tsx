@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import type { TimeField, Category, Priority } from '@/shared/types';
+import type { TimeField, Category, Priority, Todo } from '@/shared/types';
 import {
   ApiError,
   InfrastructureError,
   type BootstrapSnapshot,
-  type ResolveProposalResult,
+  type ProposalApplyItemResult,
   type TodoApi,
 } from '@/shared/api/contracts';
 import { DAILY_GOAL } from '@/shared/constants';
@@ -52,6 +52,24 @@ interface TodoApplicationContentProps extends TodoApplicationProps {
   languagePending: boolean;
 }
 
+interface ExternalTaskList {
+  upsertExternalTask: (task: Todo) => void;
+  removeExternalTask: (id: string) => void;
+}
+
+export function applyProposalItemToTaskList(
+  result: ProposalApplyItemResult,
+  taskList: ExternalTaskList,
+): void {
+  if (result.proposal.action === 'delete') {
+    if (result.proposal.targetTaskId) {
+      taskList.removeExternalTask(result.proposal.targetTaskId);
+    }
+  } else if (result.task) {
+    taskList.upsertExternalTask(result.task);
+  }
+}
+
 function TodoApplicationContent({ snapshot, api, onInfrastructureError, language, setLanguage, languagePending }: TodoApplicationContentProps) {
   const { t, errorText } = useI18n();
   const todoState = useTodos(snapshot.tasks, api, onInfrastructureError);
@@ -87,12 +105,8 @@ function TodoApplicationContent({ snapshot, api, onInfrastructureError, language
   const [assistantOpen, setAssistantOpen] = useState(false);
   const assistant = useAssistant(api, handleApplicationError);
 
-  const handleApplyProposal = useCallback((result: ResolveProposalResult) => {
-    if (result.proposal.action === 'delete') {
-      if (result.proposal.taskId) todoState.removeExternalTask(result.proposal.taskId);
-      return;
-    }
-    if (result.task) todoState.upsertExternalTask(result.task);
+  const handleApplyProposal = useCallback((result: ProposalApplyItemResult) => {
+    applyProposalItemToTaskList(result, todoState);
   }, [todoState]);
 
   const { theme, setTheme } = useTheme(

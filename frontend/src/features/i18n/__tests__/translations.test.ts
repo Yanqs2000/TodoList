@@ -27,6 +27,12 @@ describe('translations', () => {
       'assistant.failed', 'assistant.accept', 'assistant.reject',
       'assistant.accepted', 'assistant.rejected', 'assistant.proposalCreate',
       'assistant.proposalUpdate', 'assistant.proposalDelete',
+      'assistant.taskTitle', 'assistant.target', 'assistant.before',
+      'assistant.after', 'assistant.confirmBatch', 'assistant.retryRemaining',
+      'assistant.partiallyApplied', 'assistant.superseded',
+      'assistant.deleteTarget', 'assistant.confirmDelete',
+      'assistant.targetUnavailable', 'assistant.validationTitle',
+      'assistant.validationTime', 'assistant.proposalError',
       'assistant.setupRequired', 'assistant.setupHint', 'assistant.apiKey',
       'assistant.apiKeySaved', 'assistant.chatModel', 'assistant.audioModel',
       'assistant.save', 'assistant.saved', 'assistant.openAssistant',
@@ -35,6 +41,9 @@ describe('translations', () => {
       'errors.uploadTooLarge', 'errors.unsupportedFileType',
       'errors.documentNotReadable', 'errors.conversationNotFound',
       'errors.proposalNotFound', 'errors.proposalAlreadyResolved',
+      'errors.taskChangedSinceProposal', 'errors.invalidConfirmation',
+      'errors.resultVerification', 'errors.proposalBatchState',
+      'errors.assistantTurnActive',
     ] as const;
     for (const key of keys) {
       expect(translate('zh-CN', key)).not.toBe(key);
@@ -46,5 +55,15 @@ describe('translations', () => {
       .toBe(translate('en', 'errors.assistantUnavailable'));
     expect(translationForError('en', 'UPLOAD_TOO_LARGE'))
       .toBe(translate('en', 'errors.uploadTooLarge'));
+    expect(translationForError('zh-CN', 'TASK_CHANGED_SINCE_PROPOSAL'))
+      .toBe(translate('zh-CN', 'errors.taskChangedSinceProposal'));
+    expect(translationForError('en', 'INVALID_CONFIRMATION_PAYLOAD'))
+      .toBe(translate('en', 'errors.invalidConfirmation'));
+    expect(translationForError('en', 'RESULT_VERIFICATION_FAILED'))
+      .toBe(translate('en', 'errors.resultVerification'));
+    expect(translationForError('en', 'PROPOSAL_BATCH_NOT_CONFIRMABLE'))
+      .toBe(translate('en', 'errors.proposalBatchState'));
+    expect(translationForError('en', 'ASSISTANT_TURN_ACTIVE'))
+      .toBe(translate('en', 'errors.assistantTurnActive'));
   });
 });

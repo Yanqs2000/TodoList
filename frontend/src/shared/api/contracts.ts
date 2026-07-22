@@ -93,6 +93,7 @@ export interface AssistantConversationSummary {
 
 export interface AssistantMessage {
   id: string;
+  turnId: string | null;
   role: 'user' | 'assistant';
   content: string;
   attachments: AssistantAttachment[];
@@ -100,34 +101,72 @@ export interface AssistantMessage {
   createdAt: number;
 }
 
-export interface ProposalFields {
-  text?: string;
-  priority?: 'low' | 'medium' | 'high';
-  category?: 'work' | 'study' | 'life' | 'other';
-  time_start?: string | null;
-  time_end?: string | null;
-  notes?: string | null;
+export interface ProposalCardFields {
+  text: string;
+  priority: Priority;
+  category: Category;
+  time_start: string | null;
+  time_end: string | null;
+  notes: string | null;
 }
+
+export type ProposalStatus = 'pending' | 'accepted' | 'rejected' | 'superseded';
+export type ProposalBatchStatus =
+  | 'pending' | 'partially_applied' | 'accepted' | 'rejected' | 'superseded';
 
 export interface AssistantProposal {
   id: string;
   messageId: string;
+  batchId: string;
   action: 'create' | 'update' | 'delete';
-  taskId: string | null;
-  payload: ProposalFields;
-  status: 'pending' | 'accepted' | 'rejected';
+  targetTaskId: string | null;
+  beforeSnapshot: Todo | null;
+  payload: ProposalCardFields | null;
+  resultTaskId: string | null;
+  status: ProposalStatus;
+  lastError: string | null;
   createdAt: number;
+}
+
+export interface AssistantProposalBatch {
+  id: string;
+  messageId: string;
+  status: ProposalBatchStatus;
+  supersedesBatchId: string | null;
+  proposals: AssistantProposal[];
+  createdAt: number;
+  resolvedAt: number | null;
+}
+
+export interface ConfirmProposalItemInput {
+  proposalId: string;
+  payload: ProposalCardFields | null;
+}
+
+export interface ConfirmProposalBatchInput {
+  items: ConfirmProposalItemInput[];
+}
+
+export interface ProposalApplyItemResult {
+  proposal: AssistantProposal;
+  task: Todo | null;
+  error: string | null;
+}
+
+export interface ProposalBatchResolveResult {
+  batch: AssistantProposalBatch;
+  items: ProposalApplyItemResult[];
 }
 
 export interface AssistantTurn {
   message: AssistantMessage;
-  proposals: AssistantProposal[];
+  proposalBatches: AssistantProposalBatch[];
 }
 
 export interface AssistantConversationDetail {
   conversation: AssistantConversationSummary;
   messages: AssistantMessage[];
-  proposals: AssistantProposal[];
+  proposalBatches: AssistantProposalBatch[];
 }
 
 export interface AssistantSettingsView {
@@ -144,12 +183,8 @@ export interface AssistantSettingsPatch {
   baseUrl?: string;
 }
 
-export interface ResolveProposalResult {
-  proposal: AssistantProposal;
-  task: import('@/shared/types').Todo | null;
-}
-
 export interface SendAssistantMessageInput {
+  turnId: string;
   content: string;
   attachments: AssistantAttachment[];
 }
@@ -170,8 +205,11 @@ export interface TodoApi {
   sendAssistantMessage(id: string, input: SendAssistantMessageInput): Promise<AssistantTurn>;
   uploadAssistantFile(file: File): Promise<AssistantAttachment>;
   transcribeAssistantAudio(fileId: string): Promise<string>;
-  acceptAssistantProposal(id: string): Promise<ResolveProposalResult>;
-  rejectAssistantProposal(id: string): Promise<AssistantProposal>;
+  confirmAssistantProposalBatch(
+    id: string,
+    input: ConfirmProposalBatchInput,
+  ): Promise<ProposalBatchResolveResult>;
+  rejectAssistantProposalBatch(id: string): Promise<ProposalBatchResolveResult>;
   getAssistantSettings(): Promise<AssistantSettingsView>;
   updateAssistantSettings(input: AssistantSettingsPatch): Promise<AssistantSettingsView>;
 }

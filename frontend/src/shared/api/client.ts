@@ -5,13 +5,12 @@ import {
   type AssistantAttachment,
   type AssistantConversationDetail,
   type AssistantConversationSummary,
-  type AssistantProposal,
   type AssistantSettingsView,
   type AssistantTurn,
   type BackendConnection,
   type BootstrapSnapshot,
   type CompletionResult,
-  type ResolveProposalResult,
+  type ProposalBatchResolveResult,
   type TodoApi,
 } from './contracts';
 import type { Todo } from '@/shared/types';
@@ -209,14 +208,16 @@ export function createTodoApi(
     transcribeAssistantAudio: async fileId => (
       await request<{ text: string }>('/api/v1/assistant/transcribe', 'POST', { fileId })
     ).text,
-    acceptAssistantProposal: id => request<ResolveProposalResult>(
-      `/api/v1/assistant/proposals/${encodeURIComponent(id)}/accept`, 'POST', {},
+    confirmAssistantProposalBatch: (id, input) => request<ProposalBatchResolveResult>(
+      `/api/v1/assistant/proposal-batches/${encodeURIComponent(id)}/confirm`,
+      'POST',
+      input,
     ),
-    rejectAssistantProposal: async id => (
-      await request<{ proposal: AssistantProposal }>(
-        `/api/v1/assistant/proposals/${encodeURIComponent(id)}/reject`, 'POST', {},
-      )
-    ).proposal,
+    rejectAssistantProposalBatch: id => request<ProposalBatchResolveResult>(
+      `/api/v1/assistant/proposal-batches/${encodeURIComponent(id)}/reject`,
+      'POST',
+      {},
+    ),
     getAssistantSettings: () => request<AssistantSettingsView>(
       '/api/v1/assistant/settings', 'GET',
     ),

@@ -1,14 +1,22 @@
 import base64
+import hashlib
 import json
-import time
+import sqlite3
+import threading
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, cast
 
+from todo_backend.agent.apply_graph import ProposalApplyWorkflow
 from todo_backend.agent.ark_client import ArkClient, ArkUnavailableError
-from todo_backend.agent.orchestrator import HISTORY_LIMIT, AgentOrchestrator, AgentTurn
-from todo_backend.agent.tools import AgentTools
+from todo_backend.agent.checkpoints import CheckpointStore
+from todo_backend.agent.planning import ArkPlanner
+from todo_backend.agent.turn_graph import (
+    AssistantTurnWorkflow,
+    TurnGraphDependencies,
+)
 from todo_backend.config import Settings
 from todo_backend.database import Database
 from todo_backend.models import (
@@ -20,20 +28,28 @@ from todo_backend.models import (
     AssistantSettings,
     AssistantSettingsPatchCommand,
     AssistantSettingsView,
+    AssistantTurnRecord,
     AssistantTurnResponse,
     AttachmentKind,
-    CreateTaskCommand,
+    ConfirmProposalBatchCommand,
+    ConfirmProposalItem,
+    ProposalBatchResolveResponse,
     SendAssistantMessageCommand,
     Task,
-    TimeField,
     TranscribeCommand,
-    UpdateTaskCommand,
 )
 from todo_backend.repositories.assistant_settings import AssistantSettingsRepository
-from todo_backend.repositories.conversations import ConversationsRepository
-from todo_backend.repositories.reminders import ReminderRepository
-from todo_backend.repositories.tasks import TaskRepository
+from todo_backend.repositories.conversations import (
+    AssistantTurnNotFoundError,
+    ConversationsRepository,
+)
+from todo_backend.repositories.proposal_batches import ProposalBatchesRepository
 from todo_backend.services.documents import extract_document_text
+from todo_backend.services.proposal_batches import (
+    ProposalBatchExecutor,
+    ProposalBatchNotConfirmableError,
+)
+from todo_backend.services.tasks import TaskService
 
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 UPLOAD_RULES: dict[str, tuple[set[str], int]] = {
@@ -42,14 +58,21 @@ UPLOAD_RULES: dict[str, tuple[set[str], int]] = {
     "audio": ({".mp3", ".wav", ".m4a"}, 25 * 1024 * 1024),
 }
 _MIME_BY_EXT = {
-    ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
-    ".webp": "image/webp", ".pdf": "application/pdf",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
+    ".pdf": "application/pdf",
     ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    ".txt": "text/plain", ".md": "text/markdown",
-    ".mp3": "audio/mpeg", ".wav": "audio/wav", ".m4a": "audio/m4a",
+    ".txt": "text/plain",
+    ".md": "text/markdown",
+    ".mp3": "audio/mpeg",
+    ".wav": "audio/wav",
+    ".m4a": "audio/m4a",
 }
 _AUDIO_FORMAT_BY_EXT = {".mp3": "mp3", ".wav": "wav", ".m4a": "m4a"}
 _TITLE_LENGTH = 30
+_HISTORY_LIMIT = 20
 
 
 class AssistantNotConfiguredError(RuntimeError):
@@ -57,6 +80,18 @@ class AssistantNotConfiguredError(RuntimeError):
 
 
 class AssistantUnavailableError(RuntimeError):
+    pass
+
+
+class AssistantTurnActiveError(RuntimeError):
+    pass
+
+
+class AssistantTurnPayloadMismatchError(RuntimeError):
+    pass
+
+
+class ProposalBatchRequiredError(RuntimeError):
     pass
 
 
@@ -72,16 +107,24 @@ class UploadNotFoundError(LookupError):
     pass
 
 
-class ProposalAlreadyResolvedError(RuntimeError):
-    pass
-
-
-def _now_ms() -> int:
-    return time.time_ns() // 1_000_000
-
-
 def _default_ark_factory(config: AssistantSettings) -> ArkClient:
     return ArkClient(config.api_key, config.chat_model, config.audio_model, config.base_url)
+
+
+def _request_fingerprint(command: SendAssistantMessageCommand) -> str:
+    stable_request = {
+        "content": command.content,
+        "attachmentFileIds": [
+            attachment.file_id for attachment in command.attachments
+        ],
+    }
+    serialized = json.dumps(
+        stable_request,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
 
 class AssistantService:
@@ -91,14 +134,27 @@ class AssistantService:
         settings: Settings,
         *,
         ark_factory: Callable[[AssistantSettings], Any] | None = None,
+        checkpoint_store: CheckpointStore | None = None,
     ) -> None:
         self.database = database
         self._settings = settings
         self._conversations = ConversationsRepository()
         self._assistant_settings = AssistantSettingsRepository()
-        self._tasks = TaskRepository()
-        self._reminders = ReminderRepository()
+        self._tasks = TaskService(database)
         self._ark_factory = ark_factory or _default_ark_factory
+        self._checkpoint_store = checkpoint_store or CheckpointStore(
+            settings.database_path.parent / "assistant_graph.sqlite3"
+        )
+        self._batch_repository = ProposalBatchesRepository()
+        self._batch_executor = ProposalBatchExecutor(
+            database, self._batch_repository
+        )
+        self._apply_workflow = ProposalApplyWorkflow(
+            self._batch_executor, self._checkpoint_store.saver
+        )
+        self._running_turns: set[str] = set()
+        self._running_turns_lock = threading.Lock()
+        self._ark_cache: tuple[AssistantSettings, Any] | None = None
 
     @property
     def _uploads_dir(self) -> Path:
@@ -113,6 +169,9 @@ class AssistantService:
             raise UploadNotFoundError
         return path
 
+    def close(self) -> None:
+        self._checkpoint_store.close()
+
     # ---- settings ----
 
     def get_settings_view(self) -> AssistantSettingsView:
@@ -125,6 +184,7 @@ class AssistantService:
     ) -> AssistantSettingsView:
         with self.database.transaction() as connection:
             config = self._assistant_settings.patch(connection, command)
+        self._ark_cache = None
         return self._view(config)
 
     def _view(self, config: AssistantSettings) -> AssistantSettingsView:
@@ -140,7 +200,11 @@ class AssistantService:
             config = self._assistant_settings.get(connection)
         if not config.api_key:
             raise AssistantNotConfiguredError
-        return self._ark_factory(config)
+        if self._ark_cache is not None and self._ark_cache[0] == config:
+            return self._ark_cache[1]
+        ark = self._ark_factory(config)
+        self._ark_cache = (config, ark)
+        return ark
 
     # ---- conversations ----
 
@@ -152,12 +216,20 @@ class AssistantService:
         with self.database.transaction() as connection:
             return self._conversations.list_conversations(connection)
 
-    def get_conversation_detail(self, conversation_id: str) -> AssistantConversationDetail:
+    def get_conversation_detail(
+        self, conversation_id: str
+    ) -> AssistantConversationDetail:
         with self.database.transaction() as connection:
             return AssistantConversationDetail(
-                conversation=self._conversations.get_conversation(connection, conversation_id),
-                messages=self._conversations.list_messages(connection, conversation_id),
-                proposals=self._conversations.list_proposals(connection, conversation_id),
+                conversation=self._conversations.get_conversation(
+                    connection, conversation_id
+                ),
+                messages=self._conversations.list_messages(
+                    connection, conversation_id
+                ),
+                proposalBatches=self._batch_repository.list_for_conversation(
+                    connection, conversation_id
+                ),
             )
 
     def delete_conversation(self, conversation_id: str) -> None:
@@ -165,7 +237,15 @@ class AssistantService:
             file_ids = self._conversations.list_conversation_file_ids(
                 connection, conversation_id
             )
+            turn_ids = self._conversations.list_turn_ids(connection, conversation_id)
+            batch_ids = self._batch_repository.list_batch_ids(
+                connection, conversation_id
+            )
             self._conversations.delete_conversation(connection, conversation_id)
+        for turn_id in turn_ids:
+            self._checkpoint_store.delete_thread(f"turn:{turn_id}")
+        for batch_id in batch_ids:
+            self._checkpoint_store.delete_thread(f"proposal:{batch_id}")
         for file_id in file_ids:
             (self._uploads_dir / file_id).unlink(missing_ok=True)
 
@@ -174,7 +254,11 @@ class AssistantService:
     def save_upload(self, filename: str, data: bytes) -> AssistantAttachment:
         suffix = Path(filename).suffix.lower()
         rule = next(
-            ((kind, limit) for kind, (exts, limit) in UPLOAD_RULES.items() if suffix in exts),
+            (
+                (kind, limit)
+                for kind, (extensions, limit) in UPLOAD_RULES.items()
+                if suffix in extensions
+            ),
             None,
         )
         if rule is None:
@@ -186,8 +270,10 @@ class AssistantService:
         file_id = f"{uuid.uuid4().hex}{suffix}"
         (self._uploads_dir / file_id).write_bytes(data)
         return AssistantAttachment(
-            fileId=file_id, kind=cast(AttachmentKind, kind),
-            name=filename[:255], mime=_MIME_BY_EXT[suffix],
+            fileId=file_id,
+            kind=cast(AttachmentKind, kind),
+            name=filename[:255],
+            mime=_MIME_BY_EXT[suffix],
         )
 
     def transcribe(self, command: TranscribeCommand) -> str:
@@ -195,7 +281,7 @@ class AssistantService:
         path, audio_format = self._audio_path(command.file_id)
         audio_base64 = base64.b64encode(path.read_bytes()).decode()
         try:
-            return ark.transcribe(audio_base64, audio_format)
+            return cast(str, ark.transcribe(audio_base64, audio_format))
         except ArkUnavailableError as error:
             raise AssistantUnavailableError from error
 
@@ -208,22 +294,139 @@ class AssistantService:
             raise UploadNotFoundError
         return path, audio_format
 
-    # ---- agent turn ----
+    # ---- assistant turns ----
 
     def send_message(
         self, conversation_id: str, command: SendAssistantMessageCommand
     ) -> AssistantTurnResponse:
-        ark = self._require_ark()
-        attachments = [self._verified_attachment(a) for a in command.attachments]
-        attachments = [self._enrich_document(a) for a in attachments]
+        fingerprint = _request_fingerprint(command)
+        existing = self._existing_turn_response(
+            conversation_id, command.turn_id, fingerprint
+        )
+        if isinstance(existing, AssistantTurnResponse):
+            return existing
 
+        turn = existing
+        if turn is None:
+            verified_attachments = [
+                self._verified_attachment(attachment)
+                for attachment in command.attachments
+            ]
+        else:
+            verified_attachments = []
+        ark = self._require_ark()
+
+        if turn is None:
+            try:
+                turn = self._insert_turn(
+                    conversation_id,
+                    command,
+                    fingerprint,
+                    verified_attachments,
+                )
+            except sqlite3.IntegrityError as error:
+                raise AssistantTurnActiveError from error
+        elif turn.status == "failed":
+            try:
+                with self.database.transaction() as connection:
+                    self._conversations.mark_turn(
+                        connection, turn.id, "active", None
+                    )
+                    self._conversations.update_message(
+                        connection,
+                        turn.assistant_message_id,
+                        content="",
+                        status="pending",
+                        tool_trace=None,
+                    )
+                    turn = self._conversations.get_turn(connection, turn.id)
+            except sqlite3.IntegrityError as error:
+                raise AssistantTurnActiveError from error
+
+        with self._claim_running_turn(turn.id):
+            try:
+                self._enrich_turn_attachments(turn, ark)
+                workflow = AssistantTurnWorkflow(
+                    TurnGraphDependencies(
+                        database=self.database,
+                        conversations=self._conversations,
+                        batches=self._batch_repository,
+                        tasks=self._tasks,
+                        planner=ArkPlanner(ark),
+                        ark=ark,
+                        apply_workflow=self._apply_workflow,
+                        build_ark_messages=self._build_ark_messages,
+                    ),
+                    self._checkpoint_store.saver,
+                )
+                return workflow.run(turn.id)
+            except ArkUnavailableError:
+                return self._fail_turn(turn, "ASSISTANT_UNAVAILABLE")
+            except Exception:
+                self._fail_turn(turn, "TURN_GRAPH_FAILED")
+                raise
+
+    def _existing_turn_response(
+        self,
+        conversation_id: str,
+        turn_id: str,
+        fingerprint: str,
+    ) -> AssistantTurnRecord | AssistantTurnResponse | None:
         with self.database.transaction() as connection:
-            conversation = self._conversations.get_conversation(connection, conversation_id)
+            try:
+                turn = self._conversations.get_turn(connection, turn_id)
+            except AssistantTurnNotFoundError:
+                return None
+            if (
+                turn.conversation_id != conversation_id
+                or turn.request_fingerprint != fingerprint
+            ):
+                raise AssistantTurnPayloadMismatchError
+            if turn.status != "done":
+                return turn
+            message = self._conversations.get_message(
+                connection, turn.assistant_message_id
+            )
+            batches = self._batch_repository.list_for_message(
+                connection, turn.assistant_message_id
+            )
+        return AssistantTurnResponse(message=message, proposalBatches=batches)
+
+    def _insert_turn(
+        self,
+        conversation_id: str,
+        command: SendAssistantMessageCommand,
+        fingerprint: str,
+        attachments: list[AssistantAttachment],
+    ) -> AssistantTurnRecord:
+        with self.database.transaction() as connection:
+            conversation = self._conversations.get_conversation(
+                connection, conversation_id
+            )
             user_message = self._conversations.insert_message(
-                connection, conversation_id, "user", command.content, attachments,
+                connection,
+                conversation_id,
+                "user",
+                command.content,
+                attachments,
+                turn_id=command.turn_id,
             )
             assistant_message = self._conversations.insert_message(
-                connection, conversation_id, "assistant", "", [], status="pending",
+                connection,
+                conversation_id,
+                "assistant",
+                "",
+                [],
+                status="pending",
+                turn_id=command.turn_id,
+            )
+            turn = self._conversations.insert_turn(
+                connection,
+                command.turn_id,
+                conversation_id,
+                user_message.id,
+                assistant_message.id,
+                fingerprint,
             )
             if not conversation.title:
                 title_source = command.content.strip() or (
@@ -234,109 +437,110 @@ class AssistantService:
                     (title_source[:_TITLE_LENGTH], conversation_id),
                 )
             self._conversations.touch(connection, conversation_id)
+        return turn
 
+    @contextmanager
+    def _claim_running_turn(self, turn_id: str) -> Iterator[None]:
+        with self._running_turns_lock:
+            if turn_id in self._running_turns:
+                raise AssistantTurnActiveError
+            self._running_turns.add(turn_id)
         try:
-            enriched = [self._enrich_audio(ark, a) for a in attachments]
-            if enriched != attachments:
-                with self.database.transaction() as connection:
-                    self._conversations.update_message_attachments(
-                        connection, user_message.id, enriched
-                    )
-            turn = self._run_agent(ark, conversation_id, assistant_message.id)
-        except ArkUnavailableError:
-            with self.database.transaction() as connection:
-                self._conversations.update_message(
-                    connection, assistant_message.id,
-                    content="", status="failed", tool_trace=None,
-                )
-            failed = AssistantMessage(
-                id=assistant_message.id, role="assistant", content="",
-                attachments=[], status="failed", createdAt=assistant_message.created_at,
-            )
-            return AssistantTurnResponse(message=failed, proposals=[])
+            yield
+        finally:
+            with self._running_turns_lock:
+                self._running_turns.discard(turn_id)
 
+    def _enrich_turn_attachments(
+        self, turn: AssistantTurnRecord, ark: Any
+    ) -> None:
+        with self.database.transaction() as connection:
+            user_message = self._conversations.get_message(
+                connection, turn.user_message_id
+            )
+        enriched = [
+            self._enrich_attachment(ark, attachment)
+            if attachment.extracted_text is None
+            else attachment
+            for attachment in user_message.attachments
+        ]
+        if enriched == user_message.attachments:
+            return
+        with self.database.transaction() as connection:
+            self._conversations.update_message_attachments(
+                connection, user_message.id, enriched
+            )
+
+    def _fail_turn(
+        self, turn: AssistantTurnRecord, error_code: str
+    ) -> AssistantTurnResponse:
         with self.database.transaction() as connection:
             self._conversations.update_message(
-                connection, assistant_message.id,
-                content=turn.content, status="done",
-                tool_trace=json.dumps(turn.tool_trace, ensure_ascii=False),
+                connection,
+                turn.assistant_message_id,
+                content="",
+                status="failed",
+                tool_trace=None,
             )
-            proposals = [
-                self._conversations.get_proposal(connection, proposal_id)
-                for proposal_id in turn.proposal_ids
-            ]
-        done = AssistantMessage(
-            id=assistant_message.id, role="assistant", content=turn.content,
-            attachments=[], status="done", createdAt=assistant_message.created_at,
-        )
-        return AssistantTurnResponse(message=done, proposals=proposals)
+            self._conversations.mark_turn(
+                connection, turn.id, "failed", error_code
+            )
+            message = self._conversations.get_message(
+                connection, turn.assistant_message_id
+            )
+        return AssistantTurnResponse(message=message, proposalBatches=[])
 
-    def _verified_attachment(self, attachment: AssistantAttachment) -> AssistantAttachment:
+    def _verified_attachment(
+        self, attachment: AssistantAttachment
+    ) -> AssistantAttachment:
         path = self._upload_path(attachment.file_id)
         if not path.is_file():
             raise UploadNotFoundError
         suffix = path.suffix.lower()
         kind = next(
-            (kind for kind, (exts, _limit) in UPLOAD_RULES.items() if suffix in exts), None
+            (
+                candidate
+                for candidate, (extensions, _limit) in UPLOAD_RULES.items()
+                if suffix in extensions
+            ),
+            None,
         )
         if kind is None:
             raise UnsupportedFileTypeError
-        return attachment.model_copy(update={"kind": kind, "extracted_text": None})
-
-    def _enrich_document(self, attachment: AssistantAttachment) -> AssistantAttachment:
-        if attachment.kind != "document":
-            return attachment
-        text = extract_document_text(self._upload_path(attachment.file_id))
-        return attachment.model_copy(update={"extracted_text": text})
-
-    def _enrich_audio(self, ark: Any, attachment: AssistantAttachment) -> AssistantAttachment:
-        if attachment.kind != "audio":
-            return attachment
-        path, audio_format = self._audio_path(attachment.file_id)
-        audio_base64 = base64.b64encode(path.read_bytes()).decode()
-        text = ark.transcribe(audio_base64, audio_format)
-        return attachment.model_copy(update={"extracted_text": text})
-
-    def _run_agent(
-        self,
-        ark: Any,
-        conversation_id: str,
-        assistant_message_id: str,
-    ) -> AgentTurn:
-        with self.database.transaction() as connection:
-            messages = self._conversations.list_messages(connection, conversation_id)
-            pending = self._conversations.list_pending_proposals(connection, conversation_id)
-            row = connection.execute(
-                "SELECT language FROM app_settings WHERE id = 1"
-            ).fetchone()
-            if row is None:
-                raise RuntimeError("Application settings are not initialized")
-            language = row["language"]
-        tools = AgentTools(
-            self.database,
-            conversation_id=conversation_id,
-            message_id=assistant_message_id,
+        return attachment.model_copy(
+            update={
+                "kind": kind,
+                "mime": _MIME_BY_EXT[suffix],
+                "extracted_text": None,
+            }
         )
-        orchestrator = AgentOrchestrator(
-            ark,
-            tools,
-            language=language,
-            now_local=time.strftime("%Y-%m-%dT%H:%M"),
-            pending_summary=self._pending_summary(pending),
-        )
-        history = [{"role": "system", "content": orchestrator.system_prompt()}]
-        history.extend(self._build_ark_messages(messages, language))
-        return orchestrator.run(history)
+
+    def _enrich_attachment(
+        self, ark: Any, attachment: AssistantAttachment
+    ) -> AssistantAttachment:
+        if attachment.kind == "document":
+            text = extract_document_text(self._upload_path(attachment.file_id))
+            return attachment.model_copy(update={"extracted_text": text})
+        if attachment.kind == "audio":
+            path, audio_format = self._audio_path(attachment.file_id)
+            audio_base64 = base64.b64encode(path.read_bytes()).decode()
+            text = ark.transcribe(audio_base64, audio_format)
+            return attachment.model_copy(update={"extracted_text": text})
+        return attachment
 
     def _build_ark_messages(
         self, messages: list[AssistantMessage], language: str
     ) -> list[dict[str, Any]]:
-        attachment_fallback = "（附件消息）" if language == "zh-CN" else "(attachment message)"
+        attachment_fallback = (
+            "（附件消息）" if language == "zh-CN" else "(attachment message)"
+        )
         ark_messages: list[dict[str, Any]] = []
-        for message in messages[-HISTORY_LIMIT:]:
+        for message in messages[-_HISTORY_LIMIT:]:
             if message.role == "assistant":
                 if message.status == "done" and message.content:
-                    ark_messages.append({"role": "assistant", "content": message.content})
+                    ark_messages.append(
+                        {"role": "assistant", "content": message.content}
+                    )
                 continue
             parts: list[dict[str, Any]] = []
             text = message.content
@@ -344,90 +548,84 @@ class AssistantService:
                 if attachment.kind == "image":
                     path = self._upload_path(attachment.file_id)
                     encoded = base64.b64encode(path.read_bytes()).decode()
-                    parts.append({
-                        "type": "image_url",
-                        "image_url": {"url": f"data:{attachment.mime};base64,{encoded}"},
-                    })
+                    parts.append(
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:{attachment.mime};base64,{encoded}"
+                            },
+                        }
+                    )
                 elif attachment.extracted_text:
-                    text += f"\n\n〈{attachment.name}〉\n{attachment.extracted_text}"
-            parts.append({"type": "text", "text": text or attachment_fallback})
+                    text += (
+                        f"\n\n〈{attachment.name}〉\n"
+                        f"{attachment.extracted_text}"
+                    )
+            parts.append(
+                {"type": "text", "text": text or attachment_fallback}
+            )
             ark_messages.append({"role": "user", "content": parts})
         return ark_messages
 
-    def _pending_summary(self, pending: list[AssistantProposal]) -> str:
-        lines: list[str] = []
-        for proposal in pending:
-            label = proposal.payload.text or proposal.task_id or ""
-            lines.append(f"- [{proposal.id}] {proposal.action}: {label}")
-        return "\n".join(lines)
+    # ---- proposal batches ----
 
-    # ---- proposals ----
+    def confirm_proposal_batch(
+        self, batch_id: str, command: ConfirmProposalBatchCommand
+    ) -> ProposalBatchResolveResponse:
+        current = self._batch_executor.current(batch_id)
+        if current.batch.status == "superseded":
+            raise ProposalBatchNotConfirmableError
+        if not any(item.proposal.status == "pending" for item in current.items):
+            return current
+        self._apply_workflow.start(batch_id)
+        return self._apply_workflow.confirm(batch_id, command)
+
+    def reject_proposal_batch(
+        self, batch_id: str
+    ) -> ProposalBatchResolveResponse:
+        current = self._batch_executor.current(batch_id)
+        if current.batch.status == "superseded":
+            raise ProposalBatchNotConfirmableError
+        if not any(item.proposal.status == "pending" for item in current.items):
+            return current
+        self._apply_workflow.start(batch_id)
+        return self._apply_workflow.reject(batch_id)
 
     def accept_proposal(
         self, proposal_id: str
     ) -> tuple[AssistantProposal, Task | None]:
-        with self.database.transaction() as connection:
-            proposal = self._conversations.get_proposal(connection, proposal_id)
-            if proposal.status != "pending":
-                raise ProposalAlreadyResolvedError
-            task: Task | None = None
-            if proposal.action == "create":
-                task = self._tasks.create(
-                    connection,
-                    CreateTaskCommand(
-                        text=proposal.payload.text or "",
-                        priority=proposal.payload.priority or "medium",
-                        category=proposal.payload.category or "other",
-                        time=self._time_field(proposal.payload),
-                        notes=proposal.payload.notes,
-                    ),
-                )
-            elif proposal.action == "update":
-                task = self._tasks.update(
-                    connection,
-                    proposal.task_id or "",
-                    UpdateTaskCommand(**self._update_kwargs(proposal.payload)),
-                )
-                if {"time_start", "time_end"} & proposal.payload.model_fields_set:
-                    self._reminders.prune_stale(
-                        connection,
-                        task.id,
-                        task.time.start if task.time else None,
+        proposal, batch_size = self._legacy_proposal(proposal_id)
+        if batch_size != 1:
+            raise ProposalBatchRequiredError
+        result = self.confirm_proposal_batch(
+            proposal.batch_id,
+            ConfirmProposalBatchCommand(
+                items=[
+                    ConfirmProposalItem(
+                        proposalId=proposal.id,
+                        payload=proposal.payload,
                     )
-            else:
-                self._tasks.delete(connection, proposal.task_id or "")
-            resolved = self._conversations.mark_proposal(
-                connection, proposal_id, "accepted", _now_ms()
-            )
-        return resolved, task
+                ]
+            ),
+        )
+        item = result.items[0]
+        return item.proposal, item.task
 
     def reject_proposal(self, proposal_id: str) -> AssistantProposal:
+        proposal, batch_size = self._legacy_proposal(proposal_id)
+        if batch_size != 1:
+            raise ProposalBatchRequiredError
+        result = self.reject_proposal_batch(proposal.batch_id)
+        return result.items[0].proposal
+
+    def _legacy_proposal(
+        self, proposal_id: str
+    ) -> tuple[AssistantProposal, int]:
         with self.database.transaction() as connection:
-            proposal = self._conversations.get_proposal(connection, proposal_id)
-            if proposal.status != "pending":
-                raise ProposalAlreadyResolvedError
-            return self._conversations.mark_proposal(
-                connection, proposal_id, "rejected", _now_ms()
+            proposal = self._batch_repository.get_proposal(
+                connection, proposal_id
             )
-
-    def _time_field(self, payload: Any) -> TimeField | None:
-        if not payload.time_start:
-            return None
-        return TimeField(start=payload.time_start, end=payload.time_end)
-
-    def _update_kwargs(self, payload: Any) -> dict[str, Any]:
-        fields_set = payload.model_fields_set
-        kwargs: dict[str, Any] = {}
-        for name in ("text", "priority", "category"):
-            value = getattr(payload, name)
-            if name in fields_set and value is not None:
-                kwargs[name] = value
-        if "notes" in fields_set:
-            kwargs["notes"] = payload.notes
-        if {"time_start", "time_end"} & fields_set:
-            kwargs["time"] = (
-                TimeField(start=payload.time_start, end=payload.time_end)
-                if payload.time_start
-                else None
+            batch = self._batch_repository.get_batch(
+                connection, proposal.batch_id
             )
-        return kwargs
+        return proposal, len(batch.proposals)

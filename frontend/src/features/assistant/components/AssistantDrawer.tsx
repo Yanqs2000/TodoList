@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useI18n } from '@/features/i18n/I18nProvider';
-import type { AssistantProposal, ResolveProposalResult, TodoApi } from '@/shared/api/contracts';
+import type { ProposalApplyItemResult, TodoApi } from '@/shared/api/contracts';
 import type { AssistantState } from '../hooks/useAssistant';
 import AssistantSettingsPanel from './AssistantSettingsPanel';
 import Composer from './Composer';
@@ -12,19 +12,17 @@ interface AssistantDrawerProps {
   onClose: () => void;
   assistant: AssistantState;
   api: TodoApi;
-  onApplyProposal: (result: ResolveProposalResult) => void;
+  onApplyProposal: (result: ProposalApplyItemResult) => void;
   onError: (error: unknown) => void;
 }
 
 function AssistantDrawer({ open, onClose, assistant, api, onApplyProposal, onError }: AssistantDrawerProps) {
   const { t } = useI18n();
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [proposalOverrides, setProposalOverrides] = useState<Record<string, AssistantProposal>>({});
   if (!open) return null;
 
   const needsSetup = assistant.settingsView !== null && !assistant.settingsView.hasApiKey;
   const showSettings = needsSetup || settingsOpen;
-  const proposals = assistant.proposals.map(p => proposalOverrides[p.id] ?? p);
 
   return (
     <aside className="assistant-drawer" aria-label={t('assistant.title')}>
@@ -66,16 +64,19 @@ function AssistantDrawer({ open, onClose, assistant, api, onApplyProposal, onErr
         <>
           <MessageList
             messages={assistant.messages}
-            proposals={proposals}
+            proposalBatches={assistant.proposalBatches}
+            submittingBatchIds={assistant.submittingBatchIds}
             sending={assistant.sending}
             onRetry={assistant.retry}
-            onResolve={async (id, action) => {
-              const result = await assistant.resolveProposal(id, action);
-              if (result) {
-                setProposalOverrides(prev => ({ ...prev, [id]: result.proposal }));
-                if (action === 'accept') onApplyProposal(result);
+            onConfirmBatch={async (id, items) => {
+              const result = await assistant.confirmBatch(id, items);
+              for (const item of result?.items ?? []) {
+                if (item.proposal.status === 'accepted') {
+                  onApplyProposal(item);
+                }
               }
             }}
+            onRejectBatch={assistant.rejectBatch}
           />
           <Composer
             sending={assistant.sending}

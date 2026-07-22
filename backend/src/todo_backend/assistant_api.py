@@ -10,6 +10,8 @@ from todo_backend.models import (
     AssistantSettingsPatchCommand,
     AssistantSettingsView,
     AssistantTurnResponse,
+    ConfirmProposalBatchCommand,
+    ProposalBatchResolveResponse,
     SendAssistantMessageCommand,
     TranscribeCommand,
     TranscribeResponse,
@@ -41,7 +43,6 @@ def build_assistant_router(service: AssistantService) -> APIRouter:
     @router.get(
         "/assistant/conversations/{conversation_id}",
         response_model=AssistantConversationDetail,
-        response_model_exclude_none=True,
     )
     def _get_conversation(conversation_id: str) -> AssistantConversationDetail:
         return service.get_conversation_detail(conversation_id)
@@ -78,6 +79,22 @@ def build_assistant_router(service: AssistantService) -> APIRouter:
     @router.post("/assistant/transcribe", response_model=TranscribeResponse)
     def _transcribe(command: TranscribeCommand) -> TranscribeResponse:
         return TranscribeResponse(text=service.transcribe(command))
+
+    @router.post(
+        "/assistant/proposal-batches/{batch_id}/confirm",
+        response_model=ProposalBatchResolveResponse,
+    )
+    def _confirm_batch(
+        batch_id: str, command: ConfirmProposalBatchCommand
+    ) -> ProposalBatchResolveResponse:
+        return service.confirm_proposal_batch(batch_id, command)
+
+    @router.post(
+        "/assistant/proposal-batches/{batch_id}/reject",
+        response_model=ProposalBatchResolveResponse,
+    )
+    def _reject_batch(batch_id: str) -> ProposalBatchResolveResponse:
+        return service.reject_proposal_batch(batch_id)
 
     @router.post(
         "/assistant/proposals/{proposal_id}/accept",

@@ -21,8 +21,11 @@
 
 ## AI 助手
 
-- [AI 助手设计](superpowers/specs/2026-07-20-ai-assistant-design.md) — 多模态 agent 架构、Ark 接入、提议确认流、安全约束
-- [AI 助手实施计划](superpowers/plans/2026-07-20-ai-assistant.md) — 15 个任务的 TDD 实施步骤
+- [LangGraph agent redesign 设计](superpowers/specs/2026-07-22-langgraph-agent-redesign-design.md) — 当前设计：稳定 turn、两个工作流、批次确认、checkpoint 与兼容边界
+- [LangGraph agent redesign 实施计划](superpowers/plans/2026-07-22-langgraph-agent-redesign.md) — 当前实施计划
+- [LangGraph redesign 验证交接](superpowers/plans/2026-07-22-langgraph-agent-redesign-test-handoff.md) — Tasks 4–13 延期测试的环境决策、分阶段命令和风险清单
+- [AI 助手原始设计基线](superpowers/specs/2026-07-20-ai-assistant-design.md) — 2026-07-20 原始实现基线，不代表当前 LangGraph 架构
+- [AI 助手原始实施基线](superpowers/plans/2026-07-20-ai-assistant.md) — 2026-07-20 原始实施基线，不作为当前执行计划
 
 ## 历史与归档
 
