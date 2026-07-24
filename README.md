@@ -1,5 +1,7 @@
 # TodoList
 
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 TodoList 是一个支持中文和英文的桌面待办应用，使用 React + Tauri 提供任务管理、拖拽排序、提醒、主题、音效和成就反馈。应用数据由随桌面程序启动的 Python 后端写入本机 SQLite；不需要账号，也不会把数据同步到云端。当前稳定版本为 **v1.3.0**。
 
 ## 当前架构
@@ -102,3 +104,7 @@ npm --prefix desktop run sign:macos
 - [文档索引](docs/CLAUDE.md)
 
 版本记录保留在 [docs/development-logs](docs/development-logs/) 中；旧日志描述对应版本当时的实现，不代表当前架构。
+
+## 开源
+
+本项目采用 [MIT](LICENSE) 许可证。欢迎提交 Issue 和 Pull Request，详见 [贡献指南](CONTRIBUTING.md)。
