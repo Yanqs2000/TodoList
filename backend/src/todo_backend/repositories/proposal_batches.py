@@ -21,7 +21,7 @@ class ProposalDraft:
     action: ProposalAction
     target_task_id: str | None
     before_snapshot: Task | None
-    payload: ProposalCardFields
+    payload: ProposalCardFields | None
     source_batch_id: str | None = None
     source_proposal_id: str | None = None
 
@@ -75,8 +75,9 @@ class ProposalBatchesRepository:
                 raise ValueError("batch belongs to another conversation or message")
 
             for proposal in draft.proposals:
-                payload = cast(ProposalCardFields | None, proposal.payload)
-                if payload is None:
+                payload = proposal.payload
+                # delete 卡片的 payload 契约为 null；create/update 必须有 payload
+                if payload is None and proposal.action != "delete":
                     raise ValueError("proposal payload cannot be null")
                 connection.execute(
                     "INSERT OR IGNORE INTO assistant_proposals"
@@ -95,7 +96,11 @@ class ProposalBatchesRepository:
                             if proposal.before_snapshot is not None
                             else None
                         ),
-                        payload.model_dump_json(by_alias=True),
+                        (
+                            payload.model_dump_json(by_alias=True)
+                            if payload is not None
+                            else None
+                        ),
                         now,
                     ),
                 )
@@ -294,7 +299,7 @@ class ProposalBatchesRepository:
         rows = connection.execute(
             "SELECT id, message_id, batch_id, action, target_task_id, before_snapshot,"
             " payload, result_task_id, status, last_error, created_at"
-            " FROM assistant_proposals WHERE batch_id = ? ORDER BY created_at ASC, id ASC",
+            " FROM assistant_proposals WHERE batch_id = ? ORDER BY created_at ASC, rowid ASC",
             (batch_id,),
         ).fetchall()
         return [self._proposal_from_row(row) for row in rows]
@@ -320,15 +325,14 @@ class ProposalBatchesRepository:
                     **raw_payload,
                 }
             )
+        elif action == "delete":
+            # delete 卡片不可编辑，payload 恒为 null；审计信息以 before_snapshot 为准
+            payload = None
         elif before_snapshot is None:
             payload = None
-        elif action == "update":
-            payload = ProposalCardFields.model_validate(
-                {**self._fields_from_task(before_snapshot), **raw_payload}
-            )
         else:
             payload = ProposalCardFields.model_validate(
-                self._fields_from_task(before_snapshot)
+                {**self._fields_from_task(before_snapshot), **raw_payload}
             )
 
         return AssistantProposal(

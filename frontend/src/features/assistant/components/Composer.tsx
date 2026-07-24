@@ -115,7 +115,10 @@ function Composer({ sending, onSend, onError, uploadFile, transcribe }: Composer
           disabled={sending}
           rows={2}
           onKeyDown={event => {
-            if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) void handleSend();
+            if (event.key === 'Enter' && !event.shiftKey) {
+              event.preventDefault();
+              void handleSend();
+            }
           }}
         />
         <div className="assistant-composer__buttons">

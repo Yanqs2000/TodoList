@@ -1,10 +1,11 @@
+import asyncio
 import base64
 import hashlib
 import json
 import sqlite3
 import threading
 import uuid
-from collections.abc import Callable, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, cast
@@ -365,6 +366,129 @@ class AssistantService:
             except Exception:
                 self._fail_turn(turn, "TURN_GRAPH_FAILED")
                 raise
+
+    async def send_message_stream(
+        self, conversation_id: str, command: SendAssistantMessageCommand
+    ) -> "AsyncIterator[dict[str, Any]]":
+        """Send a message and stream SSE events as the agent processes it."""
+        import asyncio as _asyncio
+        fingerprint = _request_fingerprint(command)
+        existing = self._existing_turn_response(
+            conversation_id, command.turn_id, fingerprint
+        )
+        if isinstance(existing, AssistantTurnResponse):
+            yield {"event": "done", "data": {
+                "message": existing.message.model_dump(mode="json", by_alias=True),
+                "proposalBatches": [
+                    b.model_dump(mode="json", by_alias=True) for b in existing.proposalBatches
+                ],
+            }}
+            return
+
+        turn = existing
+        if turn is None:
+            verified_attachments = [
+                self._verified_attachment(attachment)
+                for attachment in command.attachments
+            ]
+        else:
+            verified_attachments = []
+        ark = self._require_ark()
+
+        if turn is None:
+            try:
+                turn = self._insert_turn(
+                    conversation_id, command, fingerprint, verified_attachments,
+                )
+            except sqlite3.IntegrityError as error:
+                raise AssistantTurnActiveError from error
+        elif turn.status == "failed":
+            try:
+                with self.database.transaction() as connection:
+                    self._conversations.mark_turn(connection, turn.id, "active", None)
+                    self._conversations.update_message(
+                        connection, turn.assistant_message_id,
+                        content="", status="pending", tool_trace=None,
+                    )
+                    turn = self._conversations.get_turn(connection, turn.id)
+            except sqlite3.IntegrityError as error:
+                raise AssistantTurnActiveError from error
+
+        with self._claim_running_turn(turn.id):
+            stream_done = False
+            try:
+                self._enrich_turn_attachments(turn, ark)
+                queue: _asyncio.Queue = _asyncio.Queue()
+
+                def on_event(event_type: str, data: dict[str, Any]) -> None:
+                    try:
+                        queue.put_nowait({"event": event_type, "data": data})
+                    except _asyncio.QueueFull:
+                        pass
+
+                workflow = AssistantTurnWorkflow(
+                    TurnGraphDependencies(
+                        database=self.database,
+                        conversations=self._conversations,
+                        batches=self._batch_repository,
+                        tasks=self._tasks,
+                        planner=ArkPlanner(ark),
+                        ark=ark,
+                        apply_workflow=self._apply_workflow,
+                        build_ark_messages=self._build_ark_messages,
+                        on_event=on_event,
+                    ),
+                    self._checkpoint_store.saver,
+                )
+
+                def _run() -> None:
+                    try:
+                        workflow.run(turn.id)
+                    except ArkUnavailableError:
+                        self._fail_turn(turn, "ASSISTANT_UNAVAILABLE")
+                        try:
+                            queue.put_nowait({"event": "error", "data": {"code": "ASSISTANT_UNAVAILABLE", "message": "Assistant unavailable"}})
+                        except _asyncio.QueueFull:
+                            pass
+                    except Exception:
+                        self._fail_turn(turn, "TURN_GRAPH_FAILED")
+                        try:
+                            queue.put_nowait({"event": "error", "data": {"code": "TURN_GRAPH_FAILED", "message": "Internal error"}})
+                        except _asyncio.QueueFull:
+                            pass
+
+                loop = _asyncio.get_running_loop()
+                loop.run_in_executor(None, _run)
+
+                _STREAM_TIMEOUT = 120  # seconds max wait between events
+                while True:
+                    try:
+                        event = await _asyncio.wait_for(queue.get(), timeout=_STREAM_TIMEOUT)
+                    except TimeoutError:
+                        self._fail_turn(turn, "STREAM_TIMEOUT")
+                        yield {"event": "error", "data": {"code": "STREAM_TIMEOUT", "message": "Stream timed out"}}
+                        stream_done = True
+                        break
+                    yield event
+                    if event["event"] in ("done", "error"):
+                        stream_done = True
+                        break
+
+            except ArkUnavailableError:
+                self._fail_turn(turn, "ASSISTANT_UNAVAILABLE")
+                yield {"event": "error", "data": {"code": "ASSISTANT_UNAVAILABLE", "message": "Assistant unavailable"}}
+                stream_done = True
+            except Exception:
+                self._fail_turn(turn, "TURN_GRAPH_FAILED")
+                yield {"event": "error", "data": {"code": "TURN_GRAPH_FAILED", "message": "Internal error"}}
+                stream_done = True
+            finally:
+                if not stream_done:
+                    # Client disconnected before completion — fail the turn
+                    try:
+                        self._fail_turn(turn, "STREAM_DISCONNECTED")
+                    except Exception:
+                        pass
 
     def _existing_turn_response(
         self,

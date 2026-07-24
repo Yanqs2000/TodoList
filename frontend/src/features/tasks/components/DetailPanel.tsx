@@ -152,71 +152,35 @@ function DetailPanel({
     </svg>
   );
 
-  // State A: today summary (no task selected)
-  if (!selectedTask) {
-    return (
-      <aside className="detail">
-        <header className="detail__header">
-          <div className="detail__heading">
-            <h2 className="detail__title">{t('detail.summary')}</h2>
-            <p className="detail__subtitle">{t('detail.noSelection')}</p>
-          </div>
-          <button
-            className="detail__close"
-            onClick={onClose}
-            aria-label={t('detail.close')}
-          >
-            {CloseIcon}
-          </button>
-        </header>
-
-        <div className="detail__summary">
-          <div className="detail__summary-card">
-            <div className="detail__summary-label">{t('detail.todayCompleted')}</div>
-            <div className="detail__summary-value">{todayCompleted}</div>
-            <div className="detail__summary-sub">{t('detail.goal', { goal: dailyGoal })}</div>
-          </div>
-          <div className="detail__summary-card">
-            <div className="detail__summary-label">{t('detail.streak')}</div>
-            <div className="detail__summary-value">{streakDays}</div>
-          </div>
-          <div className="detail__summary-card">
-            <div className="detail__summary-label">{t('detail.total')}</div>
-            <div className="detail__summary-value">{stats.total}</div>
-            <div className="detail__summary-sub">{t('detail.active', { count: stats.active })}</div>
-          </div>
-        </div>
-
-        <p className="detail__hint">{t('detail.hint')}</p>
-      </aside>
-    );
-  }
-
-  // State B: task detail
   return (
     <aside className="detail">
       <header className="detail__header">
-        <div className="detail__title-area">
-          {isEditingTitle ? (
-            <input
-              ref={titleInputRef}
-              type="text"
-              className="detail__title-input"
-              value={editTitle}
-              onChange={(e) => setEditTitle(e.target.value)}
-              onBlur={submitTitle}
-              onKeyDown={handleTitleKeyDown}
-              aria-label={t('detail.editTitle')}
-              disabled={editPending}
-            />
+        <div className="detail__heading">
+          <h2 className="detail__title">{t('detail.summary')}</h2>
+          {selectedTask ? (
+            isEditingTitle ? (
+              <input
+                ref={titleInputRef}
+                type="text"
+                className="detail__title-input"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                onBlur={submitTitle}
+                onKeyDown={handleTitleKeyDown}
+                aria-label={t('detail.editTitle')}
+                disabled={editPending}
+              />
+            ) : (
+              <p
+                className="detail__subtitle detail__subtitle--editable"
+                onClick={startEditTitle}
+                title={t('detail.clickEdit')}
+              >
+                {selectedTask.text}
+              </p>
+            )
           ) : (
-            <h2
-              className="detail__title detail__title--editable"
-              onClick={startEditTitle}
-              title={t('detail.clickEdit')}
-            >
-              {selectedTask.text}
-            </h2>
+            <p className="detail__subtitle">{t('detail.noSelection')}</p>
           )}
         </div>
         <button
@@ -228,124 +192,147 @@ function DetailPanel({
         </button>
       </header>
 
-      <button
-        className={`detail__status${selectedTask.completed ? ' detail__status--done' : ''}`}
-        onClick={handleStatusToggle}
-        aria-label={selectedTask.completed ? t('task.markActive') : t('task.markCompleted')}
-        disabled={togglePending}
-      >
-        {selectedTask.completed && (
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-          </svg>
-        )}
-        {selectedTask.completed ? t('detail.completed') : t('detail.notCompleted')}
-      </button>
+      <div className="detail__summary">
+        <div className="detail__summary-card">
+          <div className="detail__summary-label">{t('detail.todayCompleted')}</div>
+          <div className="detail__summary-value">{todayCompleted}</div>
+          <div className="detail__summary-sub">{t('detail.goal', { goal: dailyGoal })}</div>
+        </div>
+        <div className="detail__summary-card">
+          <div className="detail__summary-label">{t('detail.streak')}</div>
+          <div className="detail__summary-value">{streakDays}</div>
+        </div>
+        <div className="detail__summary-card">
+          <div className="detail__summary-label">{t('detail.total')}</div>
+          <div className="detail__summary-value">{stats.total}</div>
+          <div className="detail__summary-sub">{t('detail.active', { count: stats.active })}</div>
+        </div>
+      </div>
 
-      <div className="detail__body">
-        <section className="detail__section">
-          <div className="detail__label">{t('detail.priority')}</div>
-          <div className="detail__btn-group">
-            {priorityOptions.map((opt) => (
-              <button
-                key={opt.value}
-                className={`detail__btn${selectedTask.priority === opt.value ? ' detail__btn--active' : ''}`}
-                data-priority={opt.value}
-                onClick={() => onEdit(selectedTask.id, { priority: opt.value })}
-                disabled={editPending}
-              >
-                {t(opt.label)}
-              </button>
-            ))}
-          </div>
-        </section>
+      {selectedTask ? (
+        <>
+          <button
+            className={`detail__status${selectedTask.completed ? ' detail__status--done' : ''}`}
+            onClick={handleStatusToggle}
+            aria-label={selectedTask.completed ? t('task.markActive') : t('task.markCompleted')}
+            disabled={togglePending}
+          >
+            {selectedTask.completed && (
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            )}
+            {selectedTask.completed ? t('detail.completed') : t('detail.notCompleted')}
+          </button>
 
-        <section className="detail__section">
-          <div className="detail__label">{t('detail.category')}</div>
-          <div className="detail__btn-group">
-            {categoryOptions.map((cat) => (
-              <button
-                key={cat}
-                className={`detail__btn${selectedTask.category === cat ? ' detail__btn--active' : ''}`}
-                onClick={() => onEdit(selectedTask.id, { category: cat })}
-                disabled={editPending}
-              >
-                {t(CATEGORY_LABELS[cat])}
-              </button>
-            ))}
-          </div>
-        </section>
+          <div className="detail__body">
+            <section className="detail__section">
+              <div className="detail__label">{t('detail.priority')}</div>
+              <div className="detail__btn-group">
+                {priorityOptions.map((opt) => (
+                  <button
+                    key={opt.value}
+                    className={`detail__btn${selectedTask.priority === opt.value ? ' detail__btn--active' : ''}`}
+                    data-priority={opt.value}
+                    onClick={() => onEdit(selectedTask.id, { priority: opt.value })}
+                    disabled={editPending}
+                  >
+                    {t(opt.label)}
+                  </button>
+                ))}
+              </div>
+            </section>
 
-        <section className="detail__section">
-          <div className="detail__label">{t('detail.time')}</div>
-          <div className="detail__field">
-            {selectedTask.time ? (
-              <div className="detail__time-tag">
-                <svg className="detail__time-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
-                </svg>
-                <span>{formatTimeField(selectedTask.time, locale)}</span>
+            <section className="detail__section">
+              <div className="detail__label">{t('detail.category')}</div>
+              <div className="detail__btn-group">
+                {categoryOptions.map((cat) => (
+                  <button
+                    key={cat}
+                    className={`detail__btn${selectedTask.category === cat ? ' detail__btn--active' : ''}`}
+                    onClick={() => onEdit(selectedTask.id, { category: cat })}
+                    disabled={editPending}
+                  >
+                    {t(CATEGORY_LABELS[cat])}
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            <section className="detail__section">
+              <div className="detail__label">{t('detail.time')}</div>
+              <div className="detail__field">
+                {selectedTask.time ? (
+                  <div className="detail__time-tag">
+                    <svg className="detail__time-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
+                    </svg>
+                    <span>{formatTimeField(selectedTask.time, locale)}</span>
+                    <button
+                      className="detail__time-clear"
+                      onClick={handleClearTime}
+                      aria-label={t('create.clearTime')}
+                      disabled={editPending}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ) : (
+                  <span className="detail__time-empty">{t('detail.noTime')}</span>
+                )}
                 <button
-                  className="detail__time-clear"
-                  onClick={handleClearTime}
-                  aria-label={t('create.clearTime')}
+                  type="button"
+                  className="detail__btn detail__time-edit"
+                  onClick={() => setShowTimePicker((s) => !s)}
+                  aria-expanded={showTimePicker}
                   disabled={editPending}
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                  {showTimePicker ? t('create.collapse') : selectedTask.time ? t('detail.changeTime') : t('create.setTime')}
                 </button>
               </div>
-            ) : (
-              <span className="detail__time-empty">{t('detail.noTime')}</span>
-            )}
+              {showTimePicker && (
+                <div className="detail__time-picker-wrap">
+                  <TimePicker
+                    time={selectedTask.time}
+                    onTimeChange={handleTimeChange}
+                    onClose={() => setShowTimePicker(false)}
+                  />
+                </div>
+              )}
+            </section>
+
+            <section className="detail__section">
+              <div className="detail__label">{t('detail.notes')}</div>
+              <textarea
+                ref={notesRef}
+                className="detail__notes"
+                value={notesDraft}
+                onChange={(e) => setNotesDraft(e.target.value)}
+                onBlur={handleNotesBlur}
+                placeholder={t('detail.notesPlaceholder')}
+                disabled={editPending}
+              />
+            </section>
+          </div>
+
+          <div className="detail__footer">
             <button
-              type="button"
-              className="detail__btn detail__time-edit"
-              onClick={() => setShowTimePicker((s) => !s)}
-              aria-expanded={showTimePicker}
-              disabled={editPending}
+              className="detail__delete"
+              onClick={handleDelete}
+              disabled={deletePending}
             >
-              {showTimePicker ? t('create.collapse') : selectedTask.time ? t('detail.changeTime') : t('create.setTime')}
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              {t('task.deleteTitle')}
             </button>
           </div>
-          {showTimePicker && (
-            <div className="detail__time-picker-wrap">
-              <TimePicker
-                time={selectedTask.time}
-                onTimeChange={handleTimeChange}
-                onClose={() => setShowTimePicker(false)}
-              />
-            </div>
-          )}
-        </section>
-
-        <section className="detail__section">
-          <div className="detail__label">{t('detail.notes')}</div>
-          <textarea
-            ref={notesRef}
-            className="detail__notes"
-            value={notesDraft}
-            onChange={(e) => setNotesDraft(e.target.value)}
-            onBlur={handleNotesBlur}
-            placeholder={t('detail.notesPlaceholder')}
-            disabled={editPending}
-          />
-        </section>
-      </div>
-
-      <div className="detail__footer">
-        <button
-          className="detail__delete"
-          onClick={handleDelete}
-          disabled={deletePending}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-          </svg>
-          {t('task.deleteTitle')}
-        </button>
-      </div>
+        </>
+      ) : (
+        <p className="detail__hint">{t('detail.hint')}</p>
+      )}
     </aside>
   );
 }

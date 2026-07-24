@@ -198,6 +198,63 @@ export function createTodoApi(
     sendAssistantMessage: (id, input) => request<AssistantTurn>(
       `/api/v1/assistant/conversations/${encodeURIComponent(id)}/messages`, 'POST', input, 120_000,
     ),
+    sendAssistantMessageStream: async (id, input, onEvent, onError, onDone, signal) => {
+      const controller = new AbortController();
+      if (signal) signal.addEventListener('abort', () => controller.abort());
+      try {
+        const response = await fetcher(
+          `${baseUrl}/api/v1/assistant/conversations/${encodeURIComponent(id)}/messages/stream`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${connection.token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(input),
+            signal: controller.signal,
+          },
+        );
+        if (!response.ok) {
+          const error = await responseError(response);
+          onError(error);
+          onDone();
+          return;
+        }
+        const reader = response.body?.getReader();
+        if (!reader) { onDone(); return; }
+        const decoder = new TextDecoder();
+        let buffer = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const parts = buffer.split('\n\n');
+          buffer = parts.pop() || '';
+          for (const part of parts) {
+            const lines = part.split('\n');
+            let eventType = '';
+            let eventData = '';
+            for (const line of lines) {
+              if (line.startsWith('event: ')) eventType = line.slice(7);
+              else if (line.startsWith('data: ')) eventData = line.slice(6);
+            }
+            if (eventType && eventData) {
+              try {
+                onEvent(eventType, JSON.parse(eventData));
+              } catch { /* skip malformed */ }
+              if (eventType === 'done' || eventType === 'error') {
+                onDone();
+                return;
+              }
+            }
+          }
+        }
+        onDone();
+      } catch (e: unknown) {
+        if (!controller.signal.aborted) onError(e);
+        onDone();
+      }
+    },
     uploadAssistantFile: async file => {
       const form = new FormData();
       form.append('file', file, file.name);

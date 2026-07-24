@@ -8,6 +8,7 @@ from todo_backend.agent.planning import (
 from todo_backend.agent.proposals import (
     ProposalVerificationError,
     ResolvedMutation,
+    _copied_pending_draft,
     build_batch_drafts,
     verify_drafts,
 )
@@ -350,6 +351,87 @@ def test_update_overlays_every_explicit_field() -> None:
     )
 
 
+def test_create_treats_explicit_null_priority_and_category_as_unspecified() -> None:
+    plan = mutation_plan(
+        [
+            PlannedMutation(
+                action="create",
+                fields=PlannedFields.model_validate(
+                    {
+                        "text": "x",
+                        "priority": None,
+                        "category": None,
+                        "notes": None,
+                    }
+                ),
+            )
+        ]
+    )
+
+    drafts = build_batch_drafts(
+        "turn-1", plan, [ResolvedMutation()], superseded_batch=None
+    )
+
+    payload = drafts[0].proposals[0].payload
+    assert payload.priority == "medium"
+    assert payload.category == "other"
+    assert payload.notes is None
+
+
+def test_update_treats_explicit_null_priority_and_category_as_unspecified() -> None:
+    current = task("t1", "旧任务", priority="low", category="study")
+    plan = mutation_plan(
+        [
+            PlannedMutation(
+                action="update",
+                target_query=TargetQuery(title="旧任务"),
+                fields=PlannedFields.model_validate(
+                    {"text": "新任务", "priority": None, "category": None}
+                ),
+            )
+        ]
+    )
+
+    drafts = build_batch_drafts(
+        "turn-1", plan, [ResolvedMutation(task=current)], superseded_batch=None
+    )
+
+    payload = drafts[0].proposals[0].payload
+    assert payload.text == "新任务"
+    assert payload.priority == "low"
+    assert payload.category == "study"
+
+
+def test_explicit_null_notes_and_start_still_clear_values() -> None:
+    current = task(
+        "t1",
+        "旧任务",
+        start="2026-07-22T15:00",
+        end="2026-07-22T16:00",
+        notes="旧备注",
+    )
+    plan = mutation_plan(
+        [
+            PlannedMutation(
+                action="update",
+                target_query=TargetQuery(title="旧任务"),
+                fields=PlannedFields.model_validate(
+                    {"notes": None, "time_start": None}
+                ),
+            )
+        ]
+    )
+
+    drafts = build_batch_drafts(
+        "turn-1", plan, [ResolvedMutation(task=current)], superseded_batch=None
+    )
+
+    payload = drafts[0].proposals[0].payload
+    assert payload.notes is None
+    assert payload.time_start is None
+    assert payload.time_end is None
+
+
 def test_update_reference_to_pending_create_builds_superseding_create() -> None:
     old_batch = pending_create_batch(
         [("p-old", "开会")], batch_id="b-old", hour=15
@@ -414,8 +496,28 @@ def test_delete_reference_to_pending_delete_reproduces_complete_draft() -> None:
     assert proposal.action == "delete"
     assert proposal.target_task_id == "t1"
     assert proposal.before_snapshot == pending.before_snapshot
-    assert proposal.payload == pending.payload
+    assert proposal.payload is None
     assert drafts[0].supersedes_batch_id == "b-old"
+
+
+def test_delete_reference_to_pending_delete_with_null_payload_is_allowed() -> None:
+    old_batch = pending_delete_batch("b-old", "p-old", "t1")
+    pending = old_batch.proposals[0].model_copy(update={"payload": None})
+    old_batch = old_batch.model_copy(update={"proposals": [pending]})
+    plan = mutation_plan([planned_delete(reference="p-old")])
+
+    drafts = build_batch_drafts(
+        "turn-2",
+        plan,
+        [ResolvedMutation(pending=pending)],
+        superseded_batch=old_batch,
+    )
+
+    proposal = drafts[0].proposals[0]
+    assert proposal.action == "delete"
+    assert proposal.payload is None
+    assert proposal.target_task_id == "t1"
+    assert proposal.before_snapshot == pending.before_snapshot
 
 
 def test_referenced_edit_copies_unmentioned_pending_sibling() -> None:
@@ -441,6 +543,21 @@ def test_referenced_edit_copies_unmentioned_pending_sibling() -> None:
     assert drafts[0].proposals[1].payload == old_batch.proposals[1].payload
     assert drafts[0].proposals[1].source_proposal_id == "p-b"
     assert drafts[0].supersedes_batch_id == old_batch.id
+
+
+def test_copy_forward_accepts_delete_sibling_with_null_payload() -> None:
+    pending = pending_proposal(
+        "p-b", "b-old", "delete", card("B"), target=task("t2", "B")
+    ).model_copy(update={"payload": None})
+
+    draft = _copied_pending_draft("p-new", pending)
+
+    assert draft.action == "delete"
+    assert draft.payload is None
+    assert draft.target_task_id == "t2"
+    assert draft.before_snapshot == pending.before_snapshot
+    assert draft.source_batch_id == "b-old"
+    assert draft.source_proposal_id == "p-b"
 
 
 def test_copy_forward_skips_sibling_that_is_no_longer_pending() -> None:
@@ -604,14 +721,7 @@ def test_delete_contains_complete_before_snapshot_and_payload() -> None:
 
     proposal = drafts[0].proposals[0]
     assert proposal.before_snapshot == current
-    assert proposal.payload == card(
-        "会议",
-        priority="high",
-        category="work",
-        time_start="2026-07-22T15:00",
-        time_end="2026-07-22T16:00",
-        notes="纪要",
-    )
+    assert proposal.payload is None
 
 
 @pytest.mark.parametrize(

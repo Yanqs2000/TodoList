@@ -188,7 +188,6 @@ def update_batch(database: Database) -> SeededBatch:
 def delete_batch(database: Database) -> SeededBatch:
     task_service = TaskService(database)
     task = task_service.create(CreateTaskCommand(text="删除我", priority="medium"))
-    payload = _card_from_task(task)
     batch = _insert_batch(
         database,
         BatchDraft(
@@ -200,7 +199,7 @@ def delete_batch(database: Database) -> SeededBatch:
                     action="delete",
                     target_task_id=task.id,
                     before_snapshot=task,
-                    payload=payload,
+                    payload=None,
                 )
             ],
         ),
@@ -213,7 +212,7 @@ def delete_batch(database: Database) -> SeededBatch:
         batch=batch,
         proposal=proposal,
         confirm_command=ConfirmProposalBatchCommand(
-            items=[ConfirmProposalItem(proposalId=proposal.id, payload=payload)]
+            items=[ConfirmProposalItem(proposalId=proposal.id, payload=None)]
         ),
         task=task,
     )
@@ -306,6 +305,76 @@ def test_batch_commits_successes_and_keeps_failures_pending(database: Database) 
     assert [item.error for item in result.items] == [None, "TASK_TARGET_NOT_FOUND"]
     assert result.batch.status == "partially_applied"
     assert [task.text for task in TaskService(database).list_all()] == ["成功创建"]
+
+
+def test_confirm_mixed_actions_keep_editable_payloads_and_null_delete(
+    database: Database,
+) -> None:
+    task_service = TaskService(database)
+    update_target = task_service.create(
+        CreateTaskCommand(text="待修改", priority="medium")
+    )
+    delete_target = task_service.create(
+        CreateTaskCommand(text="待删除", priority="high")
+    )
+    create_payload = _card("新建任务")
+    update_payload = _card_from_task(update_target, text="已修改")
+    batch = _insert_batch(
+        database,
+        BatchDraft(
+            id="b-mixed-actions",
+            supersedes_batch_id=None,
+            proposals=[
+                ProposalDraft(
+                    id="p-create",
+                    action="create",
+                    target_task_id=None,
+                    before_snapshot=None,
+                    payload=create_payload,
+                ),
+                ProposalDraft(
+                    id="p-update",
+                    action="update",
+                    target_task_id=update_target.id,
+                    before_snapshot=update_target,
+                    payload=update_payload,
+                ),
+                ProposalDraft(
+                    id="p-delete",
+                    action="delete",
+                    target_task_id=delete_target.id,
+                    before_snapshot=delete_target,
+                    payload=None,
+                ),
+            ],
+        ),
+    )
+    executor = ProposalBatchExecutor(database)
+
+    result = executor.confirm(
+        batch.id,
+        ConfirmProposalBatchCommand(
+            items=[
+                ConfirmProposalItem(proposalId="p-create", payload=create_payload),
+                ConfirmProposalItem(proposalId="p-update", payload=update_payload),
+                ConfirmProposalItem(proposalId="p-delete", payload=None),
+            ]
+        ),
+    )
+
+    by_id = {item.proposal.id: item for item in result.items}
+    assert [by_id[f"p-{kind}"].error for kind in ("create", "update", "delete")] == [
+        None,
+        None,
+        None,
+    ]
+    assert by_id["p-create"].proposal.payload == create_payload
+    assert by_id["p-update"].proposal.payload == update_payload
+    assert by_id["p-delete"].proposal.payload is None
+    assert {task.text for task in task_service.list_all()} == {
+        "新建任务",
+        "已修改",
+    }
 
 
 def test_confirm_persists_edited_payload_for_reload(
@@ -529,6 +598,20 @@ def test_delete_is_idempotent(delete_batch: SeededBatch) -> None:
     assert first.items[0].proposal.result_task_id == second.items[0].proposal.result_task_id
     assert first.items[0].task is None
     assert second.items[0].task is None
+    assert delete_batch.task_service.list_all() == []
+
+
+def test_confirm_delete_with_null_payload_accepts_and_removes_task(
+    delete_batch: SeededBatch,
+) -> None:
+    result = delete_batch.executor.confirm(
+        delete_batch.batch.id, delete_batch.confirm_command
+    )
+
+    assert result.items[0].error is None
+    assert result.items[0].proposal.status == "accepted"
+    assert result.items[0].proposal.payload is None
+    assert result.items[0].proposal.before_snapshot == delete_batch.task
     assert delete_batch.task_service.list_all() == []
 
 

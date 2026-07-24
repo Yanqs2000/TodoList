@@ -1,15 +1,20 @@
 # pyright: reportUnknownArgumentType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownVariableType=false
 
 import json
+import logging
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import pytest
 from langgraph.checkpoint.memory import InMemorySaver
 
+import todo_backend.agent.turn_graph as turn_graph_module
 from todo_backend.agent.ark_client import ArkChatResult
 from todo_backend.agent.planning import (
+    AnalysisResult,
     IntentPlan,
     PlannedMutation,
     PlanValidationError,
@@ -24,6 +29,7 @@ from todo_backend.models import (
     CreateTaskCommand,
     LocalDateTime,
     PlannedFields,
+    ProposalCardFields,
     Task,
     TimeField,
 )
@@ -34,15 +40,32 @@ from todo_backend.services.assistant import AssistantService
 from todo_backend.services.tasks import TaskService
 
 
+# 固定时钟：2026-07-23T01:30+08:00（周四），保证日期上下文相关测试确定可复现。
+FIXED_NOW = datetime(2026, 7, 23, 1, 30, tzinfo=ZoneInfo("Asia/Shanghai"))
+
+
 class FakePlanner:
     def __init__(self) -> None:
         self.results: list[IntentPlan] = []
         self.errors: list[str] = []
         self.calls: list[dict[str, Any]] = []
+        self.exception: BaseException | None = None
+        self.analyze_results: list[AnalysisResult] = []
+        self.analyze_calls: list[dict[str, Any]] = []
 
     @property
     def call_count(self) -> int:
         return len(self.calls)
+
+    def analyze(
+        self, user_text: str, messages: list[dict[str, Any]]
+    ) -> AnalysisResult:
+        self.analyze_calls.append({"user_text": user_text, "messages": messages})
+        if self.analyze_results:
+            return self.analyze_results.pop(0)
+        return AnalysisResult(
+            intent="mutations", reasoning="default for backward compatibility"
+        )
 
     def plan_once(
         self,
@@ -57,6 +80,8 @@ class FakePlanner:
                 "validation_code": validation_code,
             }
         )
+        if self.exception is not None:
+            raise self.exception
         if self.errors:
             raise PlanValidationError(self.errors.pop(0))
         return self.results.pop(0)
@@ -130,6 +155,7 @@ class TurnFixture:
     workflow: AssistantTurnWorkflow
     conversation_id: str
     uploads_dir: Path
+    now: datetime
 
     def create_task(
         self,
@@ -234,6 +260,7 @@ def graph_fixture(tmp_path: Path) -> TurnFixture:
             build_ark_messages=message_service._build_ark_messages,
         ),
         InMemorySaver(),
+        clock=lambda: FIXED_NOW,
     )
     return TurnFixture(
         database=database,
@@ -247,6 +274,7 @@ def graph_fixture(tmp_path: Path) -> TurnFixture:
         workflow=workflow,
         conversation_id=conversation.id,
         uploads_dir=tmp_path / "assistant_uploads",
+        now=FIXED_NOW,
     )
 
 
@@ -509,7 +537,8 @@ def test_proposal_validation_can_repair_once(graph_fixture: TurnFixture) -> None
 
     assert result.message.status == "done"
     assert graph_fixture.planner.call_count == 2
-    assert graph_fixture.planner.calls[1]["validation_code"] == "TIME_END_REQUIRES_START"
+    assert "TIME_END_REQUIRES_START" in graph_fixture.planner.calls[1]["validation_code"]
+    assert "failure context" in graph_fixture.planner.calls[1]["validation_code"].lower()
 
 
 def test_unknown_pending_reference_repairs_then_fails(
@@ -525,7 +554,8 @@ def test_unknown_pending_reference_repairs_then_fails(
 
     assert result.message.status == "failed"
     assert graph_fixture.planner.call_count == 3
-    assert graph_fixture.planner.calls[1]["validation_code"] == "PENDING_REFERENCE_NOT_FOUND"
+    assert "PENDING_REFERENCE_NOT_FOUND" in graph_fixture.planner.calls[1]["validation_code"]
+    assert "failure context" in graph_fixture.planner.calls[1]["validation_code"].lower()
 
 
 def test_retry_after_terminal_failure_reuses_messages_without_duplicate_batch(
@@ -623,7 +653,7 @@ def test_turn_graph_never_calls_real_task_write_methods(
 
     result = graph_fixture.run_user_turn("turn-no-write", "新建买菜")
 
-    assert result.message.content == "已生成 1 项提议，请检查确认卡。"
+    assert result.message.content == "已生成 1 项提议：新建「买菜」。请检查确认卡。"
     assert graph_fixture.task_repository.create_calls == 0
     assert graph_fixture.task_repository.update_calls == 0
     assert graph_fixture.task_repository.delete_calls == 0
@@ -639,6 +669,282 @@ def test_english_mutation_message_is_deterministic(
     result = graph_fixture.run_user_turn("turn-english", "Create a buy milk task")
 
     assert result.message.content == (
-        "Created 1 proposals. Review the confirmation card."
+        'Created 1 proposals: Create "Buy milk". Review the confirmation card.'
     )
     assert "?" not in result.message.content
+
+
+def test_planner_receives_current_date_context(graph_fixture: TurnFixture) -> None:
+    graph_fixture.planner.results = [create_plan("买菜")]
+
+    graph_fixture.run_user_turn("turn-date-context", "明天早上7点去买菜")
+
+    history = json.dumps(
+        graph_fixture.planner.calls[0]["messages"], ensure_ascii=False
+    )
+    assert "2026-07-23T01:30+08:00" in history
+    assert "周四" in history
+    assert "Asia/Shanghai" in history
+
+
+def test_execute_read_receives_current_date_context(graph_fixture: TurnFixture) -> None:
+    graph_fixture.planner.results = [
+        IntentPlan(kind="query", evidence="用户询问", query="今天有哪些任务")
+    ]
+    graph_fixture.ark.results = [ArkChatResult(content="今天没有安排。")]
+
+    graph_fixture.run_user_turn("turn-read-date-context", "今天有哪些安排？")
+
+    history = json.dumps(
+        graph_fixture.ark.calls[0]["messages"], ensure_ascii=False
+    )
+    assert "2026-07-23T01:30+08:00" in history
+    assert "周四" in history
+
+
+def test_turn_graph_logs_node_and_error_type_on_unexpected_failure(
+    graph_fixture: TurnFixture, caplog: pytest.LogCaptureFixture
+) -> None:
+    graph_fixture.planner.exception = RuntimeError("boom-with-secret-task-body")
+
+    with caplog.at_level(logging.ERROR, logger="todo_backend.agent.turn_graph"):
+        result = graph_fixture.run_user_turn("turn-log-failure", "新建一个保密任务XYZ")
+
+    assert result.message.status == "failed"
+    own_records = [
+        record
+        for record in caplog.records
+        if record.name == "todo_backend.agent.turn_graph"
+    ]
+    assert own_records, "expected turn_graph to log the unexpected failure"
+    combined = "\n".join(record.getMessage() for record in own_records)
+    assert "plan_intent" in combined
+    assert "RuntimeError" in combined
+    # 日志只记录结构信息，绝不记录任务正文或异常消息
+    assert "保密任务XYZ" not in combined
+    assert "boom-with-secret-task-body" not in combined
+
+
+def test_build_proposals_validation_error_repairs_then_fails_with_stable_code(
+    graph_fixture: TurnFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def raise_validation_error(*args: object, **kwargs: object) -> object:
+        ProposalCardFields.model_validate(
+            {
+                "text": "买菜",
+                "priority": None,
+                "category": "other",
+                "time_start": None,
+                "time_end": None,
+                "notes": None,
+            }
+        )
+        raise AssertionError("model_validate should have raised")
+
+    monkeypatch.setattr(turn_graph_module, "build_batch_drafts", raise_validation_error)
+    graph_fixture.planner.results = [
+        create_plan("买菜"),
+        create_plan("买菜"),
+        create_plan("买菜"),
+    ]
+
+    result = graph_fixture.run_user_turn("turn-build-repair", "新建买菜")
+
+    # 不再被 run() 静默吞成空响应 TURN_GRAPH_FAILED，而是走 repair 后以稳定错误码收尾
+    assert result.message.status == "failed"
+    assert graph_fixture.planner.call_count == 3
+    assert "INVALID_PROPOSAL_FIELDS" in graph_fixture.planner.calls[1]["validation_code"]
+    assert "failure context" in graph_fixture.planner.calls[1]["validation_code"].lower()
+    with graph_fixture.database.transaction() as connection:
+        turn = graph_fixture.conversations.get_turn(connection, "turn-build-repair")
+    assert turn.last_error == "INVALID_PROPOSAL_FIELDS"
+    assert graph_fixture.task_repository.create_calls == 0
+
+
+def test_analyze_routes_to_clarify(graph_fixture: TurnFixture) -> None:
+    graph_fixture.planner.analyze_results = [
+        AnalysisResult(
+            intent="clarify",
+            reasoning="用户请求不明确",
+            missing_info="请问您需要创建几个任务？",
+        )
+    ]
+
+    result = graph_fixture.run_user_turn("turn-analyze-clarify", "新建几个任务")
+
+    assert result.message.content == "请问您需要创建几个任务？"
+    assert result.message.status == "done"
+    assert result.proposal_batches == []
+
+
+def test_analyze_routes_to_mutations(graph_fixture: TurnFixture) -> None:
+    graph_fixture.planner.analyze_results = [
+        AnalysisResult(
+            intent="mutations",
+            reasoning="用户明确要求创建任务",
+        )
+    ]
+    graph_fixture.planner.results = [create_plan("买菜")]
+
+    result = graph_fixture.run_user_turn("turn-analyze-mutations", "新建买菜任务")
+
+    assert result.message.status == "done"
+    assert len(result.proposal_batches) == 1
+    assert result.proposal_batches[0].proposals[0].action == "create"
+
+
+# ── Phase 2: Enhanced repair context ──────────────────────────────
+
+
+def test_repair_context_includes_task_summary(
+    graph_fixture: TurnFixture,
+) -> None:
+    """Phase 2: When repair is triggered, planner receives enriched context
+    including error code, available task list, and repair instruction."""
+    graph_fixture.create_task("买菜")
+    graph_fixture.planner.results = [
+        create_plan("开会", time_end="2026-07-22T16:00"),
+        create_plan(
+            "开会",
+            time_start="2026-07-22T15:00",
+            time_end="2026-07-22T16:00",
+        ),
+    ]
+
+    result = graph_fixture.run_user_turn("turn-repair-ctx", "新建下午三点的会议")
+
+    assert result.message.status == "done"
+    assert graph_fixture.planner.call_count == 2
+    second_call = graph_fixture.planner.calls[1]
+    validation_code = second_call["validation_code"]
+    assert "TIME_END_REQUIRES_START" in validation_code
+    # Task list should include the existing task
+    assert "买菜" in validation_code
+    # Should include the repair instruction
+    assert "failure context" in validation_code.lower()
+    assert "correct the plan" in validation_code.lower()
+
+
+def test_repair_context_includes_plan_errors(
+    graph_fixture: TurnFixture,
+) -> None:
+    """Phase 2: Plan validation repair messages also carry enriched context."""
+    graph_fixture.create_task("买菜")
+    graph_fixture.planner.errors = ["INVALID_PLAN_SCHEMA"]
+    graph_fixture.planner.results = [create_plan("买菜")]
+
+    result = graph_fixture.run_user_turn("turn-plan-repair-ctx", "新建买菜")
+
+    assert result.message.status == "done"
+    assert graph_fixture.planner.call_count == 2
+    second_call = graph_fixture.planner.calls[1]
+    validation_code = second_call["validation_code"]
+    assert "INVALID_PLAN_SCHEMA" in validation_code
+    assert "failure context" in validation_code.lower()
+    # Task list should be present for context
+    assert "买菜" in validation_code
+
+
+# ── Phase 3: Reflect node ────────────────────────────────────────
+
+
+def test_reflect_ok_persists_proposals(graph_fixture: TurnFixture) -> None:
+    """Phase 3: When reflect confirms proposals are ok, persist_batches is reached."""
+    graph_fixture.planner.results = [create_plan("买菜")]
+    # reflect ark response
+    graph_fixture.ark.results = [ArkChatResult(content='{"ok": true}')]
+
+    result = graph_fixture.run_user_turn("turn-reflect-ok", "新建买菜")
+
+    assert result.message.status == "done"
+    assert len(result.proposal_batches) == 1
+    assert result.proposal_batches[0].proposals[0].action == "create"
+    # ark was called for reflect (tools=None, thinking=disabled)
+    ark_calls = graph_fixture.ark.calls
+    assert len(ark_calls) == 1
+    assert ark_calls[0]["tools"] is None
+    assert ark_calls[0]["thinking"] == "disabled"
+
+
+def test_reflect_not_ok_repairs_then_succeeds(
+    graph_fixture: TurnFixture,
+) -> None:
+    """Phase 3: When reflect finds issues, it triggers repair and eventually persists."""
+    graph_fixture.planner.results = [
+        create_plan("买菜"),
+        create_plan("买菜"),
+    ]
+    graph_fixture.ark.results = [
+        # First reflect: find issues
+        ArkChatResult(
+            content='{"ok": false, "issues": [{"item_index": 0, "problem": "title too vague"}]}'
+        ),
+        # Second reflect: ok
+        ArkChatResult(content='{"ok": true}'),
+    ]
+
+    result = graph_fixture.run_user_turn("turn-reflect-repair", "新建买菜")
+
+    assert result.message.status == "done"
+    assert len(result.proposal_batches) == 1
+    # Planner was called twice (original + repair)
+    assert graph_fixture.planner.call_count == 2
+    # Repair call should include reflect issues in validation_code
+    assert "Reflect" in graph_fixture.planner.calls[1]["validation_code"]
+
+
+def test_reflect_chat_failure_defaults_to_ok(
+    graph_fixture: TurnFixture,
+) -> None:
+    """Phase 3: If ark.chat fails during reflect, default to ok (persist)."""
+    graph_fixture.planner.results = [create_plan("买菜")]
+    # Empty results causes IndexError in FakeArk.chat → caught as Exception → default ok
+    graph_fixture.ark.results = []
+
+    result = graph_fixture.run_user_turn("turn-reflect-chat-fail", "新建买菜")
+
+    assert result.message.status == "done"
+    assert len(result.proposal_batches) == 1
+
+
+def test_reflect_json_parse_failure_defaults_to_ok(
+    graph_fixture: TurnFixture,
+) -> None:
+    """Phase 3: If reflect response is not valid JSON, default to ok (persist)."""
+    graph_fixture.planner.results = [create_plan("买菜")]
+    graph_fixture.ark.results = [ArkChatResult(content="not valid json at all")]
+
+    result = graph_fixture.run_user_turn("turn-reflect-json-fail", "新建买菜")
+
+    assert result.message.status == "done"
+    assert len(result.proposal_batches) == 1
+
+
+def test_reflect_not_ok_exceeds_repair_limit(
+    graph_fixture: TurnFixture,
+) -> None:
+    """Phase 3: When reflect fails repeatedly, eventually routes to finalize_error."""
+    # Three plans: original + 2 repair attempts
+    graph_fixture.planner.results = [
+        create_plan("买菜"),
+        create_plan("买菜"),
+        create_plan("买菜"),
+    ]
+    # Three reflects: all find issues
+    graph_fixture.ark.results = [
+        ArkChatResult(
+            content='{"ok": false, "issues": [{"item_index": 0, "problem": "issue"}]}'
+        ),
+        ArkChatResult(
+            content='{"ok": false, "issues": [{"item_index": 0, "problem": "issue"}]}'
+        ),
+        ArkChatResult(
+            content='{"ok": false, "issues": [{"item_index": 0, "problem": "issue"}]}'
+        ),
+    ]
+
+    result = graph_fixture.run_user_turn("turn-reflect-exceed", "新建买菜")
+
+    # After 2 repairs, repair_count >= 2, should route to finalize_error
+    assert result.message.status == "failed"
+    assert graph_fixture.planner.call_count == 3

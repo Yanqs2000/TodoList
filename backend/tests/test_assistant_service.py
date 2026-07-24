@@ -80,6 +80,22 @@ class FakeArk:
             raise result
         return result
 
+    @staticmethod
+    def _first_text(messages: list[dict[str, Any]]) -> str:
+        if not messages:
+            return ""
+        content = messages[0].get("content", "")
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            parts = [
+                p.get("text", "")
+                for p in content
+                if isinstance(p, dict) and p.get("type") == "text"
+            ]
+            return " ".join(parts)
+        return ""
+
     def chat(
         self,
         messages: list[dict[str, Any]],
@@ -99,10 +115,33 @@ class FakeArk:
                 },
             )
         )
-        result = self.chat_results.pop(0)
-        if isinstance(result, BaseException):
-            raise result
-        return result
+        # Auto-respond to analyze calls without consuming user-provided chat_results
+        system = self._first_text(messages)
+        if "Output one AnalysisResult" in system or (
+            tools and any(t.get("function", {}).get("name") == "submit_analysis" for t in tools)
+        ):
+            from todo_backend.agent.ark_client import ArkToolCall
+            return ArkChatResult(
+                content="",
+                tool_calls=[
+                    ArkToolCall(
+                        id="call_analyze",
+                        name="submit_analysis",
+                        arguments={"intent": "mutations", "reasoning": "default for backward compatibility"},
+                    )
+                ],
+            )
+        # Auto-respond to reflect calls without consuming chat_results
+        if tools is None and tool_choice is None and system and "review" in system.lower():
+            return ArkChatResult(content='{"ok": true}')
+        if self.chat_results:
+            result = self.chat_results.pop(0)
+            if isinstance(result, BaseException):
+                raise result
+            return result
+        return ArkChatResult(
+            content='{"intent":"mutations","reasoning":"default for backward compatibility"}'
+        )
 
     def transcribe(self, audio_base64: str, audio_format: str) -> str:
         self.mock_calls.append(
@@ -130,23 +169,11 @@ class BlockingArk(FakeArk):
         return super().plan(messages, submit_plan_tool)
 
 
-class CapabilityCachingArk(FakeArk):
+class ReusableArk(FakeArk):
     def __init__(self) -> None:
         super().__init__(
             plan_results=[create_plan_payload("A"), create_plan_payload("B")]
         )
-        self.planning_thinking_supported: bool | None = None
-        self.thinking_attempts: list[str] = []
-
-    def plan(
-        self, messages: list[dict[str, Any]], submit_plan_tool: dict[str, Any]
-    ) -> dict[str, Any]:
-        if self.planning_thinking_supported is None:
-            self.thinking_attempts.extend(["enabled", "disabled"])
-            self.planning_thinking_supported = False
-        else:
-            self.thinking_attempts.append("disabled")
-        return super().plan(messages, submit_plan_tool)
 
 
 @dataclass(frozen=True, slots=True)
@@ -363,10 +390,15 @@ def test_retry_same_turn_does_not_duplicate_messages_or_batches(
     )
 
     first = service.send_message(conversation.id, command)
+    with service.database.transaction() as connection:
+        failed_turn = ConversationsRepository().get_turn(connection, command.turn_id)
+
+    assert first.message.status == "failed"
+    assert failed_turn.last_error == "ASSISTANT_UNAVAILABLE"
+
     second = service.send_message(conversation.id, command)
     detail = service.get_conversation_detail(conversation.id)
 
-    assert first.message.status == "failed"
     assert second.message.status == "done"
     assert len(detail.messages) == 2
     assert len(detail.proposal_batches) == 1
@@ -557,6 +589,63 @@ def test_confirm_edited_batch_never_calls_ark(
     assert fake_ark.mock_calls == []
 
 
+def test_concurrent_batch_confirmation_is_idempotent_across_services(
+    persistent_service_factory: PersistentServiceFactory,
+) -> None:
+    first = persistent_service_factory.open(FakeArk())
+    second = persistent_service_factory.open(FakeArk())
+    batch = seed_create_batch(first.database, text="并发确认")
+    command = _confirm_stored_batch(batch)
+    gate = threading.Barrier(3)
+    results: list[Any] = []
+    errors: list[BaseException] = []
+
+    def confirm(service: AssistantService) -> None:
+        try:
+            gate.wait(timeout=5)
+            results.append(service.confirm_proposal_batch(batch.id, command))
+        except BaseException as error:
+            errors.append(error)
+
+    threads = [
+        threading.Thread(target=confirm, args=(first,)),
+        threading.Thread(target=confirm, args=(second,)),
+    ]
+    try:
+        for thread in threads:
+            thread.start()
+        gate.wait(timeout=5)
+        for thread in threads:
+            thread.join(timeout=10)
+
+        assert all(not thread.is_alive() for thread in threads)
+        assert errors == []
+        assert len(results) == 2
+        assert [result.batch.status for result in results] == ["accepted", "accepted"]
+        result_task_ids = {
+            result.items[0].proposal.result_task_id for result in results
+        }
+        assert None not in result_task_ids
+        assert len(result_task_ids) == 1
+        with first.database.transaction() as connection:
+            task_row = connection.execute(
+                "SELECT COUNT(*), MIN(text), MAX(text) FROM tasks"
+            ).fetchone()
+        assert task_row is not None
+        assert int(task_row[0]) == 1
+        assert task_row[1] == "并发确认"
+        assert task_row[2] == "并发确认"
+    finally:
+        gate.abort()
+        for thread in threads:
+            thread.join(timeout=10)
+        alive = [thread for thread in threads if thread.is_alive()]
+        if not alive:
+            second.close()
+            first.close()
+        assert alive == []
+
+
 def test_legacy_pending_batch_gets_checkpoint_on_first_confirmation(
     assistant: AssistantFixture,
 ) -> None:
@@ -646,17 +735,17 @@ def test_unexpected_turn_failure_never_leaves_active_row(
     assert message.status == "failed"
 
 
-def test_ark_client_capability_state_is_cached_across_turns(tmp_path: Path) -> None:
+def test_ark_client_instance_is_cached_across_turns(tmp_path: Path) -> None:
     database = Database(
         tmp_path / "todo.sqlite3", Path(__file__).parents[1] / "migrations"
     )
     database.initialize()
     _initialize_app_settings(database)
     settings = Settings(database.path, "127.0.0.1", 8000, "test-token")
-    clients: list[CapabilityCachingArk] = []
+    clients: list[ReusableArk] = []
 
-    def factory(_settings: object) -> CapabilityCachingArk:
-        client = CapabilityCachingArk()
+    def factory(_settings: object) -> ReusableArk:
+        client = ReusableArk()
         clients.append(client)
         return client
 
@@ -678,7 +767,9 @@ def test_ark_client_capability_state_is_cached_across_turns(tmp_path: Path) -> N
     service.close()
 
     assert len(clients) == 1
-    assert clients[0].thinking_attempts == ["enabled", "disabled", "disabled"]
+    assert [name for name, _payload in clients[0].mock_calls] == [
+        "chat", "plan", "chat", "chat", "plan", "chat",
+    ]
 
 
 def test_audio_message_is_transcribed_into_attachment(

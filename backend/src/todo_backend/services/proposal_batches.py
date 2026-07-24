@@ -272,21 +272,16 @@ class ProposalBatchExecutor:
 
     def _validated_full_payload(
         self, proposal: AssistantProposal, item: ConfirmProposalItem
-    ) -> ProposalCardFields:
+    ) -> ProposalCardFields | None:
         if proposal.action == "delete":
-            if (
-                proposal.target_task_id is None
-                or proposal.before_snapshot is None
-                or proposal.payload is None
-            ):
-                raise _ProposalBusinessError("TASK_TARGET_NOT_FOUND")
-            raw_payload = proposal.payload.model_dump()
-        else:
-            if item.payload is None:
-                raise _ProposalBusinessError("INVALID_PROPOSAL_PAYLOAD")
-            raw_payload = item.payload.model_dump()
-            if set(raw_payload) != EDITABLE_FIELDS:
-                raise _ProposalBusinessError("INVALID_PROPOSAL_PAYLOAD")
+            # 删除确认只消费 targetTaskId/beforeSnapshot（由 _apply_one 校验），
+            # 客户端传的 payload 本就是 null
+            return None
+        if item.payload is None:
+            raise _ProposalBusinessError("INVALID_PROPOSAL_PAYLOAD")
+        raw_payload = item.payload.model_dump()
+        if set(raw_payload) != EDITABLE_FIELDS:
+            raise _ProposalBusinessError("INVALID_PROPOSAL_PAYLOAD")
 
         payload = ProposalCardFields.model_validate(raw_payload)
         if not payload.text.strip():

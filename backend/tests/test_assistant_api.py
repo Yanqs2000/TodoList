@@ -52,7 +52,27 @@ class FakeArk:
         tool_choice: dict[str, Any] | None = None,
         thinking: str = "disabled",
     ) -> ArkChatResult:
-        del messages, tools, tool_choice, thinking
+        del tools, tool_choice, thinking
+        system = messages[0]["content"] if messages else ""
+        if "Output one AnalysisResult" in system or (
+            tools and any(t.get("function", {}).get("name") == "submit_analysis" for t in tools)
+        ):
+            self.calls.append("analyze")
+            from todo_backend.agent.ark_client import ArkToolCall
+            return ArkChatResult(
+                content="",
+                tool_calls=[
+                    ArkToolCall(
+                        id="call_analyze",
+                        name="submit_analysis",
+                        arguments={"intent": "mutations", "reasoning": "default for backward compatibility"},
+                    )
+                ],
+            )
+        # Auto-respond to reflect calls: model approves proposals
+        if tools is None and tool_choice is None and system and "review" in system.lower():
+            self.calls.append("reflect")
+            return ArkChatResult(content='{"ok": true}')
         self.calls.append("chat")
         return ArkChatResult(content="你好！")
 
@@ -429,6 +449,47 @@ def test_invalid_confirmation_payload_returns_stable_422(client: TestClient) -> 
 
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "INVALID_CONFIRMATION_PAYLOAD"
+
+
+@pytest.mark.parametrize(
+    ("location", "field_name", "value"),
+    [
+        ("item", "action", "delete"),
+        ("item", "targetTaskId", "attacker-selected-task"),
+        ("item", "beforeSnapshot", {"text": "forged snapshot"}),
+        ("payload", "completed", True),
+    ],
+)
+def test_confirmation_rejects_server_owned_and_unsupported_fields(
+    client: TestClient,
+    location: str,
+    field_name: str,
+    value: Any,
+) -> None:
+    batch = seed_batch(client)
+    command = _confirmation_payload(batch)
+    target: dict[str, Any] = (
+        command["items"][0]
+        if location == "item"
+        else command["items"][0]["payload"]
+    )
+    target[field_name] = value
+
+    response = client.post(
+        f"/api/v1/assistant/proposal-batches/{batch['id']}/confirm",
+        headers=_HEADERS,
+        json=command,
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "INVALID_REQUEST"
+    with _service(client).database.transaction() as connection:
+        stored = ProposalBatchesRepository().get_batch(connection, batch["id"])
+        task_row = connection.execute("SELECT COUNT(*) FROM tasks").fetchone()
+    assert task_row is not None
+    assert int(task_row[0]) == 0
+    assert stored.status == "pending"
+    assert stored.proposals[0].status == "pending"
 
 
 def test_partial_application_is_http_success_with_item_error(

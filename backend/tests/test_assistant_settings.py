@@ -5,6 +5,8 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from todo_backend.agent.planning import IntentPlan, PlannedMutation
+from todo_backend.agent.proposals import ResolvedMutation, build_batch_drafts
 from todo_backend.database import Database
 from todo_backend import models
 from todo_backend.models import AssistantSettingsPatchCommand
@@ -14,6 +16,7 @@ from todo_backend.repositories.assistant_settings import (
     DEFAULT_CHAT_MODEL,
     AssistantSettingsRepository,
 )
+from todo_backend.repositories.settings import SettingsRepository
 
 
 @pytest.fixture
@@ -122,3 +125,44 @@ def test_planned_fields_remain_partial() -> None:
     planned = models.PlannedFields(time_end="2026-07-22T17:00")
 
     assert planned.time_end == "2026-07-22T17:00"
+
+
+def test_planned_fields_blank_notes_normalized_to_none() -> None:
+    assert models.PlannedFields.model_validate({"notes": ""}).notes is None
+    assert models.PlannedFields.model_validate({"notes": "   "}).notes is None
+    assert models.PlannedFields.model_validate({"notes": "abc"}).notes == "abc"
+
+
+def test_create_draft_payload_uses_null_notes_for_blank_input() -> None:
+    plan = IntentPlan(
+        kind="mutations",
+        evidence="清空备注",
+        items=[PlannedMutation(action="create", fields=models.PlannedFields(text="x", notes=""))],
+    )
+
+    drafts = build_batch_drafts("turn-1", plan, [ResolvedMutation()], superseded_batch=None)
+
+    assert drafts[0].proposals[0].payload.notes is None
+
+
+def test_patch_on_uninitialized_settings_inserts_bootstrap_defaults(
+    database: Database,
+) -> None:
+    repository = AssistantSettingsRepository()
+    with database.transaction() as connection:
+        assert connection.execute("SELECT COUNT(*) FROM app_settings").fetchone()[0] == 0
+
+        patched = repository.patch(connection, AssistantSettingsPatchCommand(apiKey="k"))
+
+        assert patched.api_key == "k"
+        assert patched.chat_model == DEFAULT_CHAT_MODEL
+        assert patched.audio_model == DEFAULT_AUDIO_MODEL
+        assert patched.base_url == DEFAULT_ARK_BASE_URL
+
+        settings = SettingsRepository().get(connection)
+        assert settings.theme == "workspace-light"
+        assert settings.muted is False
+        assert settings.shortcut == "Cmd+Alt+KeyT"
+        assert settings.language == "zh-CN"
+
+        assert repository.get(connection).api_key == "k"

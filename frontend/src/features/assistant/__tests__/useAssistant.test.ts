@@ -261,6 +261,50 @@ describe('useAssistant', () => {
     expect(result.current.proposalBatches[0]).toEqual(resolved.batch);
   });
 
+  it('keeps the batch and clears submitting state when confirmation fails', async () => {
+    const api = fakeApi();
+    const error = new InfrastructureError(
+      'infrastructure', 'INTERNAL_ERROR', 'Confirmation failed', 500,
+    );
+    api.confirmAssistantProposalBatch = vi.fn().mockRejectedValue(error);
+    const onError = vi.fn();
+    const { result } = renderHook(() => useAssistant(api, onError));
+    await waitFor(() => expect(result.current.activeId).toBe('c1'));
+    const originalBatch = result.current.proposalBatches[0];
+
+    const response = await act(() => result.current.confirmBatch('b1', editedItems));
+
+    expect(response).toBeUndefined();
+    expect(api.confirmAssistantProposalBatch).toHaveBeenCalledWith('b1', {
+      items: editedItems,
+    });
+    expect(result.current.proposalBatches[0]).toEqual(originalBatch);
+    expect(result.current.submittingBatchIds.has('b1')).toBe(false);
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onError).toHaveBeenCalledWith(error);
+  });
+
+  it('keeps the batch and clears submitting state when rejection fails', async () => {
+    const api = fakeApi();
+    const error = new InfrastructureError(
+      'infrastructure', 'INTERNAL_ERROR', 'Rejection failed', 500,
+    );
+    api.rejectAssistantProposalBatch = vi.fn().mockRejectedValue(error);
+    const onError = vi.fn();
+    const { result } = renderHook(() => useAssistant(api, onError));
+    await waitFor(() => expect(result.current.activeId).toBe('c1'));
+    const originalBatch = result.current.proposalBatches[0];
+
+    const response = await act(() => result.current.rejectBatch('b1'));
+
+    expect(response).toBeUndefined();
+    expect(api.rejectAssistantProposalBatch).toHaveBeenCalledWith('b1');
+    expect(result.current.proposalBatches[0]).toEqual(originalBatch);
+    expect(result.current.submittingBatchIds.has('b1')).toBe(false);
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onError).toHaveBeenCalledWith(error);
+  });
+
   it('reports an unknown retry turn without sending', async () => {
     const api = fakeApi();
     const onError = vi.fn();

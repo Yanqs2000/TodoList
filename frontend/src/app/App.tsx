@@ -76,6 +76,7 @@ function TodoApplicationContent({ snapshot, api, onInfrastructureError, language
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [summaryOpen, setSummaryOpen] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [infoToast, setInfoToast] = useState<InfoToastState | null>(null);
   const infoTimerRef = useRef<number | null>(null);
@@ -199,7 +200,8 @@ function TodoApplicationContent({ snapshot, api, onInfrastructureError, language
   }, [todoState, sound, selectedTaskId]);
 
   const handleSelectTask = useCallback((id: string | null) => {
-    setSelectedTaskId(id);
+    setSelectedTaskId(prev => prev === id ? null : id);
+    if (id) setSummaryOpen(true);
   }, []);
 
   const handleAddTask = useCallback(async (text: string, time?: TimeField, category?: Category, priority?: Priority, notes?: string): Promise<boolean> => {
@@ -220,7 +222,7 @@ function TodoApplicationContent({ snapshot, api, onInfrastructureError, language
   ));
 
   return (
-    <div className={assistantOpen ? 'app-shell app-shell--assistant-open' : 'app-shell'}>
+    <div className={`app-shell${summaryOpen || selectedTaskId ? ' app-shell--summary-open' : ''}${assistantOpen ? ' app-shell--assistant-open' : ''}`}>
       <AchievementDrawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
@@ -275,7 +277,9 @@ function TodoApplicationContent({ snapshot, api, onInfrastructureError, language
           onOpenAchievements={() => setDrawerOpen(true)}
           onOpenCreateModal={() => setCreateModalOpen(true)}
           onOpenSettings={() => setSettingsOpen(true)}
-          onOpenAssistant={() => setAssistantOpen(true)}
+          onOpenAssistant={() => setAssistantOpen(v => !v)}
+          onToggleSummary={() => setSummaryOpen(v => !v)}
+          summaryOpen={summaryOpen}
           muted={sound.muted}
           onToggleMuted={sound.toggleMuted}
           onToggleLanguage={() => void setLanguage(language === 'zh-CN' ? 'en' : 'zh-CN')}
@@ -333,7 +337,7 @@ function TodoApplicationContent({ snapshot, api, onInfrastructureError, language
           onDelete={handleDelete}
           pendingMutations={selectedTask ? todoState.pending.taskMutations.get(selectedTask.id) : undefined}
           deleteBlocked={todoState.pending.reorder}
-          onClose={() => setSelectedTaskId(null)}
+          onClose={() => { setSelectedTaskId(null); setSummaryOpen(false); }}
           stats={todoState.stats}
           todayCompleted={achievements.achievements.todayCompleted}
           dailyGoal={DAILY_GOAL}

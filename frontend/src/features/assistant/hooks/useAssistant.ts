@@ -19,6 +19,7 @@ export interface AssistantState {
   proposalBatches: AssistantProposalBatch[];
   settingsView: AssistantSettingsView | null;
   sending: boolean;
+  streamingStep: string | null;
   submittingBatchIds: ReadonlySet<string>;
   selectConversation: (id: string) => Promise<void>;
   startNewConversation: () => void;
@@ -43,6 +44,7 @@ export function useAssistant(
   const [proposalBatches, setProposalBatches] = useState<AssistantProposalBatch[]>([]);
   const [settingsView, setSettingsView] = useState<AssistantSettingsView | null>(null);
   const [sending, setSending] = useState(false);
+  const [streamingStep, setStreamingStep] = useState<string | null>(null);
   const [submittingBatchIds, setSubmittingBatchIds] = useState<ReadonlySet<string>>(
     () => new Set<string>(),
   );
@@ -107,40 +109,81 @@ export function useAssistant(
     content: string,
     attachments: AssistantAttachment[],
   ) => {
+    // Optimistically show user message immediately
+    const optimisticUser: AssistantMessage = {
+      id: `optimistic-${turnId}`,
+      role: 'user',
+      content,
+      attachments,
+      status: 'done',
+      createdAt: Date.now(),
+      turnId,
+    };
+    setMessages(prev => [...prev, optimisticUser]);
     setSending(true);
-    let sendFailed = false;
-    let sendError: unknown;
+    setStreamingStep('analyze');
+
+    // Try SSE streaming first, fall back to regular POST
+    let streamSucceeded = false;
     try {
-      await apiRef.current.sendAssistantMessage(conversationId, {
-        turnId,
-        content,
-        attachments,
-      });
-    } catch (error) {
-      sendFailed = true;
-      sendError = error;
+      await apiRef.current.sendAssistantMessageStream(
+        conversationId,
+        { turnId, content, attachments },
+        (_event, data) => {
+          const d = data as Record<string, unknown>;
+          if (d.text && typeof d.text === 'string') {
+            setStreamingStep(d.text);
+          } else if (_event === 'step' && d.node) {
+            setStreamingStep(String(d.node));
+          }
+        },
+        (error) => {
+          onErrorRef.current(error);
+        },
+        () => { /* done callback */ },
+      );
+      streamSucceeded = true;
+    } catch {
+      // Fall back to non-streaming below
     }
 
-    const [listResult, detailResult] = await Promise.allSettled([
-      apiRef.current.listAssistantConversations(),
-      apiRef.current.getAssistantConversation(conversationId),
-    ]);
-    if (listResult.status === 'fulfilled') {
-      setConversations(listResult.value);
-    }
-    if (detailResult.status === 'fulfilled') {
-      setMessages(detailResult.value.messages);
-      setProposalBatches(detailResult.value.proposalBatches);
+    if (streamSucceeded) {
+      // Refresh from server after streaming completes
+      const [listResult, detailResult] = await Promise.allSettled([
+        apiRef.current.listAssistantConversations(),
+        apiRef.current.getAssistantConversation(conversationId),
+      ]);
+      if (listResult.status === 'fulfilled') setConversations(listResult.value);
+      if (detailResult.status === 'fulfilled') {
+        setMessages(detailResult.value.messages);
+        setProposalBatches(detailResult.value.proposalBatches);
+      }
+    } else {
+      // Non-streaming fallback
+      let sendFailed = false;
+      let sendError: unknown;
+      try {
+        await apiRef.current.sendAssistantMessage(conversationId, {
+          turnId, content, attachments,
+        });
+      } catch (error) {
+        sendFailed = true;
+        sendError = error;
+      }
+      const [listResult, detailResult] = await Promise.allSettled([
+        apiRef.current.listAssistantConversations(),
+        apiRef.current.getAssistantConversation(conversationId),
+      ]);
+      if (listResult.status === 'fulfilled') setConversations(listResult.value);
+      if (detailResult.status === 'fulfilled') {
+        setMessages(detailResult.value.messages);
+        setProposalBatches(detailResult.value.proposalBatches);
+      }
+      if (sendFailed) onErrorRef.current(sendError);
     }
 
-    if (sendFailed) {
-      onErrorRef.current(sendError);
-    } else if (detailResult.status === 'rejected') {
-      onErrorRef.current(detailResult.reason);
-    } else if (listResult.status === 'rejected') {
-      onErrorRef.current(listResult.reason);
-    }
     setSending(false);
+    setStreamingStep(null);
   }, []);
 
   const send = useCallback(async (
@@ -238,6 +281,7 @@ export function useAssistant(
     proposalBatches,
     settingsView,
     sending,
+    streamingStep,
     submittingBatchIds,
     selectConversation,
     startNewConversation,

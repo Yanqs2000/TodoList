@@ -31,10 +31,11 @@ function fakeApi(): TodoApi {
     getAssistantConversation: vi.fn(),
     deleteAssistantConversation: vi.fn(),
     sendAssistantMessage: vi.fn(),
+    sendAssistantMessageStream: vi.fn(),
     uploadAssistantFile: vi.fn(),
     transcribeAssistantAudio: vi.fn(),
-    acceptAssistantProposal: vi.fn(),
-    rejectAssistantProposal: vi.fn(),
+    confirmAssistantProposalBatch: vi.fn(),
+    rejectAssistantProposalBatch: vi.fn(),
     getAssistantSettings: vi.fn(),
     updateAssistantSettings: vi.fn(),
   };

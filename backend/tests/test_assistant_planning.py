@@ -1,27 +1,31 @@
 # pyright: reportUnknownArgumentType=false
 
+import json
 from typing import Any
 
 import pytest
 from pydantic import ValidationError
 
+from todo_backend.agent.ark_client import ArkChatResult
 from todo_backend.agent.planning import (
     SUBMIT_PLAN_TOOL,
     ArkPlanner,
     IntentPlan,
     PlannedMutation,
-    PlanPolicyError,
     PlanValidationError,
     TargetQuery,
-    explicit_actions,
-    validate_explicit_actions,
 )
-from todo_backend.models import PlannedFields, ProposalAction
+from todo_backend.models import PlannedFields
 
 
 class ScriptedPlanner:
-    def __init__(self, plans: list[dict[str, Any]]) -> None:
-        self._plans = list(plans)
+    def __init__(
+        self,
+        plans: list[dict[str, Any]] | None = None,
+        chat_results: list[ArkChatResult] | None = None,
+    ) -> None:
+        self._plans = list(plans) if plans else []
+        self._chat_results = list(chat_results) if chat_results else []
         self.calls: list[tuple[list[dict[str, Any]], dict[str, Any]]] = []
 
     @property
@@ -36,31 +40,21 @@ class ScriptedPlanner:
         self.calls.append((messages, submit_plan_tool))
         return self._plans.pop(0)
 
+    def chat(
+        self,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]] | None = None,
+        *,
+        tool_choice: dict[str, Any] | None = None,
+        thinking: str = "disabled",
+    ) -> ArkChatResult:
+        return self._chat_results.pop(0)
+
 
 def test_planner_fields_allow_end_only_before_overlay() -> None:
     fields = PlannedFields(time_end="2026-07-22T17:00")
 
     assert fields.model_fields_set == {"time_end"}
-
-
-@pytest.mark.parametrize("text", ["新建一个会议", "添加买菜任务", "add a task"])
-def test_explicit_create_cannot_be_planned_as_update(text: str) -> None:
-    plan = IntentPlan.model_validate(
-        {
-            "kind": "mutations",
-            "evidence": text,
-            "items": [
-                {
-                    "action": "update",
-                    "target_query": {"title": "会议"},
-                    "fields": {"text": "会议"},
-                }
-            ],
-        }
-    )
-
-    with pytest.raises(PlanPolicyError, match="EXPLICIT_ACTION_MISMATCH"):
-        validate_explicit_actions(text, plan)
 
 
 def test_update_requires_target_and_non_empty_changes() -> None:
@@ -187,104 +181,6 @@ def test_plan_once_returns_one_stable_schema_validation_error() -> None:
     assert ark.call_count == 1
 
 
-def test_plan_once_returns_stable_policy_error_without_retrying() -> None:
-    ark = ScriptedPlanner(
-        [
-            {
-                "kind": "mutations",
-                "evidence": "新建任务",
-                "items": [
-                    {
-                        "action": "update",
-                        "target_query": {"title": "任务"},
-                        "fields": {"text": "任务"},
-                    }
-                ],
-            }
-        ]
-    )
-
-    with pytest.raises(PlanValidationError) as raised:
-        ArkPlanner(ark).plan_once("新建任务", [], validation_code=None)
-
-    assert raised.value.code == "EXPLICIT_ACTION_MISMATCH"
-    assert ark.call_count == 1
-
-
-@pytest.mark.parametrize(
-    ("text", "expected"),
-    [
-        ("把会议改为四点", {"update"}),
-        ("更改会议时间", {"update"}),
-        ("加一个买菜任务", {"create"}),
-        ("reschedule the meeting", {"update"}),
-        ("不要删除会议，只修改时间", {"update"}),
-        ("不要新建，改现有的", {"update"}),
-        ("don't delete it; update the time", {"update"}),
-    ],
-)
-def test_explicit_action_corpus_and_negation(
-    text: str, expected: set[ProposalAction]
-) -> None:
-    assert explicit_actions(text) == expected
-
-
-def test_multiple_explicit_actions_must_match_the_complete_planned_set() -> None:
-    plan = IntentPlan(
-        kind="mutations",
-        evidence="新建会议并修改旧会议",
-        items=[PlannedMutation(action="create", fields=PlannedFields(text="会议"))],
-    )
-
-    with pytest.raises(PlanPolicyError, match="EXPLICIT_ACTION_MISMATCH"):
-        validate_explicit_actions("新建会议并修改旧会议", plan)
-
-
-def test_unrequested_action_cannot_be_added_to_a_multi_action_plan() -> None:
-    plan = IntentPlan(
-        kind="mutations",
-        evidence="新建会议并修改旧会议",
-        items=[
-            PlannedMutation(action="create", fields=PlannedFields(text="会议")),
-            PlannedMutation(
-                action="update",
-                target_query=TargetQuery(title="旧会议"),
-                fields=PlannedFields(text="新会议"),
-            ),
-            PlannedMutation(action="delete", target_query=TargetQuery(title="临时任务")),
-        ],
-    )
-
-    with pytest.raises(PlanPolicyError, match="EXPLICIT_ACTION_MISMATCH"):
-        validate_explicit_actions("新建会议并修改旧会议", plan)
-
-
-@pytest.mark.parametrize("text", ["如何删除任务", "请问如何删除任务"])
-def test_how_to_delete_is_query_not_delete_command(text: str) -> None:
-    plan = IntentPlan(
-        kind="mutations",
-        evidence=text,
-        items=[
-            PlannedMutation(action="delete", target_query=TargetQuery(title="任务"))
-        ],
-    )
-
-    with pytest.raises(PlanPolicyError, match="EXPLICIT_ACTION_MISMATCH"):
-        validate_explicit_actions(text, plan)
-
-
-def test_imperative_with_question_word_can_remain_a_mutation() -> None:
-    plan = IntentPlan(
-        kind="mutations",
-        evidence="请帮我删除任务",
-        items=[
-            PlannedMutation(action="delete", target_query=TargetQuery(title="任务"))
-        ],
-    )
-
-    validate_explicit_actions("请帮我删除任务", plan)
-
-
 def test_submit_plan_tool_uses_the_strict_intent_schema() -> None:
     function = SUBMIT_PLAN_TOOL["function"]
 
@@ -306,9 +202,25 @@ def test_planner_prompt_defines_reference_and_card_confirmation_policy() -> None
     prompt = messages[0]["content"]
     assert "exact pending proposal ID" in prompt
     assert "never copy a phrase such as" in prompt
-    assert "Cards are the only confirmation" in prompt
-    assert "must not ask for confirmation" in prompt
     assert tool is SUBMIT_PLAN_TOOL
+
+
+def test_planner_prompt_covers_midnight_ambiguity_and_capability_boundary() -> None:
+    ark = ScriptedPlanner(
+        [{"kind": "query", "evidence": "查看任务", "query": "查看任务"}]
+    )
+
+    ArkPlanner(ark).plan_once(
+        "查看任务", [{"role": "user", "content": "查看任务"}], validation_code=None
+    )
+
+    prompt = ark.calls[0][0][0]["content"]
+    # D7：日期边界歧义必须澄清
+    assert "晚上12点" in prompt
+    assert "kind=query" in prompt
+    # D8：能力边界说明（更新为正面清单）
+    assert "YOU CANNOT do these" in prompt
+    assert "completed" in prompt
 
 
 def test_repair_prompt_contains_only_code_and_original_request() -> None:
@@ -327,8 +239,75 @@ def test_repair_prompt_contains_only_code_and_original_request() -> None:
         "role": "user",
         "content": (
             "Return one corrected plan.\n"
-            "Validation code: INVALID_PLAN_SCHEMA\n"
+            "Failure context:\n"
+            "INVALID_PLAN_SCHEMA\n\n"
             "Original user request: 查看任务"
         ),
     }
     assert ark.call_count == 1
+
+
+def test_analyze_returns_clarify_for_vague_input() -> None:
+    from todo_backend.agent.ark_client import ArkToolCall
+    ark = ScriptedPlanner(
+        chat_results=[
+            ArkChatResult(
+                content="",
+                tool_calls=[
+                    ArkToolCall(
+                        id="call_1",
+                        name="submit_analysis",
+                        arguments={
+                            "intent": "clarify",
+                            "reasoning": "用户说'几个'，数量不明确",
+                            "missing_info": "请问您需要创建几个任务？",
+                        },
+                    )
+                ],
+            )
+        ]
+    )
+    planner = ArkPlanner(ark)
+    result = planner.analyze("新建几个任务", [{"role": "user", "content": "新建几个任务"}])
+    assert result.intent == "clarify"
+    assert result.reasoning == "用户说'几个'，数量不明确"
+    assert result.missing_info == "请问您需要创建几个任务？"
+
+
+def test_analyze_returns_mutations_for_clear_create() -> None:
+    from todo_backend.agent.ark_client import ArkToolCall
+    ark = ScriptedPlanner(
+        chat_results=[
+            ArkChatResult(
+                content="",
+                tool_calls=[
+                    ArkToolCall(
+                        id="call_1",
+                        name="submit_analysis",
+                        arguments={
+                            "intent": "mutations",
+                            "reasoning": "用户明确要求创建任务，标题清晰",
+                            "missing_info": None,
+                        },
+                    )
+                ],
+            )
+        ]
+    )
+    planner = ArkPlanner(ark)
+    result = planner.analyze("新建买菜任务", [{"role": "user", "content": "新建买菜任务"}])
+    assert result.intent == "mutations"
+    assert result.reasoning == "用户明确要求创建任务，标题清晰"
+    assert result.missing_info is None
+
+
+def test_analyze_fallback_clarify_on_parse_failure() -> None:
+    ark = ScriptedPlanner(
+        chat_results=[
+            ArkChatResult(content="not valid json{{{")
+        ]
+    )
+    planner = ArkPlanner(ark)
+    result = planner.analyze("随便说点啥", [{"role": "user", "content": "随便说点啥"}])
+    assert result.intent == "clarify"
+    assert "parse failure" in result.reasoning

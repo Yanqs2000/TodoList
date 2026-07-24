@@ -35,7 +35,7 @@ function proposalBatch(
 
 function state(overrides: Partial<AssistantState> = {}): AssistantState {
   return {
-    conversations: [], activeId: 'c1', sending: false,
+    conversations: [], activeId: 'c1', sending: false, streamingStep: null,
     messages: [
       { id: 'm1', turnId: 'turn-1', role: 'user', content: '安排明天', attachments: [], status: 'done', createdAt: 1 },
       { id: 'm2', turnId: 'turn-1', role: 'assistant', content: '提议如下', attachments: [], status: 'done', createdAt: 2 },

@@ -45,7 +45,12 @@ def _overlay(
 ) -> ProposalCardFields:
     values = before.model_dump()
     for field_name in changes.model_fields_set:
-        values[field_name] = getattr(changes, field_name)
+        value = getattr(changes, field_name)
+        # 模型对未指定的 priority/category 会输出显式 null，视为“未指定”保留原值；
+        # notes/time_start 的显式 null 是合法清空语义，照常覆盖。
+        if field_name in ("priority", "category") and value is None:
+            continue
+        values[field_name] = value
     if "time_start" in changes.model_fields_set and changes.time_start is None:
         values["time_end"] = None
     return ProposalCardFields.model_validate(values)
@@ -146,7 +151,7 @@ def _real_target_draft(
         action="delete",
         target_task_id=current.id,
         before_snapshot=current,
-        payload=before,
+        payload=None,
     )
 
 
@@ -155,14 +160,13 @@ def _pending_target_draft(
     item: PlannedMutation,
     pending: AssistantProposal,
 ) -> ProposalDraft:
-    if (
-        item.reference != pending.id
-        or pending.status != "pending"
-        or pending.payload is None
-    ):
+    if item.reference != pending.id or pending.status != "pending":
         raise ProposalVerificationError("PENDING_REFERENCE_ACTION_MISMATCH")
 
     if item.action == "update" and pending.action in {"create", "update"}:
+        # delete 卡片的 payload 恒为 null；update 叠加则需要既有 payload
+        if pending.payload is None:
+            raise ProposalVerificationError("PENDING_REFERENCE_ACTION_MISMATCH")
         target_task_id = (
             None if pending.action == "create" else pending.target_task_id
         )
@@ -184,7 +188,7 @@ def _pending_target_draft(
             action="delete",
             target_task_id=pending.target_task_id,
             before_snapshot=pending.before_snapshot,
-            payload=pending.payload,
+            payload=None,
             source_batch_id=pending.batch_id,
             source_proposal_id=pending.id,
         )
@@ -195,7 +199,8 @@ def _copied_pending_draft(
     proposal_id: str,
     pending: AssistantProposal,
 ) -> ProposalDraft:
-    if pending.payload is None:
+    # delete 卡片的 payload 恒为 null，复制 pending delete 不需要 payload
+    if pending.payload is None and pending.action != "delete":
         raise ProposalVerificationError("TARGET_REQUIRED")
     return ProposalDraft(
         id=proposal_id,
@@ -309,14 +314,17 @@ def verify_drafts(drafts: list[BatchDraft]) -> None:
                     raise ProposalVerificationError("DUPLICATE_PROPOSAL")
                 source_proposal_ids.add(proposal.source_proposal_id)
 
-            payload = proposal.payload
-            if not payload.text.strip():
-                raise ProposalVerificationError("CREATE_TITLE_REQUIRED")
             if proposal.action in {"update", "delete"} and (
                 proposal.target_task_id is None
                 or proposal.before_snapshot is None
             ):
                 raise ProposalVerificationError("TARGET_REQUIRED")
+            payload = proposal.payload
+            # delete 卡片的 payload 契约为 null，无 payload 内容可校验
+            if payload is None:
+                continue
+            if not payload.text.strip():
+                raise ProposalVerificationError("CREATE_TITLE_REQUIRED")
             if payload.time_end is not None and payload.time_start is None:
                 raise ProposalVerificationError("TIME_END_REQUIRES_START")
             if (

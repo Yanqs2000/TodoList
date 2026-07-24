@@ -252,6 +252,15 @@ class PlannedFields(WireModel):
     time_end: LocalDateTime | None = None
     notes: StrictNotes | None = None
 
+    @field_validator("notes")
+    @classmethod
+    def normalize_blank_notes(cls, value: str | None) -> str | None:
+        # "Clear notes" arrives as an empty or whitespace-only string; the wire
+        # contract represents absent notes as null.
+        if value is not None and not value.strip():
+            return None
+        return value
+
 
 class ProposalCardFields(WireModel):
     text: StrictText

@@ -159,14 +159,37 @@
 }
 
 /* “思考中…”提示（消息列表的直接子级气泡）*/
-.assistant-messages > .assistant-bubble {
+.assistant-messages > .assistant-bubble--thinking {
   color: var(--text-muted);
   animation: assistant-thinking 1.4s ease-in-out infinite;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.assistant-thinking__label {
+  font-size: 0.875rem;
+}
+
+.assistant-thinking__step {
+  padding: 2px 10px;
+  border-radius: 8px;
+  background: var(--active-bg);
+  color: var(--primary);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.4;
+  animation: assistant-step-in 300ms ease-out;
 }
 
 @keyframes assistant-thinking {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.55; }
+}
+
+@keyframes assistant-step-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .assistant-bubble__failed {

@@ -14,6 +14,7 @@
 | [v0.4.1](../development-logs/v0.4.1-shortcut-fix.md) | 全局热键录制修复 |
 | [v0.4.2](../development-logs/v0.4.2-confirm-dialog.md) | 清除已完成/删除按钮无效（window.confirm 替换为应用内对话框） |
 | [v0.4.3](../development-logs/v0.4.3-category-default.md) | 无分类任务无法在分类筛选中找到（默认归「其他」） |
+| [dev-agent（2026-07-22）](../development-logs/2026-07-22-agent-reply-timeout.md) | Agent 规划开启 thinking 导致非流式请求超时、回复失败 |
 
 ## 何时在此目录新增
 

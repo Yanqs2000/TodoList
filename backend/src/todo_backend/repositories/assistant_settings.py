@@ -6,7 +6,9 @@ from todo_backend.models import (
     DEFAULT_CHAT_MODEL,
     AssistantSettings,
     AssistantSettingsPatchCommand,
+    BootstrapCommand,
 )
+from todo_backend.repositories.settings import SettingsRepository
 
 __all__ = [
     "DEFAULT_ARK_BASE_URL",
@@ -36,6 +38,10 @@ class AssistantSettingsRepository:
         connection: sqlite3.Connection,
         command: AssistantSettingsPatchCommand,
     ) -> AssistantSettings:
+        # Self-heal when /bootstrap was never called: INSERT OR IGNORE seeds the
+        # id=1 row with the same defaults bootstrap uses, then UPDATE applies
+        # the patched fields.
+        SettingsRepository().initialize(connection, BootstrapCommand().preferred_theme)
         column_by_field = {
             "api_key": "assistant_api_key",
             "chat_model": "assistant_chat_model",

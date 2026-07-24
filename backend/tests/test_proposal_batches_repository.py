@@ -7,6 +7,8 @@ from typing import cast
 
 import pytest
 
+from todo_backend.agent.planning import IntentPlan, PlannedMutation, TargetQuery
+from todo_backend.agent.proposals import ResolvedMutation, build_batch_drafts
 from todo_backend.database import Database
 from todo_backend.models import CreateTaskCommand, ProposalCardFields, TimeField
 from todo_backend.repositories.conversations import ConversationsRepository
@@ -297,7 +299,54 @@ def test_batch_repository_hydrates_legacy_update_payload(
     assert proposal.payload.time_end == "2026-07-22T17:00"
 
 
-def test_batch_repository_hydrates_delete_from_snapshot_not_legacy_payload(
+def test_delete_draft_with_null_payload_roundtrips_end_to_end(
+    database: Database, seeded_turn: Seed
+) -> None:
+    tasks = TaskRepository()
+    batches = ProposalBatchesRepository()
+    with database.transaction() as connection:
+        task = tasks.create(
+            connection,
+            CreateTaskCommand(
+                text="归档会议", priority="high", category="work", notes="纪要"
+            ),
+        )
+    plan = IntentPlan(
+        kind="mutations",
+        evidence="删除请求",
+        items=[
+            PlannedMutation(
+                action="delete", target_query=TargetQuery(title="归档会议")
+            )
+        ],
+    )
+    drafts = build_batch_drafts(
+        "turn-1", plan, [ResolvedMutation(task=task)], superseded_batch=None
+    )
+    assert drafts[0].proposals[0].payload is None
+
+    with database.transaction() as connection:
+        batches.insert_batches(
+            connection,
+            conversation_id=seeded_turn.conversation_id,
+            message_id=seeded_turn.assistant_message_id,
+            drafts=drafts,
+        )
+        proposal_id = drafts[0].proposals[0].id
+        raw_payload = connection.execute(
+            "SELECT payload FROM assistant_proposals WHERE id = ?",
+            (proposal_id,),
+        ).fetchone()["payload"]
+        proposal = batches.get_proposal(connection, proposal_id)
+
+    assert raw_payload is None
+    assert proposal.action == "delete"
+    assert proposal.payload is None
+    assert proposal.target_task_id == task.id
+    assert proposal.before_snapshot == task
+
+
+def test_batch_repository_reads_delete_payload_as_null_ignoring_legacy_column(
     database: Database, seeded_turn: Seed
 ) -> None:
     tasks = TaskRepository()
@@ -340,11 +389,10 @@ def test_batch_repository_hydrates_delete_from_snapshot_not_legacy_payload(
     with database.transaction() as connection:
         proposal = batches.get_proposal(connection, "p1")
 
-    assert proposal.payload is not None
-    assert proposal.payload.text == "归档会议"
-    assert proposal.payload.priority == "high"
-    assert proposal.payload.category == "work"
-    assert proposal.payload.notes == "保留审计快照"
+    assert proposal.payload is None
+    assert proposal.before_snapshot is not None
+    assert proposal.before_snapshot.text == "归档会议"
+    assert proposal.before_snapshot.notes == "保留审计快照"
 
 
 def test_missing_legacy_snapshots_remain_readable_with_null_payload(

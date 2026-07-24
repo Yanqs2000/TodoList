@@ -202,7 +202,7 @@ body {
 
 .app-shell {
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr) 320px 0px;
+  grid-template-columns: 240px minmax(0, 1fr) 0px 0px;
   grid-template-rows: 56px minmax(0, 1fr);
   grid-template-areas:
     "header header header header"
@@ -212,7 +212,15 @@ body {
   transition: grid-template-columns var(--layout-transition);
 }
 
+.app-shell--summary-open {
+  grid-template-columns: 240px minmax(0, 1fr) 320px 0px;
+}
+
 .app-shell--assistant-open {
+  grid-template-columns: 240px minmax(0, 1fr) 0px 380px;
+}
+
+.app-shell--summary-open.app-shell--assistant-open {
   grid-template-columns: 240px minmax(0, 1fr) 320px 380px;
 }
 
@@ -236,7 +244,7 @@ body {
 .app-shell__detail {
   grid-area: detail;
   border-left: 1px solid var(--border);
-  overflow-y: auto;
+  overflow: hidden;
   background: var(--bg-elevated);
 }
 
@@ -247,7 +255,10 @@ body {
 }
 
 @media (max-width: 1024px) {
-  .app-shell {
+  .app-shell,
+  .app-shell--summary-open,
+  .app-shell--assistant-open,
+  .app-shell--summary-open.app-shell--assistant-open {
     grid-template-columns: 200px minmax(0, 1fr);
     grid-template-areas:
       "header header"
@@ -256,12 +267,20 @@ body {
   .app-shell__detail {
     display: none;
   }
+  .app-shell--summary-open .app-shell__detail {
+    display: block;
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 50;
+    width: 320px;
+    max-width: 90vw;
+    box-shadow: -4px 0 16px rgb(0 0 0 / 8%);
+  }
   /* 窄窗口下助手面板不再挤占布局，改为覆盖层 */
   .app-shell__assistant {
     display: none;
-  }
-  .app-shell--assistant-open {
-    grid-template-columns: 200px minmax(0, 1fr);
   }
   .app-shell--assistant-open .app-shell__assistant {
     display: block;
@@ -274,6 +293,13 @@ body {
     max-width: 90vw;
     overflow: visible;
     box-shadow: -4px 0 16px rgb(0 0 0 / 8%);
+  }
+  /* When both are open on narrow, summary overlay sits on top (higher z-index if opened later) */
+  .app-shell--summary-open.app-shell--assistant-open .app-shell__detail {
+    z-index: 50;
+  }
+  .app-shell--summary-open.app-shell--assistant-open .app-shell__assistant {
+    z-index: 40;
   }
 }
 

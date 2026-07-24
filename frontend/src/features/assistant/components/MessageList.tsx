@@ -12,6 +12,7 @@ interface MessageListProps {
   proposalBatches: AssistantProposalBatch[];
   submittingBatchIds: ReadonlySet<string>;
   sending: boolean;
+  streamingStep: string | null;
   onRetry: (turnId: string) => void | Promise<void>;
   onConfirmBatch: (
     id: string,
@@ -25,6 +26,7 @@ function MessageList({
   proposalBatches,
   submittingBatchIds,
   sending,
+  streamingStep,
   onRetry,
   onConfirmBatch,
   onRejectBatch,
@@ -72,9 +74,14 @@ function MessageList({
             })}
         </div>
       ))}
-      {sending && <div className="assistant-bubble assistant-bubble--assistant">
-        {t('assistant.thinking')}
-      </div>}
+      {sending && (
+        <div className="assistant-bubble assistant-bubble--assistant assistant-bubble--thinking">
+          <span className="assistant-thinking__label">{t('assistant.thinking')}</span>
+          {streamingStep && (
+            <span className="assistant-thinking__step">{streamingStep}</span>
+          )}
+        </div>
+      )}
     </div>
   );
 }

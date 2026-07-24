@@ -18,6 +18,12 @@
   color: var(--primary);
 }
 
+.icon-btn--active {
+  border-color: var(--primary);
+  background: var(--active-bg);
+  color: var(--primary);
+}
+
 .icon-btn:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;

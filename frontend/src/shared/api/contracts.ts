@@ -203,6 +203,14 @@ export interface TodoApi {
   getAssistantConversation(id: string): Promise<AssistantConversationDetail>;
   deleteAssistantConversation(id: string): Promise<void>;
   sendAssistantMessage(id: string, input: SendAssistantMessageInput): Promise<AssistantTurn>;
+  sendAssistantMessageStream(
+    id: string,
+    input: SendAssistantMessageInput,
+    onEvent: (event: string, data: unknown) => void,
+    onError: (error: unknown) => void,
+    onDone: () => void,
+    signal?: AbortSignal,
+  ): Promise<void>;
   uploadAssistantFile(file: File): Promise<AssistantAttachment>;
   transcribeAssistantAudio(fileId: string): Promise<string>;
   confirmAssistantProposalBatch(

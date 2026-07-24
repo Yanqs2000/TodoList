@@ -5,6 +5,8 @@ from todo_backend.agent.planning import TargetQuery
 from todo_backend.models import Task
 
 TARGET_THRESHOLD = 0.68
+TITLE_FUZZY_THRESHOLD = 0.85
+AMBIGUITY_EPSILON = 0.02
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,12 +66,33 @@ def resolve_target(
         )
     if not tasks:
         return TargetResolution(None, 0.0, "TASK_TARGET_NOT_FOUND")
+    title = query.title
+    if title is not None and query.time_start is None and query.category is None:
+        # D4: title-only queries prefer an exact normalized match and require a
+        # stricter fuzzy threshold; a miss means the target does not exist.
+        normalized = _normalized(title)
+        exact = [item for item in tasks if _normalized(item.text) == normalized]
+        if len(exact) == 1:
+            return TargetResolution(exact[0], 1.0)
+        if exact:
+            return TargetResolution(None, 1.0, "TASK_TARGET_AMBIGUOUS")
+        effective_threshold = TITLE_FUZZY_THRESHOLD
+        miss_error = "TASK_TARGET_NOT_FOUND"
+    else:
+        effective_threshold = threshold
+        miss_error = "TASK_TARGET_AMBIGUOUS"
     ranked = sorted(
         ((_score(query, task, tasks, recent_task_ids), task) for task in tasks),
         key=lambda pair: (pair[0], pair[1].created_at),
         reverse=True,
     )
     score, task = ranked[0]
-    if score < threshold:
-        return TargetResolution(None, score, "TASK_TARGET_AMBIGUOUS")
+    if score < effective_threshold:
+        return TargetResolution(None, score, miss_error)
+    if len(ranked) > 1:
+        # D6: multiple candidates clearing the threshold within epsilon are
+        # indistinguishable (e.g. same title and time) and must be clarified.
+        second_score = ranked[1][0]
+        if second_score >= effective_threshold and score - second_score < AMBIGUITY_EPSILON:
+            return TargetResolution(None, score, "TASK_TARGET_AMBIGUOUS")
     return TargetResolution(task, score)

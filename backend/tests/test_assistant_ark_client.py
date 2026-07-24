@@ -1,12 +1,9 @@
 # pyright: reportUnknownArgumentType=false, reportUnknownMemberType=false, reportUnknownVariableType=false
 
-import logging
 from typing import Any
 from unittest.mock import MagicMock
 
-import httpx
 import pytest
-from openai import BadRequestError
 
 from todo_backend.agent.ark_client import ArkClient, ArkUnavailableError
 
@@ -50,17 +47,6 @@ def ark_client_with(responses: list[Any]) -> tuple[ArkClient, MagicMock]:
     sdk.chat.completions.create.side_effect = responses
     client = ArkClient("sk-x", "chat-model", "audio-model", client=sdk)
     return client, sdk
-
-
-def thinking_bad_request() -> BadRequestError:
-    return BadRequestError(
-        "thinking unsupported",
-        response=httpx.Response(
-            400,
-            request=httpx.Request("POST", "https://ark.test"),
-        ),
-        body={"error": "unsupported"},
-    )
 
 
 def test_chat_returns_text_when_no_tool_calls() -> None:
@@ -148,7 +134,7 @@ def test_chat_rejects_non_object_tool_call_arguments() -> None:
         client.chat([{"role": "user", "content": "hi"}])
 
 
-def test_plan_forces_submit_plan_and_enables_thinking() -> None:
+def test_plan_forces_submit_plan_and_disables_thinking() -> None:
     completion = fake_completion(tool_name="submit_plan", arguments='{"kind":"query"}')
     client, transport = ark_client_with([completion])
 
@@ -156,47 +142,11 @@ def test_plan_forces_submit_plan_and_enables_thinking() -> None:
 
     assert plan == {"kind": "query"}
     request = transport.chat.completions.create.call_args.kwargs
-    assert request["extra_body"] == {"thinking": {"type": "enabled"}}
+    assert request["extra_body"] == {"thinking": {"type": "disabled"}}
     assert request["tool_choice"] == {
         "type": "function",
         "function": {"name": "submit_plan"},
     }
-
-
-def test_plan_retries_without_thinking_only_for_bad_request() -> None:
-    completion = fake_completion(tool_name="submit_plan", arguments='{"kind":"query"}')
-    client, transport = ark_client_with([thinking_bad_request(), completion])
-
-    assert client.plan([], SUBMIT_PLAN_TOOL) == {"kind": "query"}
-    calls = transport.chat.completions.create.call_args_list
-    assert calls[0].kwargs["extra_body"] == {"thinking": {"type": "enabled"}}
-    assert calls[1].kwargs["extra_body"] == {"thinking": {"type": "disabled"}}
-    assert client.planning_thinking_supported is False
-
-
-def test_known_unsupported_thinking_skips_enabled_probe_and_duplicate_event(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    fallback = fake_completion(tool_name="submit_plan", arguments='{"kind":"query"}')
-    next_plan = fake_completion(tool_name="submit_plan", arguments='{"kind":"query"}')
-    client, transport = ark_client_with([thinking_bad_request(), fallback, next_plan])
-    caplog.set_level(logging.INFO, logger="todo_backend.agent.ark_client")
-
-    client.plan([], SUBMIT_PLAN_TOOL)
-    client.plan([], SUBMIT_PLAN_TOOL)
-
-    calls = transport.chat.completions.create.call_args_list
-    assert [call.kwargs["extra_body"] for call in calls] == [
-        {"thinking": {"type": "enabled"}},
-        {"thinking": {"type": "disabled"}},
-        {"thinking": {"type": "disabled"}},
-    ]
-    capability_events = [
-        record.getMessage()
-        for record in caplog.records
-        if record.name == "todo_backend.agent.ark_client"
-    ]
-    assert capability_events == ["assistant_planner_thinking_fallback"]
 
 
 def test_plan_generic_error_does_not_trigger_fallback() -> None:

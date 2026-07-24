@@ -1,6 +1,9 @@
 # pyright: reportUnusedFunction=false
 
+import json
+
 from fastapi import APIRouter, File, Response, UploadFile, status
+from fastapi.responses import StreamingResponse
 
 from todo_backend.models import (
     AssistantConversationDetail,
@@ -60,6 +63,17 @@ def build_assistant_router(service: AssistantService) -> APIRouter:
         conversation_id: str, command: SendAssistantMessageCommand
     ) -> AssistantTurnResponse:
         return service.send_message(conversation_id, command)
+
+    @router.post(
+        "/assistant/conversations/{conversation_id}/messages/stream",
+    )
+    async def _send_message_stream(
+        conversation_id: str, command: SendAssistantMessageCommand,
+    ) -> StreamingResponse:
+        async def event_generator():
+            async for event in service.send_message_stream(conversation_id, command):
+                yield f"event: {event['event']}\ndata: {json.dumps(event['data'], ensure_ascii=False)}\n\n"
+        return StreamingResponse(event_generator(), media_type="text/event-stream")
 
     @router.post(
         "/assistant/uploads",
