@@ -62,6 +62,22 @@ _RELATIVE_TIME_RULES = (
     "晚点/下班后/傍晚等无约定分钟的表达必须用 kind=query 澄清，不得猜测分钟；"
     "若推算出的时间已过去（早于上述当前时间），必须用 kind=query 询问用户是否要今天还是未来日期。"
 )
+_CHAT_SYSTEM_PROMPT = """You are a friendly, helpful AI assistant integrated into a Todo List app.
+Answer the user naturally and warmly, like a real person chatting. Keep it concise (1-3 sentences).
+
+After answering, ALWAYS end your response by briefly mentioning what you can help with
+in this Todo List app. Pick the most relevant 2-3 capabilities based on the conversation
+context. For example:
+
+我能帮你做的事：
+• 新建任务 — 直接告诉我 "明天下午3点开会"
+• 查询任务 — 问我 "今天有什么任务"
+• 修改 / 删除已有任务
+• 通过语音输入任务
+• 上传文件作为附件
+
+Vary the wording each time so it doesn't feel robotic. Match the user's language.
+If the user writes in Chinese, respond in Chinese. If English, respond in English."""
 _REPAIRABLE_PROPOSAL_ERRORS = {
     "CREATE_TITLE_REQUIRED",
     "INVALID_PROPOSAL_FIELDS",
@@ -75,7 +91,8 @@ _REPAIRABLE_PROPOSAL_ERRORS = {
 }
 _MUTATION_COMPLETION_CLAIM = re.compile(
     r"(?:已|已经)(?:创建|新建|添加|更新|修改|删除|移除)"
-    r"|\b(?:created|added|updated|modified|deleted|removed)\b",
+    r"|\bI(?:\s*'ve|\s+have)?\s+(?:created|added|updated|modified|deleted|removed)\b"
+    r"|\b[Tt]ask\s+(?:created|added|updated|modified|deleted|removed)\s+successfully\b",
     flags=re.IGNORECASE,
 )
 
@@ -195,6 +212,7 @@ class AssistantTurnWorkflow:
         builder.add_node("execute_read", self._execute_read)
         builder.add_node("verify_answer", self._verify_answer)
         builder.add_node("clarify_response", self._clarify_response)
+        builder.add_node("chat_response", self._chat_response)
         builder.add_node("resolve_targets", self._resolve_targets)
         builder.add_node("select_superseded", self._select_superseded)
         builder.add_node("build_proposals", self._build_proposals)
@@ -210,9 +228,10 @@ class AssistantTurnWorkflow:
             "analyze_intent",
             self._analyze_route,
             {
-                "query": "execute_read",
+                "query": "plan_intent",
                 "clarify": "clarify_response",
                 "mutations": "plan_intent",
+                "chat": "chat_response",
             },
         )
         builder.add_conditional_edges(
@@ -233,6 +252,7 @@ class AssistantTurnWorkflow:
             {"valid": "finalize", "invalid": "finalize_error"},
         )
         builder.add_edge("clarify_response", "finalize")
+        builder.add_edge("chat_response", "finalize")
         builder.add_edge("resolve_targets", "select_superseded")
         builder.add_conditional_edges(
             "select_superseded",
@@ -277,6 +297,7 @@ class AssistantTurnWorkflow:
         checkpoint = self._checkpointer.get_tuple(config)
         snapshot = self.graph.get_state(config)
         self._emit("step", {"node": "start", "status": "start", "text": "正在理解你的需求..."})
+        turn_errored = False
         try:
             if checkpoint is None:
                 self.graph.invoke({"turn_id": turn_id, "turn_memory": prev_memory}, config=config)
@@ -288,6 +309,7 @@ class AssistantTurnWorkflow:
         except ArkUnavailableError:
             raise
         except Exception as exc:
+            turn_errored = True
             failed_snapshot = self.graph.get_state(config)
             error_type = type(exc).__name__
             logger.error(
@@ -318,7 +340,7 @@ class AssistantTurnWorkflow:
 
         # Save cross-turn memory to conversation checkpoint for next turn
         final_state = self.graph.get_state(config)
-        if final_state.values:
+        if final_state.values and not turn_errored:
             final_memory = final_state.values.get("turn_memory", [])
             if final_memory:
                 self.graph.update_state(conv_config, {"turn_memory": final_memory})
@@ -331,12 +353,13 @@ class AssistantTurnWorkflow:
                 connection, turn.assistant_message_id
             )
         response = AssistantTurnResponse(message=message, proposalBatches=batches)
-        self._emit("done", {
-            "message": message.model_dump(mode="json", by_alias=True),
-            "proposalBatches": [
-                b.model_dump(mode="json", by_alias=True) for b in batches
-            ],
-        })
+        if not turn_errored:
+            self._emit("done", {
+                "message": message.model_dump(mode="json", by_alias=True),
+                "proposalBatches": [
+                    b.model_dump(mode="json", by_alias=True) for b in batches
+                ],
+            })
         return response
 
     def _load_context(self, state: AssistantTurnState) -> AssistantTurnState:
@@ -429,21 +452,37 @@ class AssistantTurnWorkflow:
             ),
         })
 
-        # Inject cross-turn memory — what the agent learned from previous turns
+        # Inject cross-turn memory — what the agent did in previous turns
         memory = state.get("turn_memory", [])
         if memory:
-            ark_messages.append({
-                "role": "system",
-                "content": (
-                    "Cross-turn memory (what you learned from earlier turns in this conversation):\n"
-                    + json.dumps(memory, ensure_ascii=False, separators=(",", ":"))
-                ),
-            })
+            pending = [m for m in memory if m.get("status") == "pending_confirmation"]
+            clarifying = [m for m in memory if m.get("status") == "awaiting_clarification"]
+            memory_text = (
+                "Cross-turn memory (what happened in earlier turns):\n"
+                + json.dumps(memory, ensure_ascii=False, separators=(",", ":"))
+            )
+            if clarifying:
+                memory_text += (
+                    "\n\n💬  The assistant just asked the user a clarification "
+                    "question. The user's current message is likely the answer. "
+                    "Re-evaluate the full context (original request + this answer) "
+                    "and try to resolve the intent. Be more aggressive about using "
+                    "'mutations' if the combined info is now clear."
+                )
+            if pending:
+                memory_text += (
+                    "\n\n⚠️  There are pending confirmation cards from previous turns "
+                    "that the user has NOT yet confirmed or rejected. The user may "
+                    "refer to these. If the user says standalone words like '确认', "
+                    "'好的', '行', 'ok', 'yes', use 'clarify' and remind them to "
+                    "click the card buttons — do NOT create new mutations for these."
+                )
+            ark_messages.append({"role": "system", "content": memory_text})
 
         analysis = self._deps.planner.analyze(user_message.content, ark_messages)
         analysis_data = analysis.model_dump(mode="json")
         lang = state["language"]
-        intent_labels = {"query": "查询", "clarify": "澄清", "mutations": "操作"} if lang == "zh-CN" else {"query": "query", "clarify": "clarify", "mutations": "mutation"}
+        intent_labels = {"query": "查询", "clarify": "澄清", "mutations": "操作", "chat": "聊天"} if lang == "zh-CN" else {"query": "query", "clarify": "clarify", "mutations": "mutation", "chat": "chat"}
         self._emit("step", {"node": "analyze", "status": "done",
             "text": f"分析意图：{intent_labels.get(analysis.intent, analysis.intent)}"})
         self._emit("analysis", {**analysis_data,
@@ -452,14 +491,92 @@ class AssistantTurnWorkflow:
 
     def _analyze_route(
         self, state: AssistantTurnState
-    ) -> Literal["query", "clarify", "mutations"]:
+    ) -> Literal["query", "clarify", "mutations", "chat"]:
         intent = state.get("analysis", {}).get("intent", "clarify")
-        return intent if intent in ("query", "clarify", "mutations") else "clarify"
+        valid = ("query", "clarify", "mutations", "chat")
+        return intent if intent in valid else "clarify"
 
     def _clarify_response(self, state: AssistantTurnState) -> AssistantTurnState:
         analysis = state.get("analysis", {})
         missing = analysis.get("missing_info") or "请问您需要什么帮助？"
-        return {"response_text": missing, "error_code": None}
+        # Record the clarification context so the follow-up turn can re-evaluate
+        memory = state.get("turn_memory", [])
+        memory.append({
+            "round": len(memory) + 1,
+            "user_question": "",
+            "assistant_summary": f"Asked for clarification: {missing}",
+            "actions": ["clarify"],
+            "task_texts": [],
+            "count": 0,
+            "status": "awaiting_clarification",
+        })
+        if len(memory) > 10:
+            memory = memory[-10:]
+        return {"response_text": missing, "error_code": None, "turn_memory": memory}
+
+    def _chat_response(self, state: AssistantTurnState) -> AssistantTurnState:
+        self._emit("step", {"node": "chat", "status": "start",
+            "text": "正在思考…" if state.get("language") == "zh-CN" else "Thinking…"})
+        with self._deps.database.transaction() as conn:
+            user_message = self._deps.conversations.get_message(
+                conn, state["user_message_id"]
+            )
+        lang = state["language"]
+        time_ctx = _render_current_time(self._clock())
+        try:
+            result = self._deps.ark.chat(
+                [
+                    {
+                        "role": "system",
+                        "content": (
+                            _CHAT_SYSTEM_PROMPT
+                            + f"\n\nCurrent time: {time_ctx}"
+                        ),
+                    },
+                    {"role": "user", "content": user_message.content},
+                ],
+                tools=None,
+                thinking="disabled",
+            )
+            response_text = result.content.strip()
+            if not response_text:
+                response_text = (
+                    "你好！我是你的待办清单 AI 助手。我可以帮你创建、查询、修改和删除任务，"
+                    "也支持语音输入和文件上传。直接告诉我你需要什么吧！"
+                    if lang == "zh-CN"
+                    else "Hello! I'm your Todo List AI assistant. I can help you create, "
+                    "query, update, and delete tasks. Just tell me what you need!"
+                )
+        except ArkUnavailableError:
+            raise
+        except Exception:
+            response_text = (
+                "抱歉，我暂时无法回复。\n\n"
+                "不过别担心，我还可以帮你管理待办事项：\n"
+                "• 新建任务 — 直接告诉我「明天下午开会」\n"
+                "• 查询任务 — 问我「今天有什么任务」\n"
+                "• 修改/删除已有任务"
+                if lang == "zh-CN"
+                else "Sorry, I can't respond right now.\n\n"
+                "But I can still help with your tasks:\n"
+                "• Create — tell me \"meeting tomorrow 3pm\"\n"
+                "• Query — ask \"what are my tasks today\"\n"
+                "• Update/delete existing tasks"
+            )
+        # Record chat memory so later turns know we chatted
+        memory = state.get("turn_memory", [])
+        memory.append({
+            "round": len(memory) + 1,
+            "user_question": user_message.content[:200],
+            "assistant_summary": response_text[:200],
+            "actions": ["chat"],
+            "task_texts": [],
+            "count": 0,
+            "status": "done",
+        })
+        if len(memory) > 10:
+            memory = memory[-10:]
+        return {"response_text": response_text, "error_code": None, "turn_memory": memory}
 
     def _plan_intent(self, state: AssistantTurnState) -> AssistantTurnState:
         with self._deps.database.transaction() as connection:
@@ -483,13 +600,26 @@ class AssistantTurnWorkflow:
         memory = state.get("turn_memory", [])
         memory_messages: list[dict[str, Any]] = []
         if memory:
-            memory_messages.append({
-                "role": "system",
-                "content": (
-                    "Cross-turn memory (what happened in earlier turns of this conversation):\n"
-                    + json.dumps(memory, ensure_ascii=False, separators=(",", ":"))
-                ),
-            })
+            pending = [m for m in memory if m.get("status") == "pending_confirmation"]
+            clarifying = [m for m in memory if m.get("status") == "awaiting_clarification"]
+            memory_text = (
+                "Cross-turn memory (what happened in earlier turns):\n"
+                + json.dumps(memory, ensure_ascii=False, separators=(",", ":"))
+            )
+            if clarifying:
+                memory_text += (
+                    "\n\n💬  The assistant was asking the user for clarification. "
+                    "The user's current message is likely the answer. Re-evaluate "
+                    "the original context with this new info."
+                )
+            if pending:
+                memory_text += (
+                    "\n\n⚠️  The user has unconfirmed proposal cards from earlier "
+                    "turns. If the user says standalone words like '确认', '好的', "
+                    "'行', 'ok', 'yes' — do NOT create new mutations. Instead use "
+                    "kind=query to tell the user: 请点击确认卡上的按钮来应用更改。"
+                )
+            memory_messages.append({"role": "system", "content": memory_text})
         pending_context = {
             "pendingProposalBatches": [
                 batch.model_dump(mode="json", by_alias=True)
@@ -989,6 +1119,7 @@ class AssistantTurnWorkflow:
                 "actions": sorted(actions),
                 "task_texts": texts,
                 "count": len(summary),
+                "status": "pending_confirmation",
             })
             # Keep only the last 10 rounds to avoid unbounded growth
             if len(memory) > 10:
@@ -1089,11 +1220,13 @@ class AssistantTurnWorkflow:
         return {"response_text": content}
 
     def _finalize_error(self, state: AssistantTurnState) -> AssistantTurnState:
-        error_code = (
-            state.get("error_code")
-            or state.get("validation_error")
-            or "TURN_GRAPH_FAILED"
-        )
+        raw_error = state.get("error_code") or state.get("validation_error")
+        # Truncate multi-line validation text (e.g. from _reflect) to a
+        # machine-readable first line so the error_code column stays usable
+        # for grouping and alerting.
+        if raw_error:
+            raw_error = str(raw_error).split("\n")[0][:200]
+        error_code = raw_error or "TURN_GRAPH_FAILED"
         with self._deps.database.transaction() as connection:
             self._deps.conversations.update_message(
                 connection,

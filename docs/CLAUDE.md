@@ -21,6 +21,7 @@
 
 ## AI 助手
 
+- [2026-07-25 Agent 智能修复](development-logs/2026-07-25-agent-intelligence-fixes.md) — **code review 8 缺陷修复** + 分类推断、chat 意图、确认词识别、对话式追问、记忆系统增强、前端交互优化
 - [2026-07-25 v1.3.0 Agent 记忆系统与 SSE 实时流式传输](development-logs/v1.3.0-agent-memory-sse.md) — **v1.2→v1.3**：跨轮记忆修复、SSE 流式传输、前端交互优化、prompt 能力清单修正
 - [2026-07-22 Agent 回复超时修复日志](development-logs/2026-07-22-agent-reply-timeout.md) — thinking 超时根因、修复决策、回归与包内真实请求证据
 - [2026-07-23 Agent 架构演进](development-logs/2026-07-23-agent-architecture-evolution.md) — **v1.1→v1.2**：analyze 思考层 + reflect 自检层 + 拆除正则、增强 repair 上下文

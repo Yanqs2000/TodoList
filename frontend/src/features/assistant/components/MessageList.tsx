@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { useI18n } from '@/features/i18n/I18nProvider';
 import type {
   AssistantMessage,
@@ -32,13 +33,22 @@ function MessageList({
   onRejectBatch,
 }: MessageListProps) {
   const { t } = useI18n();
+  const listRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom when messages or sending state changes
+  useEffect(() => {
+    if (listRef.current) {
+      listRef.current.scrollTop = listRef.current.scrollHeight;
+    }
+  }, [messages, sending, proposalBatches]);
+
   if (messages.length === 0 && !sending) {
     return <div className="assistant-messages assistant-messages--empty">
       {t('assistant.emptyConversation')}
     </div>;
   }
   return (
-    <div className="assistant-messages">
+    <div className="assistant-messages" ref={listRef}>
       {messages.map(message => (
         <div key={message.id}>
           <div className={`assistant-bubble assistant-bubble--${message.role}`}>

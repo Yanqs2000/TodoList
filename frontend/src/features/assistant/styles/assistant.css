@@ -40,6 +40,12 @@
   flex-shrink: 0;
 }
 
+/* 头部按钮图标比全局 icon-btn 略大，方便触控 */
+.assistant-drawer__header .icon-btn svg {
+  width: 21px;
+  height: 21px;
+}
+
 .assistant-drawer__title {
   display: inline-flex;
   align-items: center;
@@ -51,18 +57,18 @@
   flex-shrink: 0;
 }
 
-/* 与 app-header__logo 呼应的主色标识 */
+/* 与 app-header__logo 呼应的主色标识 — 容器和旁边 icon-btn 一样大 */
 .assistant-drawer__title::before {
   content: '✦';
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: var(--radius-sm);
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   background: var(--primary);
   color: #fff;
-  font-size: 0.75rem;
+  font-size: 1.5rem;
   line-height: 1;
   flex-shrink: 0;
 }

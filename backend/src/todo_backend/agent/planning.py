@@ -43,7 +43,7 @@ class PlannedMutation(BaseModel):
 
 class AnalysisResult(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
-    intent: Literal["query", "clarify", "mutations"]
+    intent: Literal["query", "clarify", "mutations", "chat"]
     reasoning: str  # Why this intent? What's ambiguous? What's clear?
     missing_info: str | None = None  # What the model needs to ask the user
 
@@ -95,16 +95,38 @@ SUBMIT_PLAN_TOOL: dict[str, Any] = {
 ANALYZE_PROMPT = """You analyze user messages for a TodoList agent. Output one AnalysisResult.
 
 Intent types:
-- "query": The user is asking a factual question (what tasks do I have? when is X?).
-- "clarify": The user's request is incomplete, ambiguous, or impossible. Ask a
-  specific question. Use this when: the task title is missing (for creates),
-  quantities are vague ("几个","一些"), dates are impossible (Feb 29 non-leap-year),
-  time is already past, date format is ambiguous (08/09 could be Aug 9 or Sep 8),
-  target cannot be uniquely identified among the existing tasks (for update/delete),
-  or there are multiple candidates that can't be distinguished.
+- "query": The user is asking a factual question about their tasks (what tasks do I have? when is X?).
+- "chat": The user is making casual conversation or asking a question that is NOT about
+  their todo list (e.g. "你是什么模型", "今天天气怎么样", "讲个笑话", "你好").
+  Use this for greetings, chit-chat, questions about the assistant itself, or any
+  message that does NOT ask about or modify tasks.
+- "clarify": The user's request is incomplete, ambiguous, or needs more info.
+  Use this when: the task title is missing (for creates), quantities are vague
+  ("几个","一些"), dates are impossible (Feb 29 non-leap-year), time is already
+  past, date format is ambiguous (08/09 could be Aug 9 or Sep 8), target cannot
+  be uniquely identified among the existing tasks, or there are multiple candidates.
   NOTE: time/date is optional for creates — do NOT clarify just because the user
   didn't specify a time. The user can add a time later via update.
-- "mutations": The user clearly requests create/update/delete with enough info.
+
+  ⚠️  IMPORTANT — when you use "clarify", write missing_info as ONE specific,
+  friendly, conversational question. Like a real person asking for clarification.
+  Be warm and natural, NOT robotic or formal. Examples:
+  - BAD: "请提供更多信息"  GOOD: "你是想创建「英语课」还是「数学课」呀？"
+  - BAD: "请指定任务标题"  GOOD: "好的，这个任务你想叫什么名字呢？"
+  - BAD: "日期格式不明确"  GOOD: "你指的8/9是8月9号还是9月8号呀？"
+
+- "mutations": The user clearly requests create/update/delete of tasks with enough info.
+
+⚠️  FOLLOW-UP RESPONSES — If the conversation history shows that the assistant JUST
+asked a clarification question and the user's current message is responding to it:
+re-evaluate the FULL context (original request + clarification answer). Be more
+aggressive about finding a match. If the combined information now makes the intent
+clear, use "mutations" directly. Do NOT keep asking follow-up clarifications
+unless there's genuinely new ambiguity.
+
+IMPORTANT: Only use "query" or "mutations" when the message is genuinely about the
+user's todo tasks. Greetings, small talk, and off-topic questions should use "chat".
+Messages like "你好", "谢谢", "你是谁", "你是什么模型" → "chat".
 
 Capabilities — you CAN do ALL of these:
 - CREATE a new task (needs title; time/priority/category are optional)
@@ -124,7 +146,12 @@ Rules:
   time is impossible or already past, quantities are vague, or genuine ambiguity.
 - When in doubt between clarify and mutations, prefer "mutations" if any task in
   the existing tasks list plausibly matches what the user is referring to.
-"""
+- CRITICAL — confirmation words: When the user sends a standalone confirmation word
+  like "确认", "好的", "行", "可以", "ok", "yes", "sure", "confirm", "reject", "拒绝"
+  and the conversation context shows pending proposal cards: use "clarify" and tell
+  the user to click the 确认/拒绝 buttons on the card itself. Do NOT classify as
+  "mutations" — the text channel cannot confirm or reject proposals."""
+
 
 _PLANNER_SYSTEM_PROMPT = """You are the structured intent planner for TodoList.
 Submit exactly one plan through submit_plan and never perform a write operation.
@@ -138,6 +165,20 @@ YOU CAN DO ALL OF THESE:
   (pending proposal ID). Supply only the fields that should change in PlannedFields.
   You CAN update: text, time_start, time_end, priority, category, notes.
 - action="delete": requires target_query or reference. No fields needed.
+
+CATEGORY — always infer and set category on every create. Never leave it null.
+Choose the single best fit from the four values below:
+- "work":    job duties, meetings, projects, deadlines, clients, business.
+             Keywords: 工作 上班 开会 项目 报告 客户 出差 面试 加班 合同 预算
+- "study":   learning, classes, courses, homework, exams, reading, training.
+             Keywords: 学习 上课 作业 考试 读书 课程 培训 论文 笔记 英语课 数学
+- "life":    daily chores, shopping, health, family, social, entertainment.
+             Keywords: 购物 买菜 健身 家务 看病 聚会 旅行 电影 做饭 缴费 搬家
+- "other":   only when the task genuinely does not fit work / study / life.
+
+Infer the category from the task title and the user's wording. Examples:
+"英语课" → study, "项目周会" → work, "买菜" → life, "修水管" → life,
+"背单词" → study, "写周报" → work, "去医院复查" → life, "交论文" → study.
 
 A reference is the exact pending proposal ID copied from the supplied pending context.
 For reference, never copy a phrase such as "刚才那个" as the value.

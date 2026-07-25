@@ -123,6 +123,9 @@ export function useAssistant(
     setSending(true);
     setStreamingStep('analyze');
 
+    // Track activeId for this send so we can detect concurrent navigation
+    const sendActiveId = activeId;
+
     // Try SSE streaming first, fall back to regular POST
     let streamSucceeded = false;
     try {
@@ -131,6 +134,9 @@ export function useAssistant(
         { turnId, content, attachments },
         (_event, data) => {
           const d = data as Record<string, unknown>;
+          if (_event === 'done') {
+            streamSucceeded = true;
+          }
           if (d.text && typeof d.text === 'string') {
             setStreamingStep(d.text);
           } else if (_event === 'step' && d.node) {
@@ -142,7 +148,6 @@ export function useAssistant(
         },
         () => { /* done callback */ },
       );
-      streamSucceeded = true;
     } catch {
       // Fall back to non-streaming below
     }
@@ -155,8 +160,12 @@ export function useAssistant(
       ]);
       if (listResult.status === 'fulfilled') setConversations(listResult.value);
       if (detailResult.status === 'fulfilled') {
-        setMessages(detailResult.value.messages);
-        setProposalBatches(detailResult.value.proposalBatches);
+        // Guard against concurrent navigation: only apply if the active
+        // conversation hasn't changed since the send started.
+        if (activeId === null || activeId === sendActiveId) {
+          setMessages(detailResult.value.messages);
+          setProposalBatches(detailResult.value.proposalBatches);
+        }
       }
     } else {
       // Non-streaming fallback
@@ -176,8 +185,10 @@ export function useAssistant(
       ]);
       if (listResult.status === 'fulfilled') setConversations(listResult.value);
       if (detailResult.status === 'fulfilled') {
-        setMessages(detailResult.value.messages);
-        setProposalBatches(detailResult.value.proposalBatches);
+        if (activeId === null || activeId === sendActiveId) {
+          setMessages(detailResult.value.messages);
+          setProposalBatches(detailResult.value.proposalBatches);
+        }
       }
       if (sendFailed) onErrorRef.current(sendError);
     }

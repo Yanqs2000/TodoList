@@ -215,10 +215,7 @@ export function createTodoApi(
           },
         );
         if (!response.ok) {
-          const error = await responseError(response);
-          onError(error);
-          onDone();
-          return;
+          throw await responseError(response);
         }
         const reader = response.body?.getReader();
         if (!reader) { onDone(); return; }

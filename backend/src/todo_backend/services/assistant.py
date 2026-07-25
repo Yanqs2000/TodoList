@@ -1,4 +1,3 @@
-import asyncio
 import base64
 import hashlib
 import json
@@ -418,13 +417,22 @@ class AssistantService:
             stream_done = False
             try:
                 self._enrich_turn_attachments(turn, ark)
+                loop = _asyncio.get_running_loop()
                 queue: _asyncio.Queue = _asyncio.Queue()
 
+                def _safe_put(event: dict[str, Any]) -> None:
+                    """Schedule a put_nowait on the event-loop thread.
+
+                    asyncio.Queue is not thread-safe, so _safe_put must only
+                    be called from the event-loop thread.  Callers on other
+                    threads use loop.call_soon_threadsafe.
+                    """
+                    queue.put_nowait(event)
+
                 def on_event(event_type: str, data: dict[str, Any]) -> None:
-                    try:
-                        queue.put_nowait({"event": event_type, "data": data})
-                    except _asyncio.QueueFull:
-                        pass
+                    loop.call_soon_threadsafe(
+                        _safe_put, {"event": event_type, "data": data}
+                    )
 
                 workflow = AssistantTurnWorkflow(
                     TurnGraphDependencies(
@@ -446,18 +454,17 @@ class AssistantService:
                         workflow.run(turn.id)
                     except ArkUnavailableError:
                         self._fail_turn(turn, "ASSISTANT_UNAVAILABLE")
-                        try:
-                            queue.put_nowait({"event": "error", "data": {"code": "ASSISTANT_UNAVAILABLE", "message": "Assistant unavailable"}})
-                        except _asyncio.QueueFull:
-                            pass
+                        loop.call_soon_threadsafe(
+                            _safe_put,
+                            {"event": "error", "data": {"code": "ASSISTANT_UNAVAILABLE", "message": "Assistant unavailable"}},
+                        )
                     except Exception:
                         self._fail_turn(turn, "TURN_GRAPH_FAILED")
-                        try:
-                            queue.put_nowait({"event": "error", "data": {"code": "TURN_GRAPH_FAILED", "message": "Internal error"}})
-                        except _asyncio.QueueFull:
-                            pass
+                        loop.call_soon_threadsafe(
+                            _safe_put,
+                            {"event": "error", "data": {"code": "TURN_GRAPH_FAILED", "message": "Internal error"}},
+                        )
 
-                loop = _asyncio.get_running_loop()
                 loop.run_in_executor(None, _run)
 
                 _STREAM_TIMEOUT = 120  # seconds max wait between events

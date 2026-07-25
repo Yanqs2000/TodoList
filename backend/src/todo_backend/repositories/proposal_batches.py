@@ -4,6 +4,8 @@ import time
 from dataclasses import dataclass
 from typing import Any, cast
 
+from pydantic import ValidationError
+
 from todo_backend.models import (
     AssistantProposal,
     AssistantProposalBatch,
@@ -314,17 +316,29 @@ class ProposalBatchesRepository:
         raw_payload = self._payload_dict(row["payload"])
         payload: ProposalCardFields | None
         if action == "create":
-            payload = ProposalCardFields.model_validate(
-                {
-                    "text": None,
-                    "priority": "medium",
-                    "category": "other",
-                    "time_start": None,
-                    "time_end": None,
-                    "notes": None,
-                    **raw_payload,
-                }
-            )
+            # Guard against corrupted payloads (e.g. legacy rows with text: null).
+            # Fall back to a minimal placeholder so the conversation stays readable.
+            try:
+                payload = ProposalCardFields.model_validate(
+                    {
+                        "text": None,
+                        "priority": "medium",
+                        "category": "other",
+                        "time_start": None,
+                        "time_end": None,
+                        "notes": None,
+                        **raw_payload,
+                    }
+                )
+            except ValidationError:
+                payload = ProposalCardFields(
+                    text=raw_payload.get("text") or "(corrupted)",
+                    priority="medium",
+                    category="other",
+                    time_start=None,
+                    time_end=None,
+                    notes=None,
+                )
         elif action == "delete":
             # delete 卡片不可编辑，payload 恒为 null；审计信息以 before_snapshot 为准
             payload = None
