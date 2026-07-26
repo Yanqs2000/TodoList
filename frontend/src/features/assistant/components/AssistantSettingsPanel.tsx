@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useI18n } from '@/features/i18n/I18nProvider';
-import type { AssistantSettingsPatch, AssistantSettingsView } from '@/shared/api/contracts';
+import type { AssistantSettingsPatch, AssistantSettingsView, VoiceMode } from '@/shared/api/contracts';
 
 interface AssistantSettingsPanelProps {
   view: AssistantSettingsView | null;
@@ -13,12 +13,14 @@ function AssistantSettingsPanel({ view, onSave }: AssistantSettingsPanelProps) {
   const [baseUrl, setBaseUrl] = useState(view?.baseUrl ?? '');
   const [chatModel, setChatModel] = useState(view?.chatModel ?? '');
   const [audioModel, setAudioModel] = useState(view?.audioModel ?? '');
+  const [voiceMode, setVoiceMode] = useState<VoiceMode>(view?.voiceMode ?? 'transcribe');
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     setBaseUrl(view?.baseUrl ?? '');
     setChatModel(view?.chatModel ?? '');
     setAudioModel(view?.audioModel ?? '');
+    setVoiceMode(view?.voiceMode ?? 'transcribe');
   }, [view]);
 
   return (
@@ -46,9 +48,32 @@ function AssistantSettingsPanel({ view, onSave }: AssistantSettingsPanelProps) {
         {t('assistant.audioModel')}
         <input value={audioModel} onChange={event => setAudioModel(event.target.value)} />
       </label>
+      <fieldset className="assistant-settings__voice-mode">
+        <legend>{t('assistant.voiceModeLabel')}</legend>
+        <label className="assistant-settings__radio">
+          <input
+            type="radio"
+            name="voiceMode"
+            value="transcribe"
+            checked={voiceMode === 'transcribe'}
+            onChange={() => setVoiceMode('transcribe')}
+          />
+          <span>{t('assistant.voiceModeTranscribe')}</span>
+        </label>
+        <label className="assistant-settings__radio">
+          <input
+            type="radio"
+            name="voiceMode"
+            value="direct"
+            checked={voiceMode === 'direct'}
+            onChange={() => setVoiceMode('direct')}
+          />
+          <span>{t('assistant.voiceModeDirect')}</span>
+        </label>
+      </fieldset>
       <button
         onClick={() => {
-          const patch: AssistantSettingsPatch = { baseUrl, chatModel, audioModel };
+          const patch: AssistantSettingsPatch = { baseUrl, chatModel, audioModel, voiceMode };
           if (apiKey) patch.apiKey = apiKey;
           void onSave(patch).then(() => {
             setSaved(true);

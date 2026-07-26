@@ -42,7 +42,7 @@ function state(overrides: Partial<AssistantState> = {}): AssistantState {
     ],
     proposalBatches: [proposalBatch()],
     submittingBatchIds: new Set<string>(),
-    settingsView: { hasApiKey: true, chatModel: 'chat', audioModel: 'audio', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3' },
+    settingsView: { hasApiKey: true, chatModel: 'chat', audioModel: 'audio', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', voiceMode: 'transcribe' as const },
     selectConversation: vi.fn(), startNewConversation: vi.fn(),
     deleteConversation: vi.fn(), send: vi.fn(), retry: vi.fn(),
     confirmBatch: vi.fn().mockResolvedValue(undefined),
@@ -144,7 +144,7 @@ describe('AssistantDrawer', () => {
   });
 
   it('shows the setup panel when the key is missing', () => {
-    renderDrawer(state({ settingsView: { hasApiKey: false, chatModel: 'c', audioModel: 'a', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3' } }));
+    renderDrawer(state({ settingsView: { hasApiKey: false, chatModel: 'c', audioModel: 'a', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', voiceMode: 'transcribe' as const } }));
 
     expect(screen.getByText('还没有配置模型服务')).toBeTruthy();
   });

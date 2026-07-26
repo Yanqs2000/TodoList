@@ -52,7 +52,7 @@ def test_initialize_creates_schema(database: Database) -> None:
             for row in connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
         }
 
-    assert version == 5
+    assert version == 6
     assert language == "zh-CN"
     assert {
         "tasks",
@@ -68,7 +68,7 @@ def test_initialize_is_idempotent(database: Database) -> None:
     database.initialize()
 
     with database.connect() as connection:
-        assert connection.execute("PRAGMA user_version").fetchone()[0] == 5
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 6
 
 
 def test_migration_005_adds_turns_batches_and_extended_proposals(
@@ -77,7 +77,7 @@ def test_migration_005_adds_turns_batches_and_extended_proposals(
     database.initialize()
     connection = database.connect()
     try:
-        assert connection.execute("PRAGMA user_version").fetchone()[0] == 5
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 6
         tables = {
             row["name"]
             for row in connection.execute(
@@ -341,7 +341,7 @@ def test_initialize_rejects_database_version_above_latest(
     database: Database,
 ) -> None:
     with database.connect() as connection:
-        connection.execute("PRAGMA user_version = 6")
+        connection.execute("PRAGMA user_version = 7")
 
     with pytest.raises(DatabaseVersionError, match="newer"):
         database.initialize()

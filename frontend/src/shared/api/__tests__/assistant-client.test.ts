@@ -128,7 +128,7 @@ describe('assistant api client', () => {
 
   it('reads assistant settings', async () => {
     const fetcher = vi.fn().mockResolvedValue(jsonResponse({
-      hasApiKey: true, chatModel: 'chat', audioModel: 'audio',
+      hasApiKey: true, chatModel: 'chat', audioModel: 'audio', baseUrl: '', voiceMode: 'transcribe',
     }));
     const api = createTodoApi(connection, fetcher);
 

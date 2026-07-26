@@ -103,6 +103,7 @@ function AssistantDrawer({ open, onClose, assistant, api, onApplyProposal, onErr
           />
           <Composer
             sending={assistant.sending}
+            voiceMode={assistant.settingsView?.voiceMode ?? 'transcribe'}
             onSend={assistant.send}
             onError={onError}
             uploadFile={file => api.uploadAssistantFile(file)}

@@ -186,11 +186,15 @@ DEFAULT_AUDIO_MODEL = "doubao-seed-2-0-lite-260428"
 DEFAULT_ARK_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3"
 
 
+VoiceMode = Literal["direct", "transcribe"]
+
+
 class AssistantSettings(WireModel):
     api_key: str
     chat_model: str
     audio_model: str
     base_url: str
+    voice_mode: VoiceMode
 
 
 class AssistantSettingsView(WireModel):
@@ -198,6 +202,7 @@ class AssistantSettingsView(WireModel):
     chat_model: str = Field(alias="chatModel")
     audio_model: str = Field(alias="audioModel")
     base_url: str = Field(alias="baseUrl")
+    voice_mode: VoiceMode = Field(alias="voiceMode")
 
 
 class AssistantSettingsPatchCommand(WireModel):
@@ -213,6 +218,7 @@ class AssistantSettingsPatchCommand(WireModel):
     base_url: Annotated[str, Field(strict=True, min_length=1, max_length=200)] | None = Field(
         default=None, alias="baseUrl"
     )
+    voice_mode: VoiceMode | None = Field(default=None, alias="voiceMode")
 
     @model_validator(mode="after")
     def reject_empty_or_null_patch(self) -> "AssistantSettingsPatchCommand":

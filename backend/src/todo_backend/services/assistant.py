@@ -193,6 +193,7 @@ class AssistantService:
             chatModel=config.chat_model,
             audioModel=config.audio_model,
             baseUrl=config.base_url,
+            voiceMode=config.voice_mode,
         )
 
     def _require_ark(self) -> Any:
