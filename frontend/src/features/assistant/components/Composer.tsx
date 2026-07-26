@@ -20,6 +20,13 @@ interface PendingAudio {
   attachment: AssistantAttachment;
 }
 
+interface VoicePress {
+  pointerId: number;
+  released: boolean;
+  cancelled: boolean;
+  finishing: boolean;
+}
+
 function Composer({ sending, voiceMode, onSend, onError, uploadFile, transcribe }: ComposerProps) {
   const { t } = useI18n();
   const [text, setText] = useState('');
@@ -29,8 +36,8 @@ function Composer({ sending, voiceMode, onSend, onError, uploadFile, transcribe 
   const [voiceProcessing, setVoiceProcessing] = useState(false);
   const [pendingAudio, setPendingAudio] = useState<PendingAudio | null>(null);
   const recorderRef = useRef<WavRecorder | null>(null);
+  const voicePressRef = useRef<VoicePress | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const voiceButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const upload = async (file: File) => {
     try {
@@ -47,8 +54,10 @@ function Composer({ sending, voiceMode, onSend, onError, uploadFile, transcribe 
       await recorder.start();
       recorderRef.current = recorder;
       setRecording(true);
+      return recorder;
     } catch {
       onError(new ApiError('business', 'MIC_DENIED', 'Microphone denied'));
+      return null;
     }
   };
 
@@ -70,37 +79,81 @@ function Composer({ sending, voiceMode, onSend, onError, uploadFile, transcribe 
 
   // ---- Voice mode press-and-hold handlers ----
 
-  const handleVoiceDown = () => {
-    if (sending || voiceProcessing) return;
-    void startRecording();
-  };
-
-  const handleVoiceUp = () => {
-    if (!recorderRef.current) return;
+  const finishVoicePress = (press: VoicePress) => {
+    if (press.finishing || press.cancelled || !recorderRef.current) return;
+    press.finishing = true;
+    voicePressRef.current = null;
     setVoiceProcessing(true);
     void (async () => {
-      const attachment = await stopRecording();
-      if (!attachment) {
-        setVoiceProcessing(false);
-        return;
-      }
-      if (voiceMode === 'transcribe') {
-        try {
+      try {
+        const attachment = await stopRecording();
+        if (!attachment) return;
+        if (voiceMode === 'transcribe') {
           const transcribed = await transcribe(attachment.fileId);
           await onSend(transcribed, [attachment]);
-        } catch (error) {
-          onError(error);
+        } else {
+          await onSend('', [attachment]);
         }
-      } else {
-        await onSend('', [attachment]);
+      } catch (error) {
+        onError(error);
+      } finally {
+        setVoiceProcessing(false);
       }
-      setVoiceProcessing(false);
     })();
   };
 
-  // Cancel if pointer leaves the button while recording
-  const handleVoiceLeave = () => {
-    if (recording) cancelRecording();
+  const handleVoicePointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (event.button !== 0 || sending || voiceProcessing || voicePressRef.current) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    const press: VoicePress = {
+      pointerId: event.pointerId,
+      released: false,
+      cancelled: false,
+      finishing: false,
+    };
+    voicePressRef.current = press;
+
+    void (async () => {
+      const recorder = await startRecording();
+      if (!recorder) {
+        if (voicePressRef.current === press) voicePressRef.current = null;
+        return;
+      }
+      if (voicePressRef.current !== press || press.cancelled) {
+        if (recorderRef.current === recorder) cancelRecording();
+        else recorder.cancel();
+        return;
+      }
+      if (press.released) finishVoicePress(press);
+    })();
+  };
+
+  const handleVoicePointerUp = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const press = voicePressRef.current;
+    if (!press || press.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    press.released = true;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    if (recorderRef.current) finishVoicePress(press);
+  };
+
+  const handleVoicePointerCancel = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const press = voicePressRef.current;
+    if (!press || press.pointerId !== event.pointerId) return;
+    press.cancelled = true;
+    voicePressRef.current = null;
+    cancelRecording();
+  };
+
+  const switchToTextInput = () => {
+    const press = voicePressRef.current;
+    if (press) {
+      press.cancelled = true;
+      voicePressRef.current = null;
+      cancelRecording();
+    }
+    setInputMode('text');
   };
 
   // ---- Text mode handlers ----
@@ -129,25 +182,13 @@ function Composer({ sending, voiceMode, onSend, onError, uploadFile, transcribe 
   if (inputMode === 'voice') {
     return (
       <div className="assistant-composer">
-        {attachments.map(attachment => (
-          <span key={attachment.fileId} className="assistant-attachment">
-            📎 {attachment.name}
-            <button
-              aria-label={t('common.delete')}
-              onClick={() => setAttachments(prev => prev.filter(a => a.fileId !== attachment.fileId))}
-            >✕</button>
-          </span>
-        ))}
-        <div className="assistant-composer__row">
+        <div className="assistant-composer__row assistant-composer__row--voice">
           <button
-            ref={voiceButtonRef}
             className={`assistant-composer__voice-btn${recording ? ' assistant-composer__voice-btn--recording' : ''}${voiceProcessing ? ' assistant-composer__voice-btn--processing' : ''}`}
             disabled={sending || voiceProcessing}
-            onMouseDown={handleVoiceDown}
-            onMouseUp={handleVoiceUp}
-            onMouseLeave={handleVoiceLeave}
-            onTouchStart={e => { e.preventDefault(); handleVoiceDown(); }}
-            onTouchEnd={e => { e.preventDefault(); handleVoiceUp(); }}
+            onPointerDown={handleVoicePointerDown}
+            onPointerUp={handleVoicePointerUp}
+            onPointerCancel={handleVoicePointerCancel}
             aria-label={recording ? t('assistant.releaseToSend') : t('assistant.holdToRecord')}
           >
             {voiceProcessing
@@ -160,7 +201,7 @@ function Composer({ sending, voiceMode, onSend, onError, uploadFile, transcribe 
           <div className="assistant-composer__buttons assistant-composer__buttons--voice">
             <button
               className="assistant-composer__tool"
-              onClick={() => setInputMode('text')}
+              onClick={switchToTextInput}
               disabled={sending || voiceProcessing}
               title={t('assistant.textInput')}
               aria-label={t('assistant.textInput')}
@@ -231,13 +272,6 @@ function Composer({ sending, voiceMode, onSend, onError, uploadFile, transcribe 
           />
           <button className="assistant-composer__tool" onClick={() => fileInputRef.current?.click()} disabled={sending}
             title={t('assistant.attach')} aria-label={t('assistant.attach')}>📎</button>
-          <button
-            className={recording ? 'assistant-composer__tool assistant-composer__tool--recording' : 'assistant-composer__tool'}
-            onClick={() => void (recording ? cancelRecording() : startRecording())}
-            disabled={sending}
-            title={recording ? t('assistant.stopRecording') : t('assistant.record')}
-            aria-label={recording ? t('assistant.stopRecording') : t('assistant.record')}
-          >{recording ? '⏹' : '🎙'}</button>
           <button
             className="assistant-composer__tool"
             onClick={() => setInputMode('voice')}

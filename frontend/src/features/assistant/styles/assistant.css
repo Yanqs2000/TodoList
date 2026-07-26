@@ -612,6 +612,10 @@
   gap: 8px;
 }
 
+.assistant-composer__row--voice {
+  align-items: center;
+}
+
 .assistant-composer__row textarea {
   flex: 1;
   min-width: 0;
@@ -649,7 +653,7 @@
   flex-shrink: 0;
 }
 
-/* 附件 / 录音按钮，样式与全局 icon-btn 保持一致 */
+/* 附件 / 输入切换按钮，样式与全局 icon-btn 保持一致 */
 .assistant-composer__tool {
   height: 32px;
   padding: 0;
@@ -674,18 +678,6 @@
 .assistant-composer__tool:disabled {
   opacity: 0.45;
   cursor: not-allowed;
-}
-
-.assistant-composer__tool--recording {
-  border-color: var(--danger);
-  color: var(--danger);
-  background: color-mix(in srgb, var(--danger) 10%, transparent);
-  animation: assistant-pulse 1.4s ease infinite;
-}
-
-@keyframes assistant-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 25%, transparent); }
-  50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--danger) 10%, transparent); }
 }
 
 /* 发送按钮 — 与 settings-modal__btn 同款主色按钮 */
@@ -738,6 +730,9 @@
   font-weight: 600;
   letter-spacing: 0.04em;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   user-select: none;
   -webkit-user-select: none;
   touch-action: none;
