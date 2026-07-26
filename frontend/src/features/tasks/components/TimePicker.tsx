@@ -122,6 +122,17 @@ function TimePicker({ time, onTimeChange, onClose }: TimePickerProps) {
     setter({ year: newYear, month: newMonth, day: newDay, time: target.time });
   };
 
+  const handleToday = (isEnd: boolean = false) => {
+    const today = new Date();
+    const setter = isEnd ? setEndDate : setStartDate;
+    setter(current => ({
+      ...current,
+      year: today.getFullYear(),
+      month: today.getMonth(),
+      day: today.getDate(),
+    }));
+  };
+
   const handleConfirm = () => {
     const startTime = `${startHour}:${startMinute}`;
     const endTime = `${endHour}:${endMinute}`;
@@ -138,7 +149,12 @@ function TimePicker({ time, onTimeChange, onClose }: TimePickerProps) {
     onClose();
   };
 
-  const renderCalendar = (date: typeof startDate, onDayClick: (day: number) => void, onMonthChange: (delta: number) => void) => {
+  const renderCalendar = (
+    date: typeof startDate,
+    onDayClick: (day: number) => void,
+    onMonthChange: (delta: number) => void,
+    onTodayClick: () => void,
+  ) => {
     const daysInMonth = getDaysInMonth(date.year, date.month);
     const firstDay = getFirstDayOfMonth(date.year, date.month);
     const today = new Date();
@@ -168,7 +184,12 @@ function TimePicker({ time, onTimeChange, onClose }: TimePickerProps) {
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
             </svg>
           </button>
-          <span className="calendar-title">{monthName}</span>
+          <div className="calendar-title-group">
+            <span className="calendar-title">{monthName}</span>
+            <button type="button" className="calendar-today" onClick={onTodayClick}>
+              {t('time.today')}
+            </button>
+          </div>
           <button className="calendar-nav" onClick={() => onMonthChange(1)} aria-label={t('time.nextMonth')}>
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
@@ -222,14 +243,24 @@ function TimePicker({ time, onTimeChange, onClose }: TimePickerProps) {
       <div className="time-picker-body">
         <div className="time-section">
           <label className="time-section-label">{t('time.start')}</label>
-          {renderCalendar(startDate, (day) => handleDateSelect(day, false), (delta) => handleMonthChange(delta, false))}
+          {renderCalendar(
+            startDate,
+            (day) => handleDateSelect(day, false),
+            (delta) => handleMonthChange(delta, false),
+            () => handleToday(false),
+          )}
           {renderTimeScroller(startHour, startMinute, setStartHour, setStartMinute)}
         </div>
 
         {mode === 'range' && (
           <div className="time-section">
             <label className="time-section-label">{t('time.end')}</label>
-            {renderCalendar(endDate, (day) => handleDateSelect(day, true), (delta) => handleMonthChange(delta, true))}
+            {renderCalendar(
+              endDate,
+              (day) => handleDateSelect(day, true),
+              (delta) => handleMonthChange(delta, true),
+              () => handleToday(true),
+            )}
             {renderTimeScroller(endHour, endMinute, setEndHour, setEndMinute)}
           </div>
         )}
