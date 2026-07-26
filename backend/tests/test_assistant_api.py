@@ -585,6 +585,33 @@ def test_upload_and_transcribe_over_http(client: TestClient) -> None:
     assert transcribed.json()["text"] == "转写文本"
 
 
+def test_transcribe_without_recognized_text_returns_business_error(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _configure_key(client)
+    monkeypatch.setattr(FakeArk, "transcribe", lambda *_args: "")
+    upload = client.post(
+        "/api/v1/assistant/uploads",
+        headers=_HEADERS,
+        files={"file": ("silence.wav", b"RIFF silence", "audio/wav")},
+    )
+
+    response = client.post(
+        "/api/v1/assistant/transcribe",
+        headers=_HEADERS,
+        json={"fileId": upload.json()["fileId"]},
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {
+        "error": {
+            "code": "AUDIO_NOT_RECOGNIZED",
+            "message": "No speech was recognized",
+        }
+    }
+
+
 def test_upload_rejects_bad_type_and_oversize(client: TestClient) -> None:
     bad = client.post(
         "/api/v1/assistant/uploads",

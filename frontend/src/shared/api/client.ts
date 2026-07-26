@@ -46,6 +46,10 @@ const INFRASTRUCTURE_CODES = new Set([
   'UNAUTHORIZED',
 ]);
 
+const FEATURE_SERVICE_CODES = new Set([
+  'ASSISTANT_UNAVAILABLE',
+]);
+
 function isErrorEnvelope(value: unknown): value is ErrorEnvelope {
   if (typeof value !== 'object' || value === null || !('error' in value)) return false;
   const error = value.error;
@@ -66,7 +70,10 @@ async function responseError(response: Response): Promise<ApiError> {
   }
   const code = isErrorEnvelope(payload) ? payload.error.code : 'REQUEST_FAILED';
   const message = isErrorEnvelope(payload) ? payload.error.message : 'Request failed';
-  if (response.status >= 500 || INFRASTRUCTURE_CODES.has(code)) {
+  if (
+    !FEATURE_SERVICE_CODES.has(code)
+    && (response.status >= 500 || INFRASTRUCTURE_CODES.has(code))
+  ) {
     return new InfrastructureError('infrastructure', code, message, response.status);
   }
   return new ApiError('business', code, message, response.status);

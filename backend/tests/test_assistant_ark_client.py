@@ -1,5 +1,11 @@
 # pyright: reportUnknownArgumentType=false, reportUnknownMemberType=false, reportUnknownVariableType=false
 
+import base64
+import gzip
+import io
+import json
+import struct
+import wave
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -105,6 +111,135 @@ def test_transcribe_uses_audio_model_and_input_audio_part() -> None:
         "type": "input_audio",
         "input_audio": {"data": "QUJD", "format": "wav"},
     }
+
+
+def test_agent_plan_transcribe_uses_seed_asr_and_normalizes_wav(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def response_packet(payload: dict[str, Any], *, sequence: int, last: bool) -> bytes:
+        compressed = gzip.compress(json.dumps(payload).encode())
+        flags = 0b0011 if last else 0b0001
+        return (
+            bytes([0x11, (0b1001 << 4) | flags, 0x11, 0x00])
+            + struct.pack(">iI", sequence, len(compressed))
+            + compressed
+        )
+
+    class FakeWebSocket:
+        def __init__(self) -> None:
+            self.sent: list[bytes] = []
+            self.responses = [
+                response_packet({}, sequence=1, last=False),
+                response_packet(
+                    {"result": {"text": "完整文本"}},
+                    sequence=-2,
+                    last=True,
+                ),
+            ]
+
+        def __enter__(self) -> "FakeWebSocket":
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+        def send(self, data: bytes) -> None:
+            self.sent.append(data)
+
+        def recv(self, timeout: float) -> bytes:
+            del timeout
+            return self.responses.pop(0)
+
+    source = io.BytesIO()
+    with wave.open(source, "wb") as wav:
+        wav.setnchannels(2)
+        wav.setsampwidth(3)
+        wav.setframerate(44100)
+        wav.writeframes(b"\x00\x00\x00\x00\x00\x00" * 4410)
+
+    websocket = FakeWebSocket()
+    connect_calls: list[tuple[str, dict[str, Any]]] = []
+
+    def fake_connect(url: str, **kwargs: Any) -> FakeWebSocket:
+        connect_calls.append((url, kwargs))
+        return websocket
+
+    monkeypatch.setattr("websockets.sync.client.connect", fake_connect)
+    sdk = MagicMock()
+    sdk.chat.completions.create.return_value = _completion("错误接口")
+    client = ArkClient(
+        "sk-agent-plan",
+        "chat-model",
+        "doubao-seed-2.0-lite",
+        "https://ark.cn-beijing.volces.com/api/plan/v3",
+        client=sdk,
+    )
+
+    text = client.transcribe(base64.b64encode(source.getvalue()).decode(), "wav")
+
+    assert text == "完整文本"
+    assert sdk.chat.completions.create.call_count == 0
+    url, kwargs = connect_calls[0]
+    assert url == "wss://openspeech.bytedance.com/api/v3/plan/sauc/bigmodel_nostream"
+    assert kwargs["additional_headers"]["X-Api-Key"] == "sk-agent-plan"
+    assert kwargs["additional_headers"]["X-Api-Resource-Id"] == (
+        "volc.seedasr.sauc.duration"
+    )
+    normalized = b"".join(
+        gzip.decompress(packet[12 : 12 + struct.unpack(">I", packet[8:12])[0]])
+        for packet in websocket.sent[1:]
+    )
+    with wave.open(io.BytesIO(normalized), "rb") as wav:
+        assert wav.getframerate() == 16000
+        assert wav.getnchannels() == 1
+        assert wav.getsampwidth() == 2
+
+
+def test_agent_plan_transcribe_distinguishes_audio_without_recognized_text(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    compressed = gzip.compress(json.dumps({}).encode())
+
+    class FakeWebSocket:
+        def __init__(self) -> None:
+            self.responses = [
+                bytes([0x11, 0x91, 0x11, 0x00])
+                + struct.pack(">iI", 1, len(compressed))
+                + compressed,
+                bytes([0x11, 0x93, 0x11, 0x00])
+                + struct.pack(">iI", -2, len(compressed))
+                + compressed,
+            ]
+
+        def __enter__(self) -> "FakeWebSocket":
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+        def send(self, _data: bytes) -> None:
+            return None
+
+        def recv(self, timeout: float) -> bytes:
+            del timeout
+            return self.responses.pop(0)
+
+    monkeypatch.setattr(
+        "websockets.sync.client.connect",
+        lambda *_args, **_kwargs: FakeWebSocket(),
+    )
+    client = ArkClient(
+        "sk-agent-plan",
+        "chat-model",
+        "doubao-seed-2.0-lite",
+        "https://ark.cn-beijing.volces.com/api/plan/v3",
+        client=MagicMock(),
+    )
+
+    with pytest.raises(ArkUnavailableError) as error:
+        client.transcribe("UklGRiQAAABXQVZF", "wav")
+
+    assert type(error.value).__name__ == "ArkAudioNotRecognizedError"
 
 
 def test_api_errors_become_ark_unavailable() -> None:
