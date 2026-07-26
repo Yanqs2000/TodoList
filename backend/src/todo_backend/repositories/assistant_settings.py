@@ -22,7 +22,7 @@ class AssistantSettingsRepository:
     def get(self, connection: sqlite3.Connection) -> AssistantSettings:
         row = connection.execute(
             "SELECT assistant_api_key, assistant_chat_model, assistant_audio_model,"
-            " assistant_base_url FROM app_settings WHERE id = 1"
+            " assistant_base_url, assistant_voice_mode FROM app_settings WHERE id = 1"
         ).fetchone()
         if row is None:
             raise RuntimeError("Application settings are not initialized")
@@ -31,6 +31,7 @@ class AssistantSettingsRepository:
             chat_model=row["assistant_chat_model"],
             audio_model=row["assistant_audio_model"],
             base_url=row["assistant_base_url"],
+            voice_mode=row["assistant_voice_mode"],
         )
 
     def patch(
@@ -47,6 +48,7 @@ class AssistantSettingsRepository:
             "chat_model": "assistant_chat_model",
             "audio_model": "assistant_audio_model",
             "base_url": "assistant_base_url",
+            "voice_mode": "assistant_voice_mode",
         }
         assignments: list[str] = []
         values: list[object] = []

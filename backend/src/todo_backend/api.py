@@ -41,6 +41,7 @@ from todo_backend.repositories.proposal_batches import (
 )
 from todo_backend.repositories.tasks import InvalidTaskOrderError, TaskNotFoundError
 from todo_backend.services.assistant import (
+    AudioNotRecognizedError,
     AssistantNotConfiguredError,
     AssistantService,
     AssistantTurnActiveError,
@@ -111,6 +112,7 @@ def create_app(
     app.add_exception_handler(DatabaseVersionError, _database_error_handler)
     app.add_exception_handler(AssistantNotConfiguredError, _assistant_not_configured_handler)
     app.add_exception_handler(AssistantUnavailableError, _assistant_unavailable_handler)
+    app.add_exception_handler(AudioNotRecognizedError, _audio_not_recognized_handler)
     app.add_exception_handler(UnsupportedFileTypeError, _unsupported_file_type_handler)
     app.add_exception_handler(UploadTooLargeError, _upload_too_large_handler)
     app.add_exception_handler(UploadNotFoundError, _upload_not_found_handler)
@@ -292,6 +294,10 @@ def _assistant_not_configured_handler(_request: Request, _error: Exception) -> J
 
 def _assistant_unavailable_handler(_request: Request, _error: Exception) -> JSONResponse:
     return _error_response(503, "ASSISTANT_UNAVAILABLE", "Assistant service unavailable")
+
+
+def _audio_not_recognized_handler(_request: Request, _error: Exception) -> JSONResponse:
+    return _error_response(422, "AUDIO_NOT_RECOGNIZED", "No speech was recognized")
 
 
 def _unsupported_file_type_handler(_request: Request, _error: Exception) -> JSONResponse:

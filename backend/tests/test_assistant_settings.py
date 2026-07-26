@@ -42,7 +42,7 @@ def test_migration_003_creates_assistant_tables(database: Database) -> None:
         }
     finally:
         connection.close()
-    assert version == 5
+    assert version == 6
     assert {
         "assistant_conversations",
         "assistant_messages",

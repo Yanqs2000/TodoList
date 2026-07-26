@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createTodoApi, REQUEST_TIMEOUT_MS } from '../client';
 import {
+  ApiError,
   InfrastructureError,
   type ProposalBatchResolveResult,
 } from '../contracts';
@@ -128,7 +129,7 @@ describe('assistant api client', () => {
 
   it('reads assistant settings', async () => {
     const fetcher = vi.fn().mockResolvedValue(jsonResponse({
-      hasApiKey: true, chatModel: 'chat', audioModel: 'audio',
+      hasApiKey: true, chatModel: 'chat', audioModel: 'audio', baseUrl: '', voiceMode: 'transcribe',
     }));
     const api = createTodoApi(connection, fetcher);
 
@@ -142,6 +143,27 @@ describe('assistant api client', () => {
     const api = createTodoApi(connection, fetcher);
 
     await expect(api.transcribeAssistantAudio('f1.wav')).resolves.toBe('识别结果');
+  });
+
+  it('keeps an assistant provider failure local to the assistant feature', async () => {
+    const fetcher = vi.fn().mockResolvedValue(jsonResponse({
+      error: {
+        code: 'ASSISTANT_UNAVAILABLE',
+        message: 'Assistant service unavailable',
+      },
+    }, 503));
+    const api = createTodoApi(connection, fetcher);
+
+    const request = api.transcribeAssistantAudio('f1.wav');
+
+    await expect(request).rejects.toMatchObject({
+      name: 'ApiError',
+      kind: 'business',
+      code: 'ASSISTANT_UNAVAILABLE',
+      status: 503,
+    });
+    await expect(request).rejects.toBeInstanceOf(ApiError);
+    await expect(request).rejects.not.toBeInstanceOf(InfrastructureError);
   });
 
   it('uses an extended timeout for sendAssistantMessage', async () => {

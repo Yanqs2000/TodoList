@@ -169,11 +169,14 @@ export interface AssistantConversationDetail {
   proposalBatches: AssistantProposalBatch[];
 }
 
+export type VoiceMode = 'direct' | 'transcribe';
+
 export interface AssistantSettingsView {
   hasApiKey: boolean;
   chatModel: string;
   audioModel: string;
   baseUrl: string;
+  voiceMode: VoiceMode;
 }
 
 export interface AssistantSettingsPatch {
@@ -181,6 +184,7 @@ export interface AssistantSettingsPatch {
   chatModel?: string;
   audioModel?: string;
   baseUrl?: string;
+  voiceMode?: VoiceMode;
 }
 
 export interface SendAssistantMessageInput {

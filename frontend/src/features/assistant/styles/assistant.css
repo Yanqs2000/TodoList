@@ -612,6 +612,10 @@
   gap: 8px;
 }
 
+.assistant-composer__row--voice {
+  align-items: center;
+}
+
 .assistant-composer__row textarea {
   flex: 1;
   min-width: 0;
@@ -649,7 +653,7 @@
   flex-shrink: 0;
 }
 
-/* 附件 / 录音按钮，样式与全局 icon-btn 保持一致 */
+/* 附件 / 输入切换按钮，样式与全局 icon-btn 保持一致 */
 .assistant-composer__tool {
   height: 32px;
   padding: 0;
@@ -674,18 +678,6 @@
 .assistant-composer__tool:disabled {
   opacity: 0.45;
   cursor: not-allowed;
-}
-
-.assistant-composer__tool--recording {
-  border-color: var(--danger);
-  color: var(--danger);
-  background: color-mix(in srgb, var(--danger) 10%, transparent);
-  animation: assistant-pulse 1.4s ease infinite;
-}
-
-@keyframes assistant-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 25%, transparent); }
-  50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--danger) 10%, transparent); }
 }
 
 /* 发送按钮 — 与 settings-modal__btn 同款主色按钮 */
@@ -715,11 +707,74 @@
 
 .assistant-composer__tool:focus-visible,
 .assistant-composer__send:focus-visible,
+.assistant-composer__voice-btn:focus-visible,
 .assistant-proposal__actions button:focus-visible,
 .assistant-bubble__failed button:focus-visible,
 .assistant-pending-audio button:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
+}
+
+/* ---------- 语音模式按住录音按钮 ---------- */
+.assistant-composer__voice-btn {
+  flex: 1;
+  min-width: 0;
+  height: 54px;
+  padding: 0 24px;
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card-bg);
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  transition: all var(--transition);
+}
+
+.assistant-composer__voice-btn:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--active-bg);
+}
+
+.assistant-composer__voice-btn:active:not(:disabled),
+.assistant-composer__voice-btn--recording {
+  border-color: var(--primary);
+  color: #fff;
+  background: var(--primary);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 25%, transparent);
+}
+
+.assistant-composer__voice-btn--recording {
+  animation: assistant-voice-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes assistant-voice-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 30%, transparent); }
+  50% { box-shadow: 0 0 0 8px color-mix(in srgb, var(--primary) 10%, transparent); }
+}
+
+.assistant-composer__voice-btn--processing {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.assistant-composer__voice-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* 语音模式下右侧切换按钮容器 — 只放一个切换回文字的按钮 */
+.assistant-composer__buttons--voice {
+  grid-template-columns: 36px;
 }
 
 /* ---------- 设置面板（对齐 SettingsModal 的表单样式） ---------- */
@@ -800,4 +855,52 @@
   font-size: 0.75rem;
   font-weight: 500;
   color: var(--priority-low);
+}
+
+/* 语音模式选择 */
+.assistant-settings__voice-mode {
+  margin: 0;
+  padding: 0;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.assistant-settings__voice-mode > legend {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+
+.assistant-settings__radio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card-bg);
+  cursor: pointer;
+  transition: border-color var(--transition);
+}
+
+.assistant-settings__radio:hover {
+  border-color: var(--primary);
+}
+
+.assistant-settings__radio:has(input:checked) {
+  border-color: var(--primary);
+  background: var(--active-bg);
+}
+
+.assistant-settings__radio input[type="radio"] {
+  width: auto;
+  accent-color: var(--primary);
+}
+
+.assistant-settings__radio span {
+  font-size: 0.875rem;
+  color: var(--text);
 }

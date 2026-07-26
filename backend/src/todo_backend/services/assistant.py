@@ -10,7 +10,11 @@ from pathlib import Path
 from typing import Any, cast
 
 from todo_backend.agent.apply_graph import ProposalApplyWorkflow
-from todo_backend.agent.ark_client import ArkClient, ArkUnavailableError
+from todo_backend.agent.ark_client import (
+    ArkAudioNotRecognizedError,
+    ArkClient,
+    ArkUnavailableError,
+)
 from todo_backend.agent.checkpoints import CheckpointStore
 from todo_backend.agent.planning import ArkPlanner
 from todo_backend.agent.turn_graph import (
@@ -107,6 +111,10 @@ class UploadNotFoundError(LookupError):
     pass
 
 
+class AudioNotRecognizedError(ValueError):
+    pass
+
+
 def _default_ark_factory(config: AssistantSettings) -> ArkClient:
     return ArkClient(config.api_key, config.chat_model, config.audio_model, config.base_url)
 
@@ -193,6 +201,7 @@ class AssistantService:
             chatModel=config.chat_model,
             audioModel=config.audio_model,
             baseUrl=config.base_url,
+            voiceMode=config.voice_mode,
         )
 
     def _require_ark(self) -> Any:
@@ -281,7 +290,12 @@ class AssistantService:
         path, audio_format = self._audio_path(command.file_id)
         audio_base64 = base64.b64encode(path.read_bytes()).decode()
         try:
-            return cast(str, ark.transcribe(audio_base64, audio_format))
+            text = cast(str, ark.transcribe(audio_base64, audio_format)).strip()
+            if not text:
+                raise AudioNotRecognizedError
+            return text
+        except ArkAudioNotRecognizedError as error:
+            raise AudioNotRecognizedError from error
         except ArkUnavailableError as error:
             raise AssistantUnavailableError from error
 

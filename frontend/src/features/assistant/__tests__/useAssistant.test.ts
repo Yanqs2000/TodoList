@@ -113,7 +113,7 @@ function detailWithFailedTurn(turnId: string): AssistantConversationDetail {
 function fakeApi(): TodoApi {
   return {
     getAssistantSettings: vi.fn().mockResolvedValue({
-      hasApiKey: true, chatModel: 'chat', audioModel: 'audio', baseUrl: '',
+      hasApiKey: true, chatModel: 'chat', audioModel: 'audio', baseUrl: '', voiceMode: 'transcribe',
     }),
     listAssistantConversations: vi.fn().mockResolvedValue([summary]),
     getAssistantConversation: vi.fn().mockResolvedValue(detail),
