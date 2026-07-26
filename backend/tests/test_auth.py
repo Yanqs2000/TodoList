@@ -30,6 +30,26 @@ def test_settings_load_environment_and_force_loopback(monkeypatch: pytest.Monkey
         settings.port = 8000  # type: ignore[misc]
 
 
+def test_settings_enable_parent_stdin_watch(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("TODO_DATABASE_PATH", "/tmp/todo.sqlite3")
+    monkeypatch.setenv("TODO_BACKEND_PORT", "43123")
+    monkeypatch.setenv("TODO_BACKEND_TOKEN", "secret-token")
+    monkeypatch.setenv("TODO_PARENT_STDIN_WATCH", "1")
+
+    assert Settings.from_env().watch_parent_stdin is True
+
+
+def test_settings_leave_parent_stdin_watch_disabled_by_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("TODO_DATABASE_PATH", "/tmp/todo.sqlite3")
+    monkeypatch.setenv("TODO_BACKEND_PORT", "43123")
+    monkeypatch.setenv("TODO_BACKEND_TOKEN", "secret-token")
+    monkeypatch.delenv("TODO_PARENT_STDIN_WATCH", raising=False)
+
+    assert Settings.from_env().watch_parent_stdin is False
+
+
 @pytest.mark.parametrize("authorization", [None, "", "Basic secret-token", "Bearer wrong-token"])
 def test_require_token_rejects_missing_or_wrong_bearer_token(
     authorization: str | None,

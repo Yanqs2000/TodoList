@@ -3,6 +3,7 @@ use std::{
     future::Future,
     net::{Ipv4Addr, TcpListener},
     path::PathBuf,
+    process::Command as StdCommand,
     time::Duration,
 };
 
@@ -22,6 +23,9 @@ use tokio::{
 const MAX_START_ATTEMPTS: usize = 3;
 const STARTUP_TIMEOUT: Duration = Duration::from_secs(10);
 const HEALTH_POLL_INTERVAL: Duration = Duration::from_millis(100);
+const PROCESS_CLEANUP_TIMEOUT: Duration = Duration::from_secs(2);
+const PROCESS_KILL_TIMEOUT: Duration = Duration::from_secs(1);
+const PROCESS_CLEANUP_POLL_INTERVAL: Duration = Duration::from_millis(50);
 const SHORTCUT_ROLLBACK_FAILED: &str = "SHORTCUT_ROLLBACK_FAILED";
 const SHORTCUT_CLEANUP_FAILED: &str = "SHORTCUT_CLEANUP_FAILED";
 
@@ -298,6 +302,7 @@ impl BackendSupervisor {
             if self.inner.lock().await.shutting_down {
                 return Err(BackendError::NotRunning);
             }
+            terminate_stale_backends(&self.database_path).await?;
             let port = match reserve_loopback_port() {
                 Ok(port) => port,
                 Err(error) => {
@@ -316,6 +321,7 @@ impl BackendSupervisor {
             .env("TODO_DATABASE_PATH", &self.database_path)
             .env("TODO_BACKEND_PORT", port.to_string())
             .env("TODO_BACKEND_TOKEN", &connection.token)
+            .env("TODO_PARENT_STDIN_WATCH", "1")
             .env(
                 "TODO_BACKEND_ALLOW_VITE_ORIGIN",
                 if cfg!(debug_assertions) { "1" } else { "0" },
@@ -567,6 +573,161 @@ fn stop_child(inner: &mut SupervisorInner) {
     }
     inner.connection = None;
     inner.lifecycle.mark_stopped();
+}
+
+fn matching_backend_pids(
+    process_inventory: &str,
+    database_path: &std::path::Path,
+    current_pid: u32,
+) -> Vec<u32> {
+    let database_marker = format!("TODO_DATABASE_PATH={}", database_path.display());
+    process_inventory
+        .lines()
+        .filter_map(|line| {
+            let trimmed = line.trim_start();
+            let pid_end = trimmed.find(char::is_whitespace)?;
+            let pid = trimmed[..pid_end].parse::<u32>().ok()?;
+            if pid == current_pid {
+                return None;
+            }
+            let marker_start = line.find(&database_marker)?;
+            let marker_end = marker_start + database_marker.len();
+            let marker_remainder = &line[marker_end..];
+            if !marker_remainder.is_empty() && !marker_remainder.starts_with(char::is_whitespace) {
+                return None;
+            }
+            let command = &line[..marker_start];
+            (command.contains("/todo-backend") || command.contains("todo_backend.sidecar"))
+                .then_some(pid)
+        })
+        .collect()
+}
+
+#[cfg(target_os = "macos")]
+fn stale_backend_pids(database_path: &std::path::Path) -> Result<Vec<u32>, BackendError> {
+    let output = StdCommand::new("/bin/ps")
+        .args(["ewwx", "-o", "pid=,ppid=,command="])
+        .output()
+        .map_err(|error| BackendError::Sidecar(format!("failed to inspect processes: {error}")))?;
+    if !output.status.success() {
+        return Err(BackendError::Sidecar(format!(
+            "failed to inspect processes: /bin/ps exited with {}",
+            output.status
+        )));
+    }
+    let inventory = String::from_utf8_lossy(&output.stdout);
+    matching_backend_pids(&inventory, database_path, std::process::id())
+        .into_iter()
+        .filter_map(|pid| match process_is_todo_backend(pid) {
+            Ok(true) => Some(Ok(pid)),
+            Ok(false) => None,
+            Err(error) => Some(Err(error)),
+        })
+        .collect()
+}
+
+#[cfg(not(target_os = "macos"))]
+fn stale_backend_pids(_database_path: &std::path::Path) -> Result<Vec<u32>, BackendError> {
+    Ok(Vec::new())
+}
+
+#[cfg(target_os = "macos")]
+fn process_field(pid: u32, field: &str) -> Result<Option<String>, BackendError> {
+    let output = StdCommand::new("/bin/ps")
+        .args(["-ww", "-p", &pid.to_string(), "-o", field])
+        .output()
+        .map_err(|error| {
+            BackendError::Sidecar(format!("failed to verify stale backend {pid}: {error}"))
+        })?;
+    if !output.status.success() {
+        return Ok(None);
+    }
+    Ok(Some(
+        String::from_utf8_lossy(&output.stdout).trim().to_owned(),
+    ))
+}
+
+#[cfg(target_os = "macos")]
+fn process_is_todo_backend(pid: u32) -> Result<bool, BackendError> {
+    let Some(executable) = process_field(pid, "comm=")? else {
+        return Ok(false);
+    };
+    let command = process_field(pid, "command=")?.unwrap_or_default();
+    Ok(is_todo_backend_identity(&executable, &command))
+}
+
+fn is_todo_backend_identity(executable: &str, command: &str) -> bool {
+    let executable_name = std::path::Path::new(executable)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or_default();
+    let packaged_sidecar = executable_name == "todo-backend"
+        || executable_name
+            .strip_prefix("todo-backend-")
+            .is_some_and(|target| target.ends_with("-apple-darwin"));
+    packaged_sidecar
+        || (executable_name.contains("python")
+            && (command.contains("-m todo_backend.sidecar")
+                || command.contains("todo_backend/sidecar.py")))
+}
+
+#[cfg(target_os = "macos")]
+fn signal_matching_backend(
+    database_path: &std::path::Path,
+    pid: u32,
+    signal: i32,
+) -> Result<(), BackendError> {
+    if !stale_backend_pids(database_path)?.contains(&pid) {
+        return Ok(());
+    }
+    let result = unsafe { libc::kill(pid as i32, signal) };
+    if result == 0 {
+        return Ok(());
+    }
+    let error = std::io::Error::last_os_error();
+    if error.raw_os_error() == Some(libc::ESRCH) {
+        Ok(())
+    } else {
+        Err(BackendError::Sidecar(format!(
+            "failed to signal stale backend {pid}: {error}"
+        )))
+    }
+}
+
+#[cfg(target_os = "macos")]
+async fn wait_for_stale_backends(
+    database_path: &std::path::Path,
+    timeout: Duration,
+) -> Result<Vec<u32>, BackendError> {
+    let deadline = Instant::now() + timeout;
+    loop {
+        let remaining = stale_backend_pids(database_path)?;
+        if remaining.is_empty() || Instant::now() >= deadline {
+            return Ok(remaining);
+        }
+        tokio::time::sleep(PROCESS_CLEANUP_POLL_INTERVAL).await;
+    }
+}
+
+async fn terminate_stale_backends(database_path: &std::path::Path) -> Result<(), BackendError> {
+    #[cfg(target_os = "macos")]
+    {
+        let stale = stale_backend_pids(database_path)?;
+        for pid in stale {
+            signal_matching_backend(database_path, pid, libc::SIGTERM)?;
+        }
+        let remaining = wait_for_stale_backends(database_path, PROCESS_CLEANUP_TIMEOUT).await?;
+        for pid in remaining {
+            signal_matching_backend(database_path, pid, libc::SIGKILL)?;
+        }
+        let remaining = wait_for_stale_backends(database_path, PROCESS_KILL_TIMEOUT).await?;
+        if !remaining.is_empty() {
+            return Err(BackendError::Sidecar(format!(
+                "stale backends did not exit: {remaining:?}"
+            )));
+        }
+    }
+    Ok(())
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -830,6 +991,44 @@ mod tests {
         atomic::{AtomicUsize, Ordering},
         Arc,
     };
+
+    #[test]
+    fn stale_process_inventory_only_selects_todo_backends_for_the_same_database() {
+        let database_path =
+            PathBuf::from("/Users/test/Library/Application Support/com.todo/todo.sqlite3");
+        let process_inventory = "\
+101 1 /Applications/Todo List.app/Contents/MacOS/todo-backend TODO_DATABASE_PATH=/Users/test/Library/Application Support/com.todo/todo.sqlite3 TODO_BACKEND_PORT=40001
+102 101 /Applications/Todo List.app/Contents/MacOS/todo-backend TODO_DATABASE_PATH=/Users/test/Library/Application Support/com.todo/todo.sqlite3 TODO_BACKEND_PORT=40001
+103 1 /tmp/todo-backend TODO_DATABASE_PATH=/tmp/debug/todo.sqlite3 TODO_BACKEND_PORT=40002
+104 1 /bin/zsh -c echo todo-backend TODO_DATABASE_PATH=/Users/test/Library/Application Support/com.todo/todo.sqlite3
+105 1 python -m todo_backend.sidecar TODO_DATABASE_PATH=/Users/test/Library/Application Support/com.todo/todo.sqlite3 TODO_BACKEND_PORT=40003
+900 1 /Applications/Todo List.app/Contents/MacOS/todo-backend TODO_DATABASE_PATH=/Users/test/Library/Application Support/com.todo/todo.sqlite3";
+
+        assert_eq!(
+            matching_backend_pids(process_inventory, &database_path, 900),
+            vec![101, 102, 105]
+        );
+    }
+
+    #[test]
+    fn executable_identity_rejects_shells_and_similarly_named_tools() {
+        assert!(is_todo_backend_identity(
+            "/Applications/Todo List.app/Contents/MacOS/todo-backend",
+            "/Applications/Todo List.app/Contents/MacOS/todo-backend"
+        ));
+        assert!(is_todo_backend_identity(
+            "/opt/homebrew/bin/python3.12",
+            "python -m todo_backend.sidecar"
+        ));
+        assert!(!is_todo_backend_identity(
+            "/bin/zsh",
+            "/bin/zsh -c /tmp/todo-backend"
+        ));
+        assert!(!is_todo_backend_identity(
+            "/tmp/todo-backend-debugger",
+            "/tmp/todo-backend-debugger"
+        ));
+    }
 
     #[test]
     fn token_has_256_bits_of_hex_entropy() {
