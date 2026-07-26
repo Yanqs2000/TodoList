@@ -777,9 +777,37 @@
   cursor: not-allowed;
 }
 
-/* 语音模式下右侧切换按钮容器 — 只放一个切换回文字的按钮 */
-.assistant-composer__buttons--voice {
-  grid-template-columns: 36px;
+/* 文字/语音模式切换按钮（左侧，类微信风格） */
+.assistant-composer__mode-toggle {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card-bg);
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all var(--transition);
+}
+
+.assistant-composer__mode-toggle:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--active-bg);
+}
+
+.assistant-composer__mode-toggle:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.assistant-composer__mode-toggle:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 /* ---------- 设置面板（对齐 SettingsModal 的表单样式） ---------- */

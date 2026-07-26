@@ -7,6 +7,28 @@ const ACCEPT = '.jpg,.jpeg,.png,.webp,.pdf,.docx,.txt,.md,.mp3,.wav,.m4a';
 
 type InputMode = 'text' | 'voice';
 
+/* WeChat-style mic icon (outline) */
+const MicIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"
+    width="20" height="20" aria-hidden="true">
+    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+    <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+    <line x1="12" y1="19" x2="12" y2="23"/>
+    <line x1="8" y1="23" x2="16" y2="23"/>
+  </svg>
+);
+
+/* WeChat-style keyboard icon (outline grid) */
+const KeyboardIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"
+    width="20" height="20" aria-hidden="true">
+    <rect x="2" y="4" width="20" height="16" rx="2"/>
+    <path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M6 16h12"/>
+  </svg>
+);
+
 interface ComposerProps {
   sending: boolean;
   voiceMode: VoiceMode;
@@ -98,7 +120,6 @@ function Composer({ sending, voiceMode, onSend, onError, uploadFile, transcribe 
     })();
   };
 
-  // Cancel if pointer leaves the button while recording
   const handleVoiceLeave = () => {
     if (recording) cancelRecording();
   };
@@ -140,6 +161,13 @@ function Composer({ sending, voiceMode, onSend, onError, uploadFile, transcribe 
         ))}
         <div className="assistant-composer__row">
           <button
+            className={`assistant-composer__mode-toggle${inputMode === 'voice' ? ' assistant-composer__mode-toggle--active' : ''}`}
+            onClick={() => setInputMode('text')}
+            disabled={sending || voiceProcessing}
+            title={t('assistant.textInput')}
+            aria-label={t('assistant.textInput')}
+          ><KeyboardIcon /></button>
+          <button
             ref={voiceButtonRef}
             className={`assistant-composer__voice-btn${recording ? ' assistant-composer__voice-btn--recording' : ''}${voiceProcessing ? ' assistant-composer__voice-btn--processing' : ''}`}
             disabled={sending || voiceProcessing}
@@ -157,15 +185,6 @@ function Composer({ sending, voiceMode, onSend, onError, uploadFile, transcribe 
                 : t('assistant.holdToRecord')
             }
           </button>
-          <div className="assistant-composer__buttons assistant-composer__buttons--voice">
-            <button
-              className="assistant-composer__tool"
-              onClick={() => setInputMode('text')}
-              disabled={sending || voiceProcessing}
-              title={t('assistant.textInput')}
-              aria-label={t('assistant.textInput')}
-            >⌨</button>
-          </div>
         </div>
       </div>
     );
@@ -205,6 +224,13 @@ function Composer({ sending, voiceMode, onSend, onError, uploadFile, transcribe 
         </div>
       )}
       <div className="assistant-composer__row">
+        <button
+          className="assistant-composer__mode-toggle"
+          onClick={() => setInputMode('voice')}
+          disabled={sending}
+          title={t('assistant.voiceInput')}
+          aria-label={t('assistant.voiceInput')}
+        ><MicIcon /></button>
         <textarea
           value={text}
           onChange={event => setText(event.target.value)}
@@ -238,13 +264,6 @@ function Composer({ sending, voiceMode, onSend, onError, uploadFile, transcribe 
             title={recording ? t('assistant.stopRecording') : t('assistant.record')}
             aria-label={recording ? t('assistant.stopRecording') : t('assistant.record')}
           >{recording ? '⏹' : '🎙'}</button>
-          <button
-            className="assistant-composer__tool"
-            onClick={() => setInputMode('voice')}
-            disabled={sending}
-            title={t('assistant.voiceInput')}
-            aria-label={t('assistant.voiceInput')}
-          >🎤</button>
           <button
             className="assistant-composer__send"
             onClick={() => void handleTextSend()}
