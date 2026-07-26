@@ -10,6 +10,8 @@ from pathlib import Path
 import httpx
 import pytest
 
+PACKAGED_SIDECAR_STARTUP_TIMEOUT = 30
+
 
 def _free_port() -> int:
     with socket.socket() as listener:
@@ -45,7 +47,7 @@ def test_packaged_sidecar_starts_and_stops(tmp_path: Path) -> None:
     )
 
     try:
-        deadline = time.monotonic() + 10
+        deadline = time.monotonic() + PACKAGED_SIDECAR_STARTUP_TIMEOUT
         last_error = "sidecar did not accept a connection"
         while time.monotonic() < deadline:
             if process.poll() is not None:
@@ -114,7 +116,7 @@ def test_packaged_sidecar_allows_only_one_process_per_database(tmp_path: Path) -
     )
 
     try:
-        deadline = time.monotonic() + 10
+        deadline = time.monotonic() + PACKAGED_SIDECAR_STARTUP_TIMEOUT
         while time.monotonic() < deadline:
             if first.poll() is not None:
                 output = first.stdout.read() if first.stdout is not None else ""
@@ -133,7 +135,7 @@ def test_packaged_sidecar_allows_only_one_process_per_database(tmp_path: Path) -
             env=second_environment,
             capture_output=True,
             text=True,
-            timeout=10,
+            timeout=PACKAGED_SIDECAR_STARTUP_TIMEOUT,
             check=False,
         )
 
@@ -153,7 +155,7 @@ def test_packaged_sidecar_exits_after_its_parent_process_is_gone(tmp_path: Path)
     binary = Path(binary_value)
     database_path = tmp_path / "todo.sqlite3"
     pid_path = tmp_path / "sidecar.pid"
-    parent_script = """
+    parent_script = f"""
 import os
 import subprocess
 import sys
@@ -172,7 +174,7 @@ child = subprocess.Popen(
     start_new_session=True,
 )
 Path(pid_path).write_text(str(child.pid), encoding="utf-8")
-deadline = time.monotonic() + 10
+deadline = time.monotonic() + {PACKAGED_SIDECAR_STARTUP_TIMEOUT}
 while time.monotonic() < deadline and not Path(database_path).exists():
     if child.poll() is not None:
         raise SystemExit("sidecar exited before initialization")
@@ -189,7 +191,7 @@ while time.monotonic() < deadline and not Path(database_path).exists():
     parent = subprocess.run(  # noqa: S603
         [sys.executable, "-c", parent_script, str(binary), str(database_path), str(pid_path)],
         env=environment,
-        timeout=15,
+        timeout=PACKAGED_SIDECAR_STARTUP_TIMEOUT + 5,
         check=False,
     )
     assert parent.returncode == 0

@@ -21,7 +21,7 @@ use tokio::{
 };
 
 const MAX_START_ATTEMPTS: usize = 3;
-const STARTUP_TIMEOUT: Duration = Duration::from_secs(10);
+const STARTUP_TIMEOUT: Duration = Duration::from_secs(30);
 const HEALTH_POLL_INTERVAL: Duration = Duration::from_millis(100);
 const PROCESS_CLEANUP_TIMEOUT: Duration = Duration::from_secs(2);
 const PROCESS_KILL_TIMEOUT: Duration = Duration::from_secs(1);
@@ -1087,6 +1087,17 @@ mod tests {
             Some(Duration::from_secs(1))
         );
         assert_eq!(budget.remaining(started + Duration::from_secs(10)), None);
+    }
+
+    #[test]
+    fn packaged_sidecar_startup_budget_keeps_headroom_after_cold_start() {
+        let started = Instant::now();
+        let budget = StartupBudget::new(started, STARTUP_TIMEOUT);
+
+        assert_eq!(
+            budget.remaining(started + Duration::from_secs(15)),
+            Some(Duration::from_secs(15))
+        );
     }
 
     #[test]
