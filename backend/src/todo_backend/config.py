@@ -12,6 +12,7 @@ class Settings:
     port: int
     token: str
     allow_vite_dev_origin: bool = False
+    watch_parent_stdin: bool = False
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -28,6 +29,7 @@ class Settings:
             parsed_port,
             token,
             allow_vite_dev_origin=os.environ.get("TODO_BACKEND_ALLOW_VITE_ORIGIN") == "1",
+            watch_parent_stdin=os.environ.get("TODO_PARENT_STDIN_WATCH") == "1",
         )
 
 

@@ -9,10 +9,11 @@ TodoList 是一个无需账号的本地桌面待办应用。React 负责交互�
 | 前端 | React 19、TypeScript 5.8、Vite 7、Plain CSS | UI、筛选搜索、视觉效果、提醒扫描 |
 | 后端 | Python 3.12、FastAPI、Pydantic、标准库 `sqlite3` | 校验、CRUD、成就事务、提醒 claim、设置 |
 | 桌面 | Tauri 2、Rust | sidecar 监督、托盘、快捷键、自启动、打包 |
-| 数据 | SQLite WAL | 本机单文件持久化和迁移 |
+| 数据 | SQLite WAL + 独立 LangGraph checkpoint SQLite | 业务数据迁移、对话/提议审计和工作流恢复 |
 | 测试 | Vitest、Testing Library、pytest、Rust tests | 前端、API、数据库和进程监督验证 |
+| AI | 火山引擎方舟（OpenAI 兼容）、openai SDK、LangGraph | 多模态规划、目标解析、批次提议和可恢复确认 |
 
-Python 环境由 `uv` 管理。后端通过 PyInstaller 打成 Tauri external binary，用户无需单独安装 Python。
+Python 环境由 `uv` 管理。后端通过 PyInstaller 打成 Tauri external binary，用户无需单独安装 Python。AI 助手通过 `openai` Python SDK 调用火山方舟 chat completions API（支持 Agent Plan 和 Token Plan 两种 Base URL），并使用两个职责分离的 LangGraph 工作流：`AssistantTurnWorkflow` 以稳定 `turnId` 规划、解析目标并持久化 `proposalBatches`；`ProposalApplyWorkflow` 负责批次审核的 interrupt/resume、确认、拒绝、逐项应用和结果核验。业务记录保存在 `todo.sqlite3`，两个工作流的 checkpoint 保存在同目录下独立的 `assistant_graph.sqlite3`。创建/更新批次可在卡片中编辑后一次确认；每项独立事务允许部分成功，失败项保持 pending 以便修正后重试。旧版单提议 accept/reject 路由只为单项批次保留兼容。
 
 当前稳定版本为 **v1.0.0**。该版本首次把 Python/SQLite 后端作为正式桌面发行架构，并提供可持久化的中英文界面切换。
 
@@ -34,8 +35,11 @@ SQLite 保存：
 - 界面语言、主题、静音和全局快捷键
 - 成就状态与已解锁徽章
 - 已 claim 的提醒时间
+- AI 助手会话、消息、提议和模型配置（API Key 打码存储）
 
-React 只保留当前筛选、搜索、弹窗、pending 控件和动画计时等临时 UI 状态。生产代码没有 `localStorage` 持久化，也没有账号或云同步。
+AI 助手的 turn、批次和提议状态属于 `todo.sqlite3` 中的业务事实；`assistant_graph.sqlite3` 只保存 LangGraph 的可恢复执行 checkpoint。删除会话时由后端先删除业务记录，再按精确的 `turn:{turnId}` / `proposal:{batchId}` thread ID 清理 checkpoint，并清理该会话的上传文件。
+
+React 只保留当前筛选、搜索、弹窗、pending 控件和动画计时等临时 UI 状态。生产代码没有 `localStorage` 持久化，也没有账号或云同步。AI 助手的 API Key 仅存于本机 SQLite，不回传、不写日志。
 
 ## 目录
 

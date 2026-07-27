@@ -85,14 +85,19 @@
 
 .app-header__language-btn {
   min-width: 36px;
-  height: 32px;
+  height: 36px;
   padding: 0 8px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--card-bg);
   color: var(--text);
   font: 600 0.75rem/1 inherit;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition);
+  flex-shrink: 0;
 }
 
 .app-header__language-btn:hover:not(:disabled) {

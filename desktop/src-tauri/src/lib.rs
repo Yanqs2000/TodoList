@@ -11,6 +11,15 @@ use tauri::{
 };
 use tauri_plugin_global_shortcut::ShortcutState;
 
+fn backend_database_path(app_data_dir: &std::path::Path, debug: bool) -> std::path::PathBuf {
+    let data_dir = if debug {
+        app_data_dir.join("debug")
+    } else {
+        app_data_dir.to_owned()
+    };
+    data_dir.join("todo.sqlite3")
+}
+
 fn show_main_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
@@ -86,8 +95,11 @@ pub fn run() {
             }
 
             let app_data_dir = app.path().app_data_dir()?;
-            std::fs::create_dir_all(&app_data_dir)?;
-            app.manage(BackendSupervisor::new(app_data_dir.join("todo.sqlite3")));
+            let database_path = backend_database_path(&app_data_dir, cfg!(debug_assertions));
+            if let Some(data_dir) = database_path.parent() {
+                std::fs::create_dir_all(data_dir)?;
+            }
+            app.manage(BackendSupervisor::new(database_path));
             app.manage(ShortcutRegistration::new());
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
@@ -149,4 +161,24 @@ pub fn run() {
                 tauri::async_runtime::block_on(app.state::<BackendSupervisor>().shutdown());
             }
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn debug_backend_uses_an_isolated_data_directory() {
+        let app_data_dir = Path::new("/tmp/todo-app");
+
+        assert_eq!(
+            backend_database_path(app_data_dir, false),
+            app_data_dir.join("todo.sqlite3")
+        );
+        assert_eq!(
+            backend_database_path(app_data_dir, true),
+            app_data_dir.join("debug").join("todo.sqlite3")
+        );
+    }
 }

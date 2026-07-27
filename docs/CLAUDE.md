@@ -19,6 +19,19 @@
 - [Python SQLite 后端设计](architecture/2026-07-12-python-sqlite-backend-design.md)
 - [Python SQLite 后端实施计划](architecture/2026-07-12-python-sqlite-backend-implementation-plan.md)
 
+## AI 助手
+
+- [2026-07-25 Agent 智能修复](development-logs/2026-07-25-agent-intelligence-fixes.md) — **code review 8 缺陷修复** + 分类推断、chat 意图、确认词识别、对话式追问、记忆系统增强、前端交互优化
+- [2026-07-25 v1.3.0 Agent 记忆系统与 SSE 实时流式传输](development-logs/v1.3.0-agent-memory-sse.md) — **v1.2→v1.3**：跨轮记忆修复、SSE 流式传输、前端交互优化、prompt 能力清单修正
+- [2026-07-22 Agent 回复超时修复日志](development-logs/2026-07-22-agent-reply-timeout.md) — thinking 超时根因、修复决策、回归与包内真实请求证据
+- [2026-07-23 Agent 架构演进](development-logs/2026-07-23-agent-architecture-evolution.md) — **v1.1→v1.2**：analyze 思考层 + reflect 自检层 + 拆除正则、增强 repair 上下文
+- [2026-07-23 Agent 架构 v2 实施计划](development-logs/2026-07-23-agent-architecture-v2-plan.md) — 分阶段实施：analyze→repair→reflect→跨轮记忆
+- [LangGraph agent redesign 设计](superpowers/specs/2026-07-22-langgraph-agent-redesign-design.md) — v1.0/v1.1 原始设计基线，不代表当前 v1.2 架构
+- [LangGraph agent redesign 实施计划](superpowers/plans/2026-07-22-langgraph-agent-redesign.md) — 当前实施计划
+- [LangGraph redesign 验证交接](superpowers/plans/2026-07-22-langgraph-agent-redesign-test-handoff.md) — Tasks 4–13 延期测试的环境决策、分阶段命令和风险清单
+- [AI 助手原始设计基线](superpowers/specs/2026-07-20-ai-assistant-design.md) — 2026-07-20 原始实现基线，不代表当前 LangGraph 架构
+- [AI 助手原始实施基线](superpowers/plans/2026-07-20-ai-assistant.md) — 2026-07-20 原始实施基线，不作为当前执行计划
+
 ## 历史与归档
 
 - [v1.0.0 发布日志](development-logs/v1.0.0-python-sqlite-desktop.md) — Python/FastAPI + SQLite 桌面架构正式发布

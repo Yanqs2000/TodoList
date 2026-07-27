@@ -51,7 +51,7 @@ class TaskRepository:
                 command.notes,
             ),
         )
-        return self._get(connection, task_id)
+        return self.get(connection, task_id)
 
     def update(
         self,
@@ -83,7 +83,7 @@ class TaskRepository:
                 f"UPDATE tasks SET {', '.join(assignments)} WHERE id = ?",
                 values,
             )
-        return self._get(connection, task_id)
+        return self.get(connection, task_id)
 
     def delete(self, connection: sqlite3.Connection, task_id: str) -> None:
         row = connection.execute(
@@ -104,14 +104,14 @@ class TaskRepository:
         task_id: str,
         completed: bool,
     ) -> tuple[Task, bool]:
-        task = self._get(connection, task_id)
+        task = self.get(connection, task_id)
         records_progress = not task.completed and completed
         if task.completed != completed:
             connection.execute(
                 "UPDATE tasks SET completed = ? WHERE id = ?",
                 (completed, task_id),
             )
-            task = self._get(connection, task_id)
+            task = self.get(connection, task_id)
         return task, records_progress
 
     def replace_order(
@@ -134,7 +134,7 @@ class TaskRepository:
         )
         return self.list_all(connection)
 
-    def _get(self, connection: sqlite3.Connection, task_id: str) -> Task:
+    def get(self, connection: sqlite3.Connection, task_id: str) -> Task:
         row = connection.execute(
             """
             SELECT id, text, completed, priority, created_at,

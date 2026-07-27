@@ -1,13 +1,16 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import type { TimeField, Category, Priority } from '@/shared/types';
+import type { TimeField, Category, Priority, Todo } from '@/shared/types';
 import {
   ApiError,
   InfrastructureError,
   type BootstrapSnapshot,
+  type ProposalApplyItemResult,
   type TodoApi,
 } from '@/shared/api/contracts';
 import { DAILY_GOAL } from '@/shared/constants';
 import { useTodos } from '@/features/tasks/hooks/useTodos';
+import { useAssistant } from '@/features/assistant/hooks/useAssistant';
+import AssistantDrawer from '@/features/assistant/components/AssistantDrawer';
 import { useTheme } from '@/features/theme/hooks/useTheme';
 import { useSound } from '@/features/sound/hooks/useSound';
 import { useAchievements } from '@/features/achievements/hooks/useAchievements';
@@ -49,12 +52,31 @@ interface TodoApplicationContentProps extends TodoApplicationProps {
   languagePending: boolean;
 }
 
+interface ExternalTaskList {
+  upsertExternalTask: (task: Todo) => void;
+  removeExternalTask: (id: string) => void;
+}
+
+export function applyProposalItemToTaskList(
+  result: ProposalApplyItemResult,
+  taskList: ExternalTaskList,
+): void {
+  if (result.proposal.action === 'delete') {
+    if (result.proposal.targetTaskId) {
+      taskList.removeExternalTask(result.proposal.targetTaskId);
+    }
+  } else if (result.task) {
+    taskList.upsertExternalTask(result.task);
+  }
+}
+
 function TodoApplicationContent({ snapshot, api, onInfrastructureError, language, setLanguage, languagePending }: TodoApplicationContentProps) {
   const { t, errorText } = useI18n();
   const todoState = useTodos(snapshot.tasks, api, onInfrastructureError);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [summaryOpen, setSummaryOpen] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [infoToast, setInfoToast] = useState<InfoToastState | null>(null);
   const infoTimerRef = useRef<number | null>(null);
@@ -80,6 +102,13 @@ function TodoApplicationContent({ snapshot, api, onInfrastructureError, language
       'Unexpected backend error',
     ));
   }, [errorText, onInfrastructureError, showInfo]);
+
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const assistant = useAssistant(api, handleApplicationError);
+
+  const handleApplyProposal = useCallback((result: ProposalApplyItemResult) => {
+    applyProposalItemToTaskList(result, todoState);
+  }, [todoState]);
 
   const { theme, setTheme } = useTheme(
     snapshot.settings.theme,
@@ -171,7 +200,8 @@ function TodoApplicationContent({ snapshot, api, onInfrastructureError, language
   }, [todoState, sound, selectedTaskId]);
 
   const handleSelectTask = useCallback((id: string | null) => {
-    setSelectedTaskId(id);
+    setSelectedTaskId(prev => prev === id ? null : id);
+    if (id) setSummaryOpen(true);
   }, []);
 
   const handleAddTask = useCallback(async (text: string, time?: TimeField, category?: Category, priority?: Priority, notes?: string): Promise<boolean> => {
@@ -192,7 +222,7 @@ function TodoApplicationContent({ snapshot, api, onInfrastructureError, language
   ));
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell${summaryOpen || selectedTaskId ? ' app-shell--summary-open' : ''}${assistantOpen ? ' app-shell--assistant-open' : ''}`}>
       <AchievementDrawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
@@ -247,6 +277,9 @@ function TodoApplicationContent({ snapshot, api, onInfrastructureError, language
           onOpenAchievements={() => setDrawerOpen(true)}
           onOpenCreateModal={() => setCreateModalOpen(true)}
           onOpenSettings={() => setSettingsOpen(true)}
+          onOpenAssistant={() => setAssistantOpen(v => !v)}
+          onToggleSummary={() => setSummaryOpen(v => !v)}
+          summaryOpen={summaryOpen}
           muted={sound.muted}
           onToggleMuted={sound.toggleMuted}
           onToggleLanguage={() => void setLanguage(language === 'zh-CN' ? 'en' : 'zh-CN')}
@@ -304,13 +337,24 @@ function TodoApplicationContent({ snapshot, api, onInfrastructureError, language
           onDelete={handleDelete}
           pendingMutations={selectedTask ? todoState.pending.taskMutations.get(selectedTask.id) : undefined}
           deleteBlocked={todoState.pending.reorder}
-          onClose={() => setSelectedTaskId(null)}
+          onClose={() => { setSelectedTaskId(null); setSummaryOpen(false); }}
           stats={todoState.stats}
           todayCompleted={achievements.achievements.todayCompleted}
           dailyGoal={DAILY_GOAL}
           streakDays={achievements.achievements.streakDays}
         />
       </aside>
+
+      <div className="app-shell__assistant">
+        <AssistantDrawer
+          open={assistantOpen}
+          onClose={() => setAssistantOpen(false)}
+          assistant={assistant}
+          api={api}
+          onApplyProposal={handleApplyProposal}
+          onError={handleApplicationError}
+        />
+      </div>
     </div>
   );
 }

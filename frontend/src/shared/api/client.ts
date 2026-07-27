@@ -2,9 +2,15 @@ import {
   ApiError,
   InfrastructureError,
   type AppSettings,
+  type AssistantAttachment,
+  type AssistantConversationDetail,
+  type AssistantConversationSummary,
+  type AssistantSettingsView,
+  type AssistantTurn,
   type BackendConnection,
   type BootstrapSnapshot,
   type CompletionResult,
+  type ProposalBatchResolveResult,
   type TodoApi,
 } from './contracts';
 import type { Todo } from '@/shared/types';
@@ -40,6 +46,10 @@ const INFRASTRUCTURE_CODES = new Set([
   'UNAUTHORIZED',
 ]);
 
+const FEATURE_SERVICE_CODES = new Set([
+  'ASSISTANT_UNAVAILABLE',
+]);
+
 function isErrorEnvelope(value: unknown): value is ErrorEnvelope {
   if (typeof value !== 'object' || value === null || !('error' in value)) return false;
   const error = value.error;
@@ -60,7 +70,10 @@ async function responseError(response: Response): Promise<ApiError> {
   }
   const code = isErrorEnvelope(payload) ? payload.error.code : 'REQUEST_FAILED';
   const message = isErrorEnvelope(payload) ? payload.error.message : 'Request failed';
-  if (response.status >= 500 || INFRASTRUCTURE_CODES.has(code)) {
+  if (
+    !FEATURE_SERVICE_CODES.has(code)
+    && (response.status >= 500 || INFRASTRUCTURE_CODES.has(code))
+  ) {
     return new InfrastructureError('infrastructure', code, message, response.status);
   }
   return new ApiError('business', code, message, response.status);
@@ -88,19 +101,30 @@ export function createTodoApi(
     path: string,
     method: string,
     body?: unknown,
+    timeoutMs: number = REQUEST_TIMEOUT_MS,
+    rawBody?: BodyInit,
+    headers?: Record<string, string>,
   ): Promise<T> {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
+      const requestHeaders: Record<string, string> = {
+        Authorization: `Bearer ${connection.token}`,
+        ...(headers ?? {}),
+      };
+      if (rawBody === undefined) {
+        requestHeaders['Content-Type'] = 'application/json';
+      }
       let response: Response;
       try {
         response = await fetcher(`${baseUrl}${path}`, {
           method,
-          headers: {
-            Authorization: `Bearer ${connection.token}`,
-            'Content-Type': 'application/json',
-          },
-          body: body === undefined ? undefined : JSON.stringify(body),
+          headers: requestHeaders,
+          body: rawBody !== undefined
+            ? rawBody
+            : body === undefined
+              ? undefined
+              : JSON.stringify(body),
           signal: controller.signal,
         });
       } catch {
@@ -164,5 +188,102 @@ export function createTodoApi(
     updateSettings: async input => (
       await request<SettingsEnvelope>('/api/v1/settings', 'PATCH', input)
     ).settings,
+    listAssistantConversations: async () => (
+      await request<{ conversations: AssistantConversationSummary[] }>(
+        '/api/v1/assistant/conversations', 'GET',
+      )
+    ).conversations,
+    createAssistantConversation: () => request<AssistantConversationSummary>(
+      '/api/v1/assistant/conversations', 'POST', {},
+    ),
+    getAssistantConversation: id => request<AssistantConversationDetail>(
+      `/api/v1/assistant/conversations/${encodeURIComponent(id)}`, 'GET',
+    ),
+    deleteAssistantConversation: id => request<void>(
+      `/api/v1/assistant/conversations/${encodeURIComponent(id)}`, 'DELETE',
+    ),
+    sendAssistantMessage: (id, input) => request<AssistantTurn>(
+      `/api/v1/assistant/conversations/${encodeURIComponent(id)}/messages`, 'POST', input, 120_000,
+    ),
+    sendAssistantMessageStream: async (id, input, onEvent, onError, onDone, signal) => {
+      const controller = new AbortController();
+      if (signal) signal.addEventListener('abort', () => controller.abort());
+      try {
+        const response = await fetcher(
+          `${baseUrl}/api/v1/assistant/conversations/${encodeURIComponent(id)}/messages/stream`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${connection.token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(input),
+            signal: controller.signal,
+          },
+        );
+        if (!response.ok) {
+          throw await responseError(response);
+        }
+        const reader = response.body?.getReader();
+        if (!reader) { onDone(); return; }
+        const decoder = new TextDecoder();
+        let buffer = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const parts = buffer.split('\n\n');
+          buffer = parts.pop() || '';
+          for (const part of parts) {
+            const lines = part.split('\n');
+            let eventType = '';
+            let eventData = '';
+            for (const line of lines) {
+              if (line.startsWith('event: ')) eventType = line.slice(7);
+              else if (line.startsWith('data: ')) eventData = line.slice(6);
+            }
+            if (eventType && eventData) {
+              try {
+                onEvent(eventType, JSON.parse(eventData));
+              } catch { /* skip malformed */ }
+              if (eventType === 'done' || eventType === 'error') {
+                onDone();
+                return;
+              }
+            }
+          }
+        }
+        onDone();
+      } catch (e: unknown) {
+        if (!controller.signal.aborted) onError(e);
+        onDone();
+      }
+    },
+    uploadAssistantFile: async file => {
+      const form = new FormData();
+      form.append('file', file, file.name);
+      return request<AssistantAttachment>(
+        '/api/v1/assistant/uploads', 'POST', undefined, 60_000, form,
+      );
+    },
+    transcribeAssistantAudio: async fileId => (
+      await request<{ text: string }>('/api/v1/assistant/transcribe', 'POST', { fileId })
+    ).text,
+    confirmAssistantProposalBatch: (id, input) => request<ProposalBatchResolveResult>(
+      `/api/v1/assistant/proposal-batches/${encodeURIComponent(id)}/confirm`,
+      'POST',
+      input,
+    ),
+    rejectAssistantProposalBatch: id => request<ProposalBatchResolveResult>(
+      `/api/v1/assistant/proposal-batches/${encodeURIComponent(id)}/reject`,
+      'POST',
+      {},
+    ),
+    getAssistantSettings: () => request<AssistantSettingsView>(
+      '/api/v1/assistant/settings', 'GET',
+    ),
+    updateAssistantSettings: input => request<AssistantSettingsView>(
+      '/api/v1/assistant/settings', 'PUT', input,
+    ),
   };
 }

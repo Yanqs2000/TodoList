@@ -74,6 +74,125 @@ export interface SettingsPatch {
   language?: Language;
 }
 
+export type AssistantAttachmentKind = 'image' | 'document' | 'audio';
+
+export interface AssistantAttachment {
+  fileId: string;
+  kind: AssistantAttachmentKind;
+  name: string;
+  mime: string;
+  extractedText?: string | null;
+}
+
+export interface AssistantConversationSummary {
+  id: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface AssistantMessage {
+  id: string;
+  turnId: string | null;
+  role: 'user' | 'assistant';
+  content: string;
+  attachments: AssistantAttachment[];
+  status: 'pending' | 'done' | 'failed';
+  createdAt: number;
+}
+
+export interface ProposalCardFields {
+  text: string;
+  priority: Priority;
+  category: Category;
+  time_start: string | null;
+  time_end: string | null;
+  notes: string | null;
+}
+
+export type ProposalStatus = 'pending' | 'accepted' | 'rejected' | 'superseded';
+export type ProposalBatchStatus =
+  | 'pending' | 'partially_applied' | 'accepted' | 'rejected' | 'superseded';
+
+export interface AssistantProposal {
+  id: string;
+  messageId: string;
+  batchId: string;
+  action: 'create' | 'update' | 'delete';
+  targetTaskId: string | null;
+  beforeSnapshot: Todo | null;
+  payload: ProposalCardFields | null;
+  resultTaskId: string | null;
+  status: ProposalStatus;
+  lastError: string | null;
+  createdAt: number;
+}
+
+export interface AssistantProposalBatch {
+  id: string;
+  messageId: string;
+  status: ProposalBatchStatus;
+  supersedesBatchId: string | null;
+  proposals: AssistantProposal[];
+  createdAt: number;
+  resolvedAt: number | null;
+}
+
+export interface ConfirmProposalItemInput {
+  proposalId: string;
+  payload: ProposalCardFields | null;
+}
+
+export interface ConfirmProposalBatchInput {
+  items: ConfirmProposalItemInput[];
+}
+
+export interface ProposalApplyItemResult {
+  proposal: AssistantProposal;
+  task: Todo | null;
+  error: string | null;
+}
+
+export interface ProposalBatchResolveResult {
+  batch: AssistantProposalBatch;
+  items: ProposalApplyItemResult[];
+}
+
+export interface AssistantTurn {
+  message: AssistantMessage;
+  proposalBatches: AssistantProposalBatch[];
+}
+
+export interface AssistantConversationDetail {
+  conversation: AssistantConversationSummary;
+  messages: AssistantMessage[];
+  proposalBatches: AssistantProposalBatch[];
+}
+
+export type VoiceMode = 'direct' | 'transcribe';
+
+export interface AssistantSettingsView {
+  hasApiKey: boolean;
+  chatModel: string;
+  audioModel: string;
+  baseUrl: string;
+  voiceMode: VoiceMode;
+}
+
+export interface AssistantSettingsPatch {
+  apiKey?: string;
+  chatModel?: string;
+  audioModel?: string;
+  baseUrl?: string;
+  voiceMode?: VoiceMode;
+}
+
+export interface SendAssistantMessageInput {
+  turnId: string;
+  content: string;
+  attachments: AssistantAttachment[];
+}
+
 export interface TodoApi {
   bootstrap(preferredTheme: SystemTheme): Promise<BootstrapSnapshot>;
   createTask(input: CreateTaskInput): Promise<Todo>;
@@ -83,6 +202,28 @@ export interface TodoApi {
   setTaskCompletion(taskId: string, input: CompletionInput): Promise<CompletionResult>;
   claimReminder(input: ReminderClaimInput): Promise<boolean>;
   updateSettings(input: SettingsPatch): Promise<AppSettings>;
+  listAssistantConversations(): Promise<AssistantConversationSummary[]>;
+  createAssistantConversation(): Promise<AssistantConversationSummary>;
+  getAssistantConversation(id: string): Promise<AssistantConversationDetail>;
+  deleteAssistantConversation(id: string): Promise<void>;
+  sendAssistantMessage(id: string, input: SendAssistantMessageInput): Promise<AssistantTurn>;
+  sendAssistantMessageStream(
+    id: string,
+    input: SendAssistantMessageInput,
+    onEvent: (event: string, data: unknown) => void,
+    onError: (error: unknown) => void,
+    onDone: () => void,
+    signal?: AbortSignal,
+  ): Promise<void>;
+  uploadAssistantFile(file: File): Promise<AssistantAttachment>;
+  transcribeAssistantAudio(fileId: string): Promise<string>;
+  confirmAssistantProposalBatch(
+    id: string,
+    input: ConfirmProposalBatchInput,
+  ): Promise<ProposalBatchResolveResult>;
+  rejectAssistantProposalBatch(id: string): Promise<ProposalBatchResolveResult>;
+  getAssistantSettings(): Promise<AssistantSettingsView>;
+  updateAssistantSettings(input: AssistantSettingsPatch): Promise<AssistantSettingsView>;
 }
 
 export type ApiErrorKind = 'business' | 'infrastructure' | 'timeout' | 'network';
